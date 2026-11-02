@@ -1,0 +1,179 @@
+{
+  "_comment": "Reference clips and their counterfactual object variants. 'action' must refer to the object as 'the object' (it is substituted per variant). Files are resolved against --video-dir. Variant category is 'size' (same shape, different dimensions) or 'shape' (different geometry); dims are rough targets for the sim-side asset and for later checking reconstructed scale.",
+  "clips": {
+    "IMG_5689": {
+      "file": "IMG_5689.MOV",
+      "task": "single_object_pick_place",
+      "object": "a small white rounded plastic earbuds case",
+      "hand": "right",
+      "action": "reaches over the object, grasps it from above with the fingertips, lifts it, carries it to the right and sets it down, releases it, then grasps it again, carries it back to the left, sets it down near the center of the table and withdraws the arm",
+      "variants": [
+        {
+          "id": "case_large",
+          "category": "size",
+          "dims_cm": [
+            12,
+            9,
+            5
+          ],
+          "description": "a large white rounded plastic case about twice the size of an earbuds case",
+          "grasp_hint": "The hand opens much wider and grasps the large case from above with the whole palm and spread fingers.",
+          "name": "the large white case"
+        },
+        {
+          "id": "case_tiny",
+          "category": "size",
+          "dims_cm": [
+            3,
+            2,
+            1.5
+          ],
+          "description": "a tiny white rounded plastic case about half the size of an earbuds case",
+          "grasp_hint": "The hand pinches the tiny case from above between the thumb and the first two fingertips.",
+          "name": "the tiny white case"
+        },
+        {
+          "id": "red_cube",
+          "category": "shape",
+          "dims_cm": [
+            5,
+            5,
+            5
+          ],
+          "description": "a small red wooden cube with sharp edges, about 5 cm on each side",
+          "grasp_hint": "The thumb and fingers grip two opposite flat faces of the cube from above.",
+          "name": "the red cube"
+        },
+        {
+          "id": "mint_tin",
+          "category": "shape",
+          "dims_cm": [
+            7,
+            7,
+            4
+          ],
+          "description": "a short round silver metal tin of mints with a flat lid",
+          "grasp_hint": "The fingertips curve around the round rim of the tin from above.",
+          "name": "the round tin"
+        }
+      ],
+      "name": "the white case"
+    },
+    "IMG_5690": {
+      "file": "IMG_5690.MOV",
+      "task": "single_object_pick_place",
+      "object": "a green aluminum soda can",
+      "hand": "right",
+      "action": "reaches to the object on the left, wraps the fingers around its side, lifts it, carries it to the right and sets it down upright, releases it, then grasps it again from the side, moves it back toward the center of the table, sets it down upright and withdraws the arm",
+      "variants": [
+        {
+          "id": "tall_can",
+          "category": "size",
+          "dims_cm": [
+            6.6,
+            6.6,
+            17
+          ],
+          "description": "a tall slim blue aluminum energy-drink can, about one and a half times taller than a soda can",
+          "grasp_hint": "The hand wraps around the middle of the tall can, higher above the table than for a soda can.",
+          "name": "the tall blue can"
+        },
+        {
+          "id": "squat_can",
+          "category": "size",
+          "dims_cm": [
+            9,
+            9,
+            5
+          ],
+          "description": "a short wide silver aluminum food can, about half the height of a soda can and wider",
+          "grasp_hint": "The hand spreads wider and grips the short wide can around its rim with the fingertips.",
+          "name": "the short wide can"
+        },
+        {
+          "id": "water_bottle",
+          "category": "shape",
+          "dims_cm": [
+            6.5,
+            6.5,
+            21
+          ],
+          "description": "a clear plastic water bottle with a blue cap and a narrow neck",
+          "grasp_hint": "The fingers wrap around the body of the bottle below its neck.",
+          "name": "the water bottle"
+        },
+        {
+          "id": "juice_carton",
+          "category": "shape",
+          "dims_cm": [
+            6,
+            4,
+            10
+          ],
+          "description": "a small rectangular orange juice carton with flat sides",
+          "grasp_hint": "The thumb and fingers press on two opposite flat sides of the carton.",
+          "name": "the juice carton"
+        }
+      ],
+      "name": "the green can"
+    },
+    "IMG_5691": {
+      "file": "IMG_5691.MOV",
+      "task": "single_object_pick_place",
+      "object": "a small yellow cylindrical glue stick",
+      "hand": "right",
+      "action": "reaches to the object standing upright on the left, pinches it near the top, lifts it, carries it to the right and lays it down on its side, releases it, then pinches it again, stands it back upright, carries it back to the left, sets it down standing upright and withdraws the arm",
+      "variants": [
+        {
+          "id": "thick_stick",
+          "category": "size",
+          "dims_cm": [
+            4,
+            4,
+            12
+          ],
+          "description": "a thick yellow cylindrical glue stick, about twice as wide and taller",
+          "grasp_hint": "The hand uses a wider pinch with the thumb and three fingers around the thick stick.",
+          "name": "the thick glue stick"
+        },
+        {
+          "id": "aa_battery",
+          "category": "size",
+          "dims_cm": [
+            1.4,
+            1.4,
+            5
+          ],
+          "description": "a small yellow and black AA battery",
+          "grasp_hint": "The thumb and index fingertip precisely pinch the small battery.",
+          "name": "the battery"
+        },
+        {
+          "id": "hex_marker",
+          "category": "shape",
+          "dims_cm": [
+            1.8,
+            1.8,
+            13
+          ],
+          "description": "a long blue marker pen with a hexagonal barrel",
+          "grasp_hint": "The thumb and fingers pinch the long marker near its upper end.",
+          "name": "the marker"
+        },
+        {
+          "id": "wood_block",
+          "category": "shape",
+          "dims_cm": [
+            3,
+            3,
+            8
+          ],
+          "description": "a small rectangular yellow wooden block",
+          "grasp_hint": "The thumb and fingers pinch two opposite flat faces of the block.",
+          "name": "the wooden block"
+        }
+      ],
+      "name": "the glue stick"
+    }
+  }
+}

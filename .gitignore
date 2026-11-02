@@ -1,0 +1,9 @@
+__pycache__/
+*.pyc
+.venv/
+# Generated data lives under /data/sky/projects/CounterfactualHOI (see scripts/env.sh), never in the repo.
+outputs/
+*.mp4
+*.MOV
+*.mov
+*.part
