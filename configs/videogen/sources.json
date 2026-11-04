@@ -113,6 +113,19 @@
           "description": "a small rectangular orange juice carton with flat sides",
           "grasp_hint": "The thumb and fingers press on two opposite flat sides of the carton.",
           "name": "the juice carton"
+        },
+        {
+          "id": "diet_coke",
+          "category": "appearance",
+          "dims_cm": [
+            6.6,
+            6.6,
+            12.2
+          ],
+          "description": "a silver Diet Coke can with the red Diet Coke logo, exactly as shown in <Picture 1>, the same size and shape as the original can",
+          "grasp_hint": "The hand grasps the Diet Coke can exactly as it grasped the original can.",
+          "reference_image": "diet_coke_can.png",
+          "name": "the Diet Coke can"
         }
       ],
       "name": "the green can"

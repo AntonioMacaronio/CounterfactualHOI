@@ -3,7 +3,7 @@
   python -m videogen.generate --video-dir ../videos --clips IMG_5690 --variants tall_can \
       --modes identity object object_hand --seeds 0 1
 
-Outputs (default $VIDEOGEN_OUT/gen):
+Outputs (default $VIDEOGEN_GEN_DIR, i.e. ../outputs/minimax_h3 next to the repo):
   sources/<clip>.mp4                                normalized reference clip actually sent to H3
   <clip>/<mode>/<variant>/seed<k>.mp4               generated clip (mode=identity uses variant "identity")
   <clip>/<mode>/<variant>/seed<k>.prompt.txt        exact prompt
@@ -32,7 +32,14 @@ def parse_args(argv=None):
     p.add_argument("--config", type=Path, default=REPO_ROOT / "configs/videogen/sources.json")
     p.add_argument("--video-dir", type=Path, default=os.environ.get("REF_VIDEO_DIR"),
                    help="directory holding the raw reference clips (or set REF_VIDEO_DIR)")
-    p.add_argument("--out", type=Path, default=Path(os.environ.get("VIDEOGEN_OUT", "outputs/videogen")) / "gen")
+    p.add_argument("--image-dir", type=Path,
+                   default=os.environ.get("REF_IMAGE_DIR") or (
+                       Path(os.environ["PROJECT_STORAGE_ROOT"]) / "datasets/reference_images"
+                       if "PROJECT_STORAGE_ROOT" in os.environ else None),
+                   help="directory holding variants' appearance reference images (or set REF_IMAGE_DIR)")
+    p.add_argument("--out", type=Path,
+                   default=os.environ.get("VIDEOGEN_GEN_DIR")
+                   or Path(os.environ.get("VIDEOGEN_OUT", "outputs/videogen")) / "gen")
     p.add_argument("--clips", nargs="*", help="clip ids from the config (default: all)")
     p.add_argument("--variants", nargs="*", help="variant ids (default: all of each clip's variants)")
     p.add_argument("--modes", nargs="*", default=["object", "object_hand"], choices=MODES)
@@ -106,6 +113,11 @@ def main(argv=None):
         src, src_info = sources[clip_id]
 
         prompt = build_prompt(clip, mode, variant)
+        ref_images = []
+        if variant and variant.get("reference_image"):
+            if args.image_dir is None:
+                sys.exit(f"{vid} needs --image-dir (or REF_IMAGE_DIR)")
+            ref_images = [str(args.image_dir / variant["reference_image"])]
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"seed{seed}.prompt.txt").write_text(prompt)
         record = {
@@ -114,7 +126,7 @@ def main(argv=None):
             "dims_cm": variant.get("dims_cm") if variant else None,
             "seed": seed, "steps": args.steps,
             "prompt_sha1": hashlib.sha1(prompt.encode()).hexdigest(),
-            "source": str(src), "source_info": src_info, "output": str(out_mp4),
+            "source": str(src), "source_info": src_info, "reference_images": ref_images, "output": str(out_mp4),
             "num_gpus": args.num_gpus, "h3_revision": os.environ.get("H3_REVISION"),
             "started_at": time.strftime("%Y-%m-%dT%H:%M:%S"),
         }
@@ -124,6 +136,7 @@ def main(argv=None):
             video_id = client.submit_ref2va(
                 prompt, [str(src)], duration_seconds=min(src_info["duration"], prep.MAX_REF_SECONDS),
                 seed=seed, aspect_ratio=args.aspect_ratio, num_inference_steps=args.steps,
+                reference_images=ref_images,
             )
             print(f"{tag}: submitted {video_id}")
             job = client.wait(video_id)

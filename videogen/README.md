@@ -45,7 +45,8 @@ python -m videogen.generate --video-dir ../videos --clips IMG_5690 \
     --variants tall_can --modes identity object object_hand --seeds 0
 ```
 
-Outputs go to `$VIDEOGEN_OUT/gen/<clip>/<mode>/<variant>/seed<k>.mp4` with the prompt, a
+Outputs go to `$VIDEOGEN_GEN_DIR/<clip>/<mode>/<variant>/seed<k>.mp4` (default
+`../outputs/minimax_h3`, next to the repo — small enough for the root fs) with the prompt, a
 `_compare.mp4` (source | generated) for QA, and one line per attempt (failures included) in
 `manifest.jsonl` — `gpu_seconds` there is what feeds "GPU time per valid demonstration".
 

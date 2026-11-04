@@ -53,14 +53,21 @@ class H3Client:
         seed: int = 0,
         aspect_ratio: str = "auto",
         num_inference_steps: int | None = None,
+        reference_images: list[str] = (),
     ) -> str:
-        """Submit a video-to-video (Ref2VA) job. Reference paths must be readable by the server."""
+        """Submit a video-to-video (Ref2VA) job. Reference paths must be readable by the server.
+
+        In the prompt, videos are <Video 1..n> and images are <Picture 1..n>, numbered per type.
+        """
         body = {
             "task": "ref2va",
             "prompt": prompt,
             "conditions": [
                 {"type": "video", "uri": str(Path(p).resolve()), "role": "reference"}
                 for p in reference_videos
+            ] + [
+                {"type": "image", "uri": str(Path(p).resolve()), "role": "reference"}
+                for p in reference_images
             ],
             "target": {"short_edge": 768, "aspect_ratio": aspect_ratio, "duration_seconds": duration_seconds},
             "seed": seed,

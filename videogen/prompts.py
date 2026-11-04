@@ -50,6 +50,11 @@ def build_prompt(clip: dict, mode: str, variant: dict | None = None) -> str:
         f"<Subject 2> is {src_desc} on the table in <Video 1>.\n"
         "<Video 1> is the source video for the editing task."
     )
+    if variant and variant.get("reference_image"):
+        subjects += (
+            f"\n<Picture 1> is the appearance reference for {new_name}: its exact shape, colors, logo and "
+            "label must be reproduced; ignore the white background of <Picture 1>."
+        )
 
     if mode == "identity":
         summary = (

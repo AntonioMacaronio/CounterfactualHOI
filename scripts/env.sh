@@ -36,6 +36,9 @@ export H3_URL="${H3_URL:-http://127.0.0.1:$H3_PORT}"
 # Small tool env (ffmpeg/ffprobe + the videogen client)
 export TOOLS_ENV="$PROJECT_STORAGE_ROOT/venvs/tools"
 export VIDEOGEN_OUT="$PROJECT_STORAGE_ROOT/runs/videogen"
+# Generated videos + manifest. Deliberate exception to the /data rule: they're small (~8 MB per
+# clip incl. the compare video) and easier to browse next to the repo. Override per machine.
+export VIDEOGEN_GEN_DIR="${VIDEOGEN_GEN_DIR:-$(dirname "$PROJECT_ROOT")/outputs/minimax_h3}"
 
 mkdir -p "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$WANDB_DIR" \
          "$PROJECT_STORAGE_ROOT/models" "$PROJECT_STORAGE_ROOT/venvs" \
