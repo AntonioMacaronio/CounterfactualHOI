@@ -187,6 +187,100 @@
         }
       ],
       "name": "the glue stick"
+    },
+    "IMG_5703": {
+      "file": "IMG_5703.mov",
+      "task": "single_object_pick_place",
+      "object": "a small white rounded plastic earbuds case",
+      "name": "the white case",
+      "hand": "right",
+      "action": "reaches to the object, grasps it, brings it against the blue tape roll, slides the object together with the tape roll to the right across the table and releases it",
+      "prism_action": "pick it up, push it against the blue tape roll and slide them to the right with one hand",
+      "variants": [
+        {
+          "id": "case_large",
+          "category": "size",
+          "dims_cm": [
+            12,
+            9,
+            5
+          ],
+          "description": "a large white rounded plastic case about twice the size of an earbuds case",
+          "prism_cls": "a large white plastic case twice the size",
+          "name": "the large white case"
+        },
+        {
+          "id": "red_cube",
+          "category": "shape",
+          "dims_cm": [
+            5,
+            5,
+            5
+          ],
+          "description": "a small red wooden cube with sharp edges, about 5 cm on each side",
+          "prism_cls": "a small red wooden cube",
+          "name": "the red cube"
+        },
+        {
+          "id": "apple",
+          "category": "shape",
+          "dims_cm": [
+            8,
+            8,
+            7.5
+          ],
+          "description": "a red apple",
+          "prism_cls": "a red apple",
+          "name": "the apple"
+        }
+      ]
+    },
+    "IMG_5710": {
+      "file": "IMG_5710.MOV",
+      "task": "in_hand_manipulation",
+      "object": "a gray and white AirPods case",
+      "name": "the gray AirPods case",
+      "hand": "right",
+      "action": "reaches to the object, picks it up, spins it around in the palm with the fingers, sets it back down on the table and withdraws the arm",
+      "prism_action": "pick it up, spin it around in the palm with the fingers, and set it back down on the table",
+      "variants": [
+        {
+          "id": "apple",
+          "category": "shape",
+          "dims_cm": [
+            8,
+            8,
+            7.5
+          ],
+          "description": "a red apple",
+          "prism_cls": "a red apple",
+          "name": "the apple"
+        },
+        {
+          "id": "wood_block",
+          "category": "shape",
+          "dims_cm": [
+            6,
+            4,
+            4
+          ],
+          "description": "a wooden block",
+          "prism_cls": "a wooden block",
+          "name": "the wooden block"
+        },
+        {
+          "id": "lemon",
+          "category": "shape",
+          "dims_cm": [
+            6,
+            6,
+            8
+          ],
+          "description": "a lemon",
+          "prism_cls": "a lemon",
+          "name": "the lemon"
+        }
+      ]
     }
   }
 }

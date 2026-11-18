@@ -5,9 +5,20 @@ Modes (the proposal's main ablation, plus a fidelity control):
   object       swap the object only; the hand and arm motion must stay exactly as in the source
   object_hand  swap the object and let the grasp (finger pose / aperture) adapt to the new geometry,
                while keeping the arm trajectory, timing, pick and place locations
+  prism        text-only swap with the short template from the PRISM paper/project page (baseline)
 """
 
-MODES = ("identity", "object", "object_hand")
+MODES = ("identity", "object", "object_hand", "prism")
+
+# PRISM (Wang et al. 2026) project page:
+#   "<VIDEO> In a real-world continuous footage. Preserve the reference video's original background,
+#    lighting and camera viewpoint. replace the box with <CLS> , pick it up and carry with two hands."
+# H3 labels the reference video <Video 1>. Wording is kept verbatim apart from the object, the action and
+# "Replace" being capitalized (as in antzhang-notes/project.md; runs before 2026-11-04 used "replace").
+_PRISM_TEMPLATE = (
+    "<Video 1> In a real-world continuous footage. Preserve the reference video's original background, "
+    "lighting and camera viewpoint. Replace the {src} with {cls}, {action}."
+)
 
 _CAMERA = (
     "<Video 1> (source video editing): fully_preserved - the exact same static side-view camera, "
@@ -36,6 +47,13 @@ def build_prompt(clip: dict, mode: str, variant: dict | None = None) -> str:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     if mode != "identity" and variant is None:
         raise ValueError(f"mode {mode!r} needs a variant")
+    if mode == "prism":
+        # src: clip "name" without the article, e.g. "white case"; cls: the variant's short description.
+        src = clip.get("name", "the object").removeprefix("the ")
+        return _PRISM_TEMPLATE.format(
+            src=src, cls=variant.get("prism_cls", variant["description"]),
+            action=clip.get("prism_action", "pick it up and carry it"),
+        )
 
     hand = clip.get("hand", "right")
     src_desc, src_name = clip["object"], clip.get("name", "the object")

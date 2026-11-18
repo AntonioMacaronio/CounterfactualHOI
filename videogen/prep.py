@@ -6,6 +6,8 @@ from pathlib import Path
 
 # Ref2VA reference-video limits (MiniMax H3 docs): 2-15 s, 23.976-60 fps, MP4/MOV, H.264/H.265.
 MAX_REF_SECONDS = 15.0
+# iPhone "60 fps" clips are often 60.05 fps (just over the limit); H3 outputs 24 fps anyway.
+MAX_REF_FPS = 30
 
 
 def probe(path: Path) -> dict:
@@ -28,13 +30,18 @@ def probe(path: Path) -> dict:
 
 
 def normalize(src: Path, dst: Path) -> dict:
-    """iPhone HEVC .MOV -> H.264 MP4, no audio, same resolution/fps, trimmed to the Ref2VA max length."""
-    if not dst.exists():
+    """iPhone .MOV -> upright H.264 MP4, no audio, fps capped at MAX_REF_FPS, trimmed to the Ref2VA max length.
+
+    ffmpeg applies the rotation flag while decoding, so the output is upright with no rotation metadata.
+    Re-encodes if the source is newer than the cached copy (e.g. a clip re-recorded under the same name).
+    """
+    if not dst.exists() or src.stat().st_mtime > dst.stat().st_mtime:
         dst.parent.mkdir(parents=True, exist_ok=True)
         tmp = dst.with_name(dst.stem + ".part.mp4")
+        fps_filter = ["-vf", f"fps={MAX_REF_FPS}"] if probe(src)["fps"] > MAX_REF_FPS else []
         subprocess.run(
             ["ffmpeg", "-v", "error", "-y", "-i", str(src), "-t", str(MAX_REF_SECONDS), "-an",
-             "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
+             *fps_filter, "-c:v", "libx264", "-crf", "16", "-preset", "slow", "-pix_fmt", "yuv420p",
              "-movflags", "+faststart", str(tmp)],
             check=True,
         )
