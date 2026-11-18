@@ -22,6 +22,12 @@ export TRITON_CACHE_DIR="$PROJECT_STORAGE_ROOT/cache/triton"
 export WANDB_DIR="$PROJECT_STORAGE_ROOT/runs/wandb"
 export WANDB_CACHE_DIR="$SHARED_CACHE_ROOT/wandb"
 export CONDA_PKGS_DIRS="$SHARED_CACHE_ROOT/conda-pkgs"
+# Named conda envs (Do-as-I-Do's sam3/sam3d/hawor/tapnet) are created here, not in ~/miniconda3/envs,
+# so `conda activate sam3` in run_pipeline.sh still works by name.
+export CONDA_ENVS_PATH="$PROJECT_STORAGE_ROOT/conda_envs"
+export DAID_ROOT="$PROJECT_ROOT/third_party/do-as-i-do"
+export DAID_WEIGHTS="$PROJECT_STORAGE_ROOT/models/daid"
+export MANO_DIR="${MANO_DIR:-$(dirname "$PROJECT_ROOT")/mano_v1_2/models}"
 export FLASHINFER_WORKSPACE_BASE="$PROJECT_STORAGE_ROOT/cache"
 
 # MiniMax H3 (self-hosted Ref2VA via SGLang)
@@ -42,6 +48,6 @@ export VIDEOGEN_GEN_DIR="${VIDEOGEN_GEN_DIR:-$(dirname "$PROJECT_ROOT")/outputs/
 
 mkdir -p "$TMPDIR" "$TORCH_EXTENSIONS_DIR" "$TRITON_CACHE_DIR" "$WANDB_DIR" \
          "$PROJECT_STORAGE_ROOT/models" "$PROJECT_STORAGE_ROOT/venvs" \
-         "$PROJECT_STORAGE_ROOT/build" "$VIDEOGEN_OUT"
+         "$PROJECT_STORAGE_ROOT/build" "$VIDEOGEN_OUT" "$CONDA_ENVS_PATH" "$DAID_WEIGHTS"
 
 if [ -d "$TOOLS_ENV/bin" ]; then export PATH="$TOOLS_ENV/bin:$PATH"; fi
