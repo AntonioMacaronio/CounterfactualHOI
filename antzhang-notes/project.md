@@ -2,94 +2,63 @@
 We want to train a dexterous hand policy that intakes RGB and learns to pick up, in-hand manipulate, and then set down an object solely through video generation data.
 
 ## 1.0 Generated videos
-Here's how we are performing the data augmentation:
-1. We first film one video which will be our "reference_video"
-2. We augment the reference_video by using the text-only video-to-video (V2V) template from PRISM with Minimax H3.
-```
-<Video 1> In a real-world continuous footage. Preserve the reference video's original background, lighting and camera viewpoint. Replace the <OBJ> with <CLS>, <ACTION>.
-```
-- `<OBJ>`: the object in the reference_video (e.g. `white case`)
-- `<CLS>`: the replacement object, as text (e.g. `a red apple`)
-- `<ACTION>`: a short description of what the hand does in the reference_video
+We film a few real reference videos per task, then use MiniMax H3 (video-to-video) to make counterfactual versions of each one. Two kinds of edit, following Alvin's plan:
 
-#### IMG_5710.MOV: pick up, in-hand rotation, set down
+- **Type A (geometry):** same object, with one geometric change (shorter, narrower, larger). This exists to compare directly against sim augmentation, which changes the same properties inside the simulator. [`prompt_prp_type_a.md`](prompt_prp_type_a.md)
+- **Type B (object swap):** replace the object with a different rigid object from a fixed list of 10. This is the "as diverse as possible" condition. [`prompt_prp_type_b.md`](prompt_prp_type_b.md)
 
-Reference_video: the right hand picks up the gray AirPods case, spins it around in the palm with the
-fingers, and sets it back down. Seed 0; about 13 min per clip on 4x H200.
+My clips (filmed 11/19):
 
-| Object | Prompt | Result |
-|---|---|---|
-| red apple | `<Video 1> In a real-world continuous footage. Preserve the reference video's original background, lighting and camera viewpoint. Replace the gray AirPods case with a red apple, pick it up, spin it around in the palm with the fingers, and set it back down on the table.` | Apple swap and in-hand rotation look good, but the background (living room, towel) and the camera (zoomed in) changed |
-| wooden block | `<Video 1> In a real-world continuous footage. Preserve the reference video's original background, lighting and camera viewpoint. Replace the gray AirPods case with a wooden block, pick it up, spin it around in the palm with the fingers, and set it back down on the table.` | Best in-hand rotation (the block turns through several faces), but the background (black table) and the camera changed |
-| lemon | `<Video 1> In a real-world continuous footage. Preserve the reference video's original background, lighting and camera viewpoint. Replace the gray AirPods case with a lemon, pick it up, spin it around in the palm with the fingers, and set it back down on the table.` | Lemon rotation looks natural, but the background (kitchen) changed and the AirPods case stays in the scene as a second, enlarged object |
+| i | Object | pp | prp |
+|---|---|---|---|
+| 1 | small metal case | `pp_anthony_real_1` | `prp_anthony_real_1` |
+| 2 | blue tape roll | `pp_anthony_real_2` | `prp_anthony_real_2` |
+| 3 | black spatula | `pp_anthony_real_3` | `prp_anthony_real_3` |
+| 4 | gray mug | `pp_anthony_real_4` | `prp_anthony_real_4` |
+| 5 | dish soap bottle | `pp_anthony_real_5` | `prp_anthony_real_5` |
 
-Videos: `outputs/minimax_h3/IMG_5710/prism/<object>/seed0.mp4`, plus `seed0_compare.mp4` (source | generated).
+We will generate 5 counterfactual videos for every real video. This means we will have 10 * 5 counterfactual videos for a total of 50 videos.
 
-## 1.1 Begin HOI reconstruction on generated videos
-**Decision: we use Do-as-I-Do** (`third_party/do-as-i-do/reconstruction`). We also considered HOLD; see the
-comparison below for why we didn't pick it.
-
-We parametrize the hands with MANO and then visualize with viser the hand and object mesh. We reconstruct the object mesh with SAM3D because of its robustness and the fact that it's state of the art.
+## 1.1 Begin HOI reconstruction on real / generated videos
+We use **Open-CHOIR** ([hxwork/CHOIR](https://github.com/hxwork/CHOIR), SIGGRAPH Asia 2026 / TOG) for hand + object reconstruction. It replaces Do-as-I-Do, which we used first and now keep as the baseline.
 
 ### Goal / interface
-For each generated video that passes 1.0, produce a 4D hand-object trajectory that 1.2 and 1.3 can consume:
+For each real video, and each generated video that passes 1.0, produce a 4D hand-object trajectory that 1.2 can consume:
 
-- **In:** generated video (H3: 1344x768, 24 fps, 4-15 s) + `<CLS>` text from its prompt. `<CLS>` doubles as the object text prompt for segmentation, so no clicking is needed.
+- **In:** real or generated video (H3: 1344x768, 24 fps, 4-15 s) + `<CLS>` text from its prompt. `<CLS>` doubles as the object text prompt for segmentation (SAM3), which gives CHOIR its first-frame object mask, so no clicking is needed.
 - **Out (hand):** per-frame MANO (pose, shape, global wrist pose). Right hand only for now.
 - **Out (object):** one rigid mesh + per-frame 6-DoF pose, in the same camera/world frame as the hand.
-- **Out (scene):** camera intrinsics, gravity direction, metric scale. 1.3 needs the table plane and gravity.
-- **Out (QC):** per-clip validity metrics (see below), written back next to the 1.0 manifest.
+- **Out (scene):** camera intrinsics, gravity direction, metric scale. 1.2 needs the table plane (all videos are static camera, tabletop manipulation) and gravity.
 
-### Option comparison (decided: Do-as-I-Do)
+### Pipeline, status
+Old pipeline in [`choir.md`](choir.md).
 
-| | Do-as-I-Do (`third_party/do-as-i-do/reconstruction`) | HOLD (`zc-alexfan/hold`, CVPR'24) |
-|---|---|---|
-| Object geometry | SAM3D mesh from one reference frame (template, then tracked) | template-free: neural SDF optimized jointly with the hand |
-| Object pose | TAPIR velocity tracking + guided-diffusion pose tracking, then translation/scale optimization | HLoc SfM on object-only images, then hand-object alignment fitting |
-| Hand | HaWoR (MANO, world frame) | METRO (right hand only) or HaMeR, then MANO registration |
-| Metric scale | MoGe pointmaps + GeoCalib gravity | SfM is up to scale; scale comes from fitting to the hand |
-| Cost per clip | feed-forward stages plus optimization (TODO: measure) | per-video optimization (200 epochs by default), likely much slower |
-| Segmentation | SAM3: click GUI (needs an X display) or text prompt | SAM-Track click GUI |
-| Viewer | viser (`scripts/visualize_3d.py`) | aitviewer-based |
-| Downstream | output goes straight into DAID `retargeting/` (MuJoCo, Sharpa hand) | needs a converter to the retargeting input format |
-| Weak spots | single-frame mesh can be wrong on the hidden back side | SfM needs texture and many views: risky on plain objects (white case, lemon); in-hand rotation helps |
-| License | HaWoR CC BY-NC-ND, SAM License (research use OK) | MIT |
+How it works (one command per clip: scripts/fprecon/run_fprecon.sh VID GPU, about 5–8 min each):
+0. Masks and mesh: SAM3 (image model, text prompts such as "mug,cup") segments the object and hand on every frame,
+   replacing CHOIR's SAM2 tracks (those drifted: a "hand" on the whole table, a hand mask that swallowed the mug, an
+   object mask missing the camera's black panel). SAM3D then builds a textured mesh from frame 0 (CHOIR's copy of
+   SAM3D strips the texture and 95% of the triangles, which is why the earlier viewers looked bad).
+1. Depth: Depth Pro 2 gives metric depth for every frame, using CHOIR's camera focal length.
+2. Scale from the hand: I compare the MANO hand's depth with the depth map on the visible hand pixels. Depth Pro 2 was already close to metric: the correction factor is 0.95–1.16 across clips.
+3. Object: FoundationPose tracks the SAM3D mesh on that depth. It sizes the mesh by trying several sizes on the first frame, and re‑registers from the mask when a frame‑by‑frame check says the fit has slipped.
+4. Hand: each frame's hand is moved onto the depth map, so hand, object and table all share one metric depth.
 
-Why Do-as-I-Do: it's faster per clip, uses SAM3D for the object mesh, and plugs straight into the retargeting
-in 1.3, which matters at our target of 50+ clips per person. HOLD avoids an object template but needs a long
-optimization for every video, and its SfM step is risky on plain objects (white case, lemon).
-Known risk we accept: SAM3D builds the mesh from a single frame, so the hidden back side can be wrong. Check it in
-the viser views of the in-hand rotation clips.
+Results on the 10 real videos (first/last-frame object mask IoU, both methods scored on the SAM3 masks): 0.80–0.95
+vs CHOIR's 0.31–0.74; the object ends 0.4–2.5 cm from the table (CHOIR 3–20 cm); 0–1% of frames flagged by the
+per-frame check. Project website: `scripts/site/build_site.py` -> `outputs/site` (repo `CounterfactualHOI-site`).
 
-### Things specific to generated videos
-- **Reference frame for SAM3D:** use a frame before the grasp, where the object is on the table and unoccluded
-  (around frames 0-20 in IMG_5710 outputs).
-- **Camera and scene change per clip** (as seen in the IMG_5710 outputs), so estimate intrinsics, gravity and scale
-  per video and never reuse them from the reference_video.
-- **Object size is whatever H3 drew**, not the size in the prompt (the case_large run came out ~10x too big). Read
-  dimensions from the reconstruction, and flag clips that are wildly off.
-- **Leftover source object:** e.g. the lemon run still shows the AirPods case. Segment by `<CLS>` text and reject
-  clips with two candidate objects.
-- **Temporal consistency:** check that the object keeps one identity and shape for the whole clip.
 
-### Validity checks (feeds "fraction of attempted clips that yield demos")
-- reconstruction completes (all stages run, no lost tracking)
-- hand-object penetration depth below a threshold (mm, TBD)
-- no contact loss while the object is off the table (in-hand phase)
-- object reprojection IoU vs. the SAM3 masks, and pose jitter (frame-to-frame)
-- record GPU time per clip and add it to the 1.0 cost, giving GPU time per valid demo
+## 1.2 Retarget to robot morphology
+We will retarget to a Sharpa URDF using `do-as-i-do`'s retargeting pipeline.
 
-### TODO
-- [ ] Set up DAID recon: 4 conda envs (sam3, sam3d, hawor, tapnet) under `/data`, weights, HF access to
-      `facebook/sam3` + `facebook/sam-3d-objects`, MANO download; `git submodule update --init --recursive`
-- [ ] Sanity check on the **real** IMG_5710 first, then on the 3 generated IMG_5710 clips
-- [ ] Headless SAM3 with the `<CLS>` text prompt instead of the click GUI
-- [ ] Batch script: read the 1.0 `manifest.jsonl` → run recon per `ok` clip → write QC metrics back
-- [ ] Recon outputs go to `/data` (per-frame MoGe pointmaps are roughly 12 MB/frame, so a few GB per clip); only
-      viser screenshots and QC summaries go in `outputs/`
+- [x] `retargeting` env (`scripts/daid/setup.sh env retargeting`); inputs from a Do-as-I-Do run via
+  `scripts/retarget/prepare_daid_input.py`, run with `scripts/retarget/run_retarget.sh RAW_DIR TASK` (outputs under
+  `/data/.../runs/retarget`; replay with `third_party/do-as-i-do/retargeting/replay_viser.py --run-dir ...`)
+- [x] Test on IMG_5710_real (Do-as-I-Do recon): stages 1-4 (dataset, scene, IK) fine; stage 5 (MuJoCo Warp physics)
+  took 64 min and terminated early at sim step 1900/2567: the Sharpa hand never lifts the case (pushes it off its
+  pedestal at ~4.5 s), final object error 0.13 m. Pick-up + in-palm spin is a hard first test.
+- [ ] CHOIR -> retargeting adapter (CHOIR's MANO/object poses into `all_hand_meshes.npz` + layout + mesh), then retry
+  on a plain pick-and-place clip
 
-## 1.2 Physical refinement with VLM contact priors
+## 1.3 Train a policy
 
-## 1.3 Retarget to robot morphology
-
-## 1.4 Train depth-based or RGB-based policy
