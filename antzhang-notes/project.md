@@ -17,7 +17,18 @@ My clips (filmed 11/19):
 | 4 | gray mug | `pp_anthony_real_4` | `prp_anthony_real_4` |
 | 5 | dish soap bottle | `pp_anthony_real_5` | `prp_anthony_real_5` |
 
-We will generate 5 counterfactual videos for every real video. This means we will have 10 * 5 counterfactual videos for a total of 50 videos.
+Each real video gets 5 Type A and 5 Type B edits at seed 0, so 10 * 10 = 100 counterfactual videos (generated 11/21).
+Type A uses A01-A03 from the group doc plus two edits of our own: A04 taller (height 120%) and A05 smaller overall
+(all dimensions 80%). Type B splits the 10 objects into interleaved halves, {B01,B03,B05,B07,B09} and
+{B02,B04,B06,B08,B10}, alternating over pp_1..pp_5, prp_1..prp_5. So pp_i and prp_i get opposite halves (each source
+object meets all 10 targets), and each target is used 5 times. The group prompts are written for prp. The pp clips use
+the same text with the in-hand rotation steps replaced by a carry. Both versions are in `videogen/group_prompts.py`,
+and the clip list is `configs/videogen/real_20261119.json`.
+
+Results: all 100 succeeded first try, 1344x768 at 24 fps, 56.5 H200-hours in total (about 5 min per pp clip and
+12 min per prp clip on 4 H200s). They ran as 10 SkyPilot managed jobs on ll-smo (`scripts/sky/h3_videogen.yaml`).
+Videos, prompts and source|generated compare clips are in
+`s3://far-research-internal/antzhan/counterfactualhoi/videogen/real_20261119/<clip>/<type_a|type_b>/<ID>/seed0.mp4`.
 
 ## 1.1 Begin HOI reconstruction on real / generated videos
 We use **Open-CHOIR** ([hxwork/CHOIR](https://github.com/hxwork/CHOIR), SIGGRAPH Asia 2026 / TOG) for hand + object reconstruction. It replaces Do-as-I-Do, which we used first and now keep as the baseline.
