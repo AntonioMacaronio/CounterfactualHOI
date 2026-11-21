@@ -1,0 +1,485 @@
+{
+  "_comment": "Real clips filmed 2026-11-19 (antzhang-notes/project.md) and their 381V group-prompt edits (videogen/group_prompts.py): every clip gets Type A A01-A05 and five Type B objects. Type B halves are interleaved odd/even ids, alternating in the order pp_1..pp_5, prp_1..prp_5, so pp_i and prp_i get opposite halves (each source object meets all ten targets) and each target is used five times. 'file' is relative to --video-dir; 'object' is the source object as text (for segmentation later).",
+  "clips": {
+    "pp_anthony_real_1": {
+      "file": "pickplace/pp_anthony_real_1.MOV",
+      "task": "pick_place",
+      "object": "small metal case",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B01",
+          "mode": "type_b"
+        },
+        {
+          "id": "B03",
+          "mode": "type_b"
+        },
+        {
+          "id": "B05",
+          "mode": "type_b"
+        },
+        {
+          "id": "B07",
+          "mode": "type_b"
+        },
+        {
+          "id": "B09",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "pp_anthony_real_2": {
+      "file": "pickplace/pp_anthony_real_2.MOV",
+      "task": "pick_place",
+      "object": "blue tape roll",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B02",
+          "mode": "type_b"
+        },
+        {
+          "id": "B04",
+          "mode": "type_b"
+        },
+        {
+          "id": "B06",
+          "mode": "type_b"
+        },
+        {
+          "id": "B08",
+          "mode": "type_b"
+        },
+        {
+          "id": "B10",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "pp_anthony_real_3": {
+      "file": "pickplace/pp_anthony_real_3.MOV",
+      "task": "pick_place",
+      "object": "black spatula",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B01",
+          "mode": "type_b"
+        },
+        {
+          "id": "B03",
+          "mode": "type_b"
+        },
+        {
+          "id": "B05",
+          "mode": "type_b"
+        },
+        {
+          "id": "B07",
+          "mode": "type_b"
+        },
+        {
+          "id": "B09",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "pp_anthony_real_4": {
+      "file": "pickplace/pp_anthony_real_4.MOV",
+      "task": "pick_place",
+      "object": "gray mug",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B02",
+          "mode": "type_b"
+        },
+        {
+          "id": "B04",
+          "mode": "type_b"
+        },
+        {
+          "id": "B06",
+          "mode": "type_b"
+        },
+        {
+          "id": "B08",
+          "mode": "type_b"
+        },
+        {
+          "id": "B10",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "pp_anthony_real_5": {
+      "file": "pickplace/pp_anthony_real_5.MOV",
+      "task": "pick_place",
+      "object": "dish soap bottle",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B01",
+          "mode": "type_b"
+        },
+        {
+          "id": "B03",
+          "mode": "type_b"
+        },
+        {
+          "id": "B05",
+          "mode": "type_b"
+        },
+        {
+          "id": "B07",
+          "mode": "type_b"
+        },
+        {
+          "id": "B09",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "prp_anthony_real_1": {
+      "file": "pickrotateplace/prp_anthony_real_1.MOV",
+      "task": "pick_rotate_place",
+      "object": "small metal case",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B02",
+          "mode": "type_b"
+        },
+        {
+          "id": "B04",
+          "mode": "type_b"
+        },
+        {
+          "id": "B06",
+          "mode": "type_b"
+        },
+        {
+          "id": "B08",
+          "mode": "type_b"
+        },
+        {
+          "id": "B10",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "prp_anthony_real_2": {
+      "file": "pickrotateplace/prp_anthony_real_2.MOV",
+      "task": "pick_rotate_place",
+      "object": "blue tape roll",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B01",
+          "mode": "type_b"
+        },
+        {
+          "id": "B03",
+          "mode": "type_b"
+        },
+        {
+          "id": "B05",
+          "mode": "type_b"
+        },
+        {
+          "id": "B07",
+          "mode": "type_b"
+        },
+        {
+          "id": "B09",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "prp_anthony_real_3": {
+      "file": "pickrotateplace/prp_anthony_real_3.MOV",
+      "task": "pick_rotate_place",
+      "object": "black spatula",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B02",
+          "mode": "type_b"
+        },
+        {
+          "id": "B04",
+          "mode": "type_b"
+        },
+        {
+          "id": "B06",
+          "mode": "type_b"
+        },
+        {
+          "id": "B08",
+          "mode": "type_b"
+        },
+        {
+          "id": "B10",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "prp_anthony_real_4": {
+      "file": "pickrotateplace/prp_anthony_real_4.MOV",
+      "task": "pick_rotate_place",
+      "object": "gray mug",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B01",
+          "mode": "type_b"
+        },
+        {
+          "id": "B03",
+          "mode": "type_b"
+        },
+        {
+          "id": "B05",
+          "mode": "type_b"
+        },
+        {
+          "id": "B07",
+          "mode": "type_b"
+        },
+        {
+          "id": "B09",
+          "mode": "type_b"
+        }
+      ]
+    },
+    "prp_anthony_real_5": {
+      "file": "pickrotateplace/prp_anthony_real_5.MOV",
+      "task": "pick_rotate_place",
+      "object": "dish soap bottle",
+      "hand": "right",
+      "variants": [
+        {
+          "id": "A01",
+          "mode": "type_a"
+        },
+        {
+          "id": "A02",
+          "mode": "type_a"
+        },
+        {
+          "id": "A03",
+          "mode": "type_a"
+        },
+        {
+          "id": "A04",
+          "mode": "type_a"
+        },
+        {
+          "id": "A05",
+          "mode": "type_a"
+        },
+        {
+          "id": "B02",
+          "mode": "type_b"
+        },
+        {
+          "id": "B04",
+          "mode": "type_b"
+        },
+        {
+          "id": "B06",
+          "mode": "type_b"
+        },
+        {
+          "id": "B08",
+          "mode": "type_b"
+        },
+        {
+          "id": "B10",
+          "mode": "type_b"
+        }
+      ]
+    }
+  }
+}

@@ -6,9 +6,14 @@ Modes (the proposal's main ablation, plus a fidelity control):
   object_hand  swap the object and let the grasp (finger pose / aperture) adapt to the new geometry,
                while keeping the arm trajectory, timing, pick and place locations
   prism        text-only swap with the short template from the PRISM paper/project page (baseline)
+  type_a       381V group prompt, geometry edit of the same object (A01-A05); see group_prompts.py
+  type_b       381V group prompt, swap to one of ten rigid target objects (B01-B10); see group_prompts.py
 """
 
-MODES = ("identity", "object", "object_hand", "prism")
+from .group_prompts import build_group_prompt
+
+MODES = ("identity", "object", "object_hand", "prism", "type_a", "type_b")
+GROUP_MODES = ("type_a", "type_b")
 
 # PRISM (Wang et al. 2026) project page:
 #   "<VIDEO> In a real-world continuous footage. Preserve the reference video's original background,
@@ -47,6 +52,9 @@ def build_prompt(clip: dict, mode: str, variant: dict | None = None) -> str:
         raise ValueError(f"mode must be one of {MODES}, got {mode!r}")
     if mode != "identity" and variant is None:
         raise ValueError(f"mode {mode!r} needs a variant")
+    if mode in GROUP_MODES:
+        # variant["id"] is the edit/object id (A01..A05, B01..B10); clip["task"] picks the prp or pp template.
+        return build_group_prompt(clip["task"], mode, variant["id"])
     if mode == "prism":
         # src: clip "name" without the article, e.g. "white case"; cls: the variant's short description.
         src = clip.get("name", "the object").removeprefix("the ")

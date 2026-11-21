@@ -22,7 +22,8 @@ from pathlib import Path
 
 from . import prep
 from .h3_client import DEFAULT_URL, H3Client, H3Error
-from .prompts import MODES, build_prompt
+from .group_prompts import edit_info
+from .prompts import GROUP_MODES, MODES, build_prompt
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -40,6 +41,8 @@ def parse_args(argv=None):
     p.add_argument("--out", type=Path,
                    default=os.environ.get("VIDEOGEN_GEN_DIR")
                    or Path(os.environ.get("VIDEOGEN_OUT", "outputs/videogen")) / "gen")
+    p.add_argument("--manifest", type=Path, default=None,
+                   help="attempt log to append to (default: <out>/manifest.jsonl); give each parallel job its own")
     p.add_argument("--clips", nargs="*", help="clip ids from the config (default: all)")
     p.add_argument("--variants", nargs="*", help="variant ids (default: all of each clip's variants)")
     p.add_argument("--modes", nargs="*", default=["object", "object_hand"], choices=MODES)
@@ -65,6 +68,9 @@ def plan_jobs(cfg: dict, args) -> list[dict]:
         variants = [v for v in clip["variants"] if not args.variants or v["id"] in args.variants]
         for mode in args.modes:
             for variant in ([None] if mode == "identity" else variants):
+                # Variants tagged with a mode (the group's A/B edits) only pair with that mode.
+                if variant and variant.get("mode", mode) != mode:
+                    continue
                 for seed in args.seeds:
                     jobs.append({"clip_id": clip_id, "clip": clip, "mode": mode, "variant": variant, "seed": seed})
     return jobs
@@ -92,7 +98,8 @@ def main(argv=None):
         sys.exit(f"H3 server at {args.url} is not healthy; start it with scripts/serve_h3_ref2va.sh")
 
     args.out.mkdir(parents=True, exist_ok=True)
-    manifest = args.out / "manifest.jsonl"
+    manifest = args.manifest or args.out / "manifest.jsonl"
+    manifest.parent.mkdir(parents=True, exist_ok=True)
     sources = {}
     n_ok = n_fail = n_skip = 0
 
@@ -120,9 +127,12 @@ def main(argv=None):
             ref_images = [str(args.image_dir / variant["reference_image"])]
         out_dir.mkdir(parents=True, exist_ok=True)
         (out_dir / f"seed{seed}.prompt.txt").write_text(prompt)
+        category = None
+        if variant:
+            category = edit_info(mode, vid)[0] if mode in GROUP_MODES else variant.get("category")
         record = {
             "clip": clip_id, "task": clip.get("task"), "mode": mode, "variant": vid,
-            "category": variant["category"] if variant else None,
+            "category": category,
             "dims_cm": variant.get("dims_cm") if variant else None,
             "seed": seed, "steps": args.steps,
             "prompt_sha1": hashlib.sha1(prompt.encode()).hexdigest(),
