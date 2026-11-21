@@ -4,3 +4,6 @@
 [submodule "third_party/do-as-i-do"]
 	path = third_party/do-as-i-do
 	url = https://github.com/malik-group/do-as-i-do.git
+[submodule "third_party/CHOIR"]
+	path = third_party/CHOIR
+	url = https://github.com/hxwork/CHOIR.git

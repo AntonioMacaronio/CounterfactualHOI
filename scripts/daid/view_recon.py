@@ -166,9 +166,15 @@ def export_html(d, args, fps):
         serializer.insert_sleep(1.0 / fps)
     data = serializer.serialize()
     server.stop()
+    write_embed_html(args.export_html, data, saved_or_default_camera(d))
+    print(f"wrote {args.export_html} ({os.path.getsize(args.export_html) / 1e6:.1f} MB, "
+          f"recording {len(data) / 1e6:.1f} MB, {len(d['frames'])} frames @ {fps} fps, "
+          f"camera: {'saved' if os.path.exists(os.path.join(d['vd'], CAMERA_FILE)) else 'default'})")
 
+
+def write_embed_html(path, data, cam):
+    """Write viser's client with a serialized recording embedded and `cam` as the default start view."""
     client_html = open(os.path.join(os.path.dirname(viser.__file__), "client", "build", "index.html")).read()
-    cam = saved_or_default_camera(d)
     params = {"initialCameraPosition": ",".join(f"{x:.4f}" for x in cam["position"]),
               "initialCameraLookAt": ",".join(f"{x:.4f}" for x in cam["look_at"]),
               "initialCameraUp": ",".join(f"{x:.4f}" for x in cam["up"])}
@@ -186,11 +192,8 @@ def export_html(d, args, fps):
         "try{history.replaceState(null,'',location.pathname+'?'+q.toString()+location.hash);}catch(e){}}})();"
         "</script>"
     )
-    os.makedirs(os.path.dirname(os.path.abspath(args.export_html)), exist_ok=True)
-    open(args.export_html, "w").write(client_html.replace("</head>", inject + "</head>", 1))
-    print(f"wrote {args.export_html} ({os.path.getsize(args.export_html) / 1e6:.1f} MB, "
-          f"recording {len(data) / 1e6:.1f} MB, {len(d['frames'])} frames @ {fps} fps, "
-          f"camera: {'saved' if os.path.exists(os.path.join(d['vd'], CAMERA_FILE)) else 'default'})")
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    open(path, "w").write(client_html.replace("</head>", inject + "</head>", 1))
 
 
 def main():

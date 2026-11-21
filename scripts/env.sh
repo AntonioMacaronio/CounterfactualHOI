@@ -28,6 +28,9 @@ export CONDA_ENVS_PATH="$PROJECT_STORAGE_ROOT/conda_envs"
 export DAID_ROOT="$PROJECT_ROOT/third_party/do-as-i-do"
 export DAID_WEIGHTS="$PROJECT_STORAGE_ROOT/models/daid"
 export MANO_DIR="${MANO_DIR:-$(dirname "$PROJECT_ROOT")/mano_v1_2/models}"
+# Open-CHOIR runs from a working copy on /data (it writes assets/outputs into its own tree);
+# third_party/CHOIR only pins the version. See scripts/choir/setup.sh.
+export CHOIR_ROOT="$PROJECT_STORAGE_ROOT/build/CHOIR"
 export FLASHINFER_WORKSPACE_BASE="$PROJECT_STORAGE_ROOT/cache"
 
 # MiniMax H3 (self-hosted Ref2VA via SGLang)
