@@ -4,7 +4,7 @@
 # which write weights into the repo and pip-install into whatever env is active.
 #
 #   bash scripts/daid/setup.sh weights            # SAM3D, SAM3, HaWoR, BootsTAPIR, MANO links
-#   bash scripts/daid/setup.sh env sam3|tapnet|sam3d|hawor
+#   bash scripts/daid/setup.sh env sam3|tapnet|sam3d|hawor|retargeting
 #   bash scripts/daid/setup.sh check              # import smoke test for each env
 #
 # Envs: conda-forge python + ffmpeg + CUDA 12.8 compiler, then pip at the exact versions of the
@@ -139,8 +139,17 @@ env_hawor() {
   "$CONDA" env config vars set -p "$E" TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 >/dev/null
 }
 
+env_retargeting() {
+  # Do-as-I-Do retargeting (MuJoCo Warp + mink -> Sharpa hand). Pins from retargeting/env/retargeting.yml;
+  # torch 2.12.0 is PyPI's default CUDA 13 build (the node's 580 driver supports CUDA 13.0).
+  mkenv retargeting 3.12
+  $PIP install -q torch==2.12.0 numpy==2.4.6 coacd==1.0.11 mink==1.1.0 viser==1.0.30 \
+    warp-lang==1.10.1 mujoco==3.4.0
+  $PIP install -q -e "$DAID_ROOT/retargeting"
+}
+
 check() {
-  for name in sam3 tapnet sam3d hawor; do
+  for name in sam3 tapnet sam3d hawor retargeting; do
     E="$CONDA_ENVS_PATH/$name"
     [ -x "$E/bin/python" ] || { echo "$name: not built"; continue; }
     case $name in
@@ -148,6 +157,7 @@ check() {
       tapnet) mods="torch tapnet.torch.tapir_model mediapy" ;;
       sam3d)  mods="torch pytorch3d.renderer kaolin nvdiffrast.torch diff_gaussian_rasterization gsplat spconv.pytorch moge.model geocalib sam3d_objects viser" ;;
       hawor)  mods="torch pytorch3d droid_backends lietorch torch_scatter chumpy smplx pytorch_lightning" ;;
+      retargeting) mods="torch mujoco mujoco_warp warp mink coacd viser retargeting" ;;
     esac
     # SAM3D's entry points set LIDRA_SKIP_INIT before importing (sam3d_objects.init is Meta-internal).
     (cd "$R" && LIDRA_SKIP_INIT=true "$E/bin/python" - $mods <<'EOF'
@@ -166,7 +176,7 @@ EOF
 
 case "${1:-}" in
   weights) weights ;;
-  env) "env_${2:?env name: sam3|tapnet|sam3d|hawor}" ;;
+  env) "env_${2:?env name: sam3|tapnet|sam3d|hawor|retargeting}" ;;
   check) check ;;
   *) sed -n '2,12p' "$0"; exit 1 ;;
 esac
