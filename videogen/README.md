@@ -50,6 +50,31 @@ Outputs go to `$VIDEOGEN_GEN_DIR/<clip>/<mode>/<variant>/seed<k>.mp4` (default
 `_compare.mp4` (source | generated) for QA, and one line per attempt (failures included) in
 `manifest.jsonl` — `gpu_seconds` there is what feeds "GPU time per valid demonstration".
 
+## 381V group prompts (`type_a`, `type_b`)
+
+`type_a` (geometry edit, A01-A05) and `type_b` (swap to one of ten rigid objects, B01-B10) use the group's
+prompts from `antzhang-notes/prompt_prp_type_{a,b}.md`, implemented in `group_prompts.py`. The clip's `task` picks the
+template: `pick_rotate_place` uses the notes verbatim. `pick_place` uses the same text with the in-hand rotation steps
+replaced by a carry (applied as exact-match replacements, so an edit to the verbatim text fails loudly). Variants in
+the config carry a `mode`, so each A/B id only pairs with its own mode:
+
+```bash
+python -m videogen.generate --config configs/videogen/real_20261119.json --modes type_a type_b --dry-run   # 100 prompts
+```
+
+## Managed jobs on ll-smo H200s
+
+The shared dev node can't launch managed jobs, so launch them from the laptop. `scripts/sky/h3_videogen.yaml` runs
+one H3 server on an `H200:4` pod and generates `CLIPS`. Its header lists the S3 inputs: the dev node's environment
+tarball (restored at the same `/data` paths), the pinned weights, the reference clips and a code tarball. Outputs
+go to `s3://far-research-internal/antzhan/counterfactualhoi/videogen/$RUN_NAME/` every two minutes. A recovered or
+retried job pulls what is already there and only generates the missing clips.
+
+```bash
+eval "$(far-set-env-helper SKY 2>/dev/null)" && sky jobs launch scripts/sky/h3_videogen.yaml -y -d -n cfhoi-h3-pp-real1 \
+  --env CLIPS=pp_anthony_real_1 --env RUN_NAME=real_20261119 --env CODE_BUNDLE=s3://... --env CODE_SHA256=...
+```
+
 ## Known limits
 
 - Output is 768p-short-edge at 24 fps (sources are 720p/30 fps), 4–15 s; Ref2VA re-generates

@@ -1,0 +1,101 @@
+# SkyPilot managed job: MiniMax H3 Ref2VA video-to-video generation (videogen/) on one ll-smo H200 pod.
+# Launch from the laptop (the shared dev node cannot launch managed jobs), from the repo root:
+#
+#   eval "$(far-set-env-helper SKY 2>/dev/null)" && sky jobs launch scripts/sky/h3_videogen.yaml -y -d \
+#     -n cfhoi-h3-pp-real1 --env CLIPS=pp_anthony_real_1 --env RUN_NAME=real_20261119 \
+#     --env CODE_BUNDLE=s3://.../code/<bundle>.tar.gz --env CODE_SHA256=<sha256 of the bundle>
+#
+# Inputs, staged once on S3 from the dev node (paths below): the dev node's working environment as a tarball
+# (SGLang venv at H3_SGLANG_COMMIT, the ffmpeg tools env, uv's CPython; restored at the same absolute /data paths
+# so nothing is rebuilt), the Ref2VA weights at H3_REVISION, the real reference clips, and this repo as a tarball.
+# Outputs: $CFHOI_S3/videogen/$RUN_NAME/<clip>/<mode>/<variant>/seed<k>.mp4 (+ prompt, compare video), one
+# manifest per job under manifests/, and server/generate logs under logs/<clip>/. The run uploads every two
+# minutes, and a recovered job pulls what earlier attempts uploaded, so it only generates the missing clips.
+# Everything large lives under /data (the pod's root filesystem is small; filling it evicts the pod).
+name: cfhoi-h3-videogen
+
+resources:
+  infra: k8s/ll-smo
+  accelerators: H200:4  # scripts/serve_h3_ref2va.sh: Ulysses 4, ~94 GB per GPU
+  image_id: "docker:241533154612.dkr.ecr.us-east-1.amazonaws.com/skypilot-gpu:latest"
+  cpus: 32+
+  memory: 256+
+  job_recovery:
+    # Preemptions recover anyway; this also retries a failed setup or an incomplete run on a fresh pod.
+    max_restarts_on_errors: 2
+
+num_nodes: 1
+
+config:
+  kubernetes:
+    provision_timeout: 600
+
+envs:
+  AWS_DEFAULT_REGION: us-west-2
+  AWS_REGION: us-west-2
+  CFHOI_S3: s3://far-research-internal/antzhan/counterfactualhoi
+  ENV_TAR: s3://far-research-internal/antzhan/counterfactualhoi/env/h3-ref2va-sglang-2511743.tar
+  ENV_SHA256: a255bef94c8a3d6ed089db7045a825f6824e671bd87be9093f6141fffa7a9fb5
+  H3_REVISION: 42ed227ee7df40d41602854ae760620d6eb651fe
+  H3_WEIGHT_FILES: "250"
+  CODE_BUNDLE: ""  # required: s3:// URI of the repo tarball
+  CODE_SHA256: ""  # required: its sha256
+  CODE_DIR: ~/cfhoi/CounterfactualHOI
+  RUN_NAME: ""     # required: output prefix under $CFHOI_S3/videogen/
+  CLIPS: ""        # required: space-separated clip ids from CONFIG
+  CONFIG: configs/videogen/real_20261119.json
+  MODES: "type_a type_b"
+  SEEDS: "0"
+  NUM_GPUS: "4"    # match accelerators
+
+setup: |
+  set -euo pipefail
+  : "${CODE_BUNDLE:?}" "${CODE_SHA256:?}" "${RUN_NAME:?}" "${CLIPS:?}"
+  if ! command -v aws >/dev/null 2>&1; then
+    curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o /tmp/awscliv2.zip
+    rm -rf /tmp/aws && unzip -q /tmp/awscliv2.zip -d /tmp && sudo /tmp/aws/install
+    rm -rf /tmp/awscliv2.zip /tmp/aws
+  fi
+  # The pod's web identity reads/writes far-research-internal; keep AWS_PROFILE unset.
+  rm -rf ~/.aws/credentials
+  unset AWS_PROFILE
+  aws sts get-caller-identity
+  aws configure set default.s3.max_concurrent_requests 32
+  aws configure set default.s3.multipart_chunksize 64MB
+
+  sudo mkdir -p /data/sky && sudo chown "$(id -u):$(id -g)" /data/sky
+  avail_gb=$(df -BG --output=avail /data/sky | tail -1 | tr -dc 0-9)
+  echo "free under /data/sky: ${avail_gb} GB; /dev/shm: $(df -h --output=size /dev/shm | tail -1)"
+  (( avail_gb >= 250 )) || { echo "need >= 250 GB free under /data/sky (weights 135 GiB + env 11 GB)"; exit 1; }
+  P=/data/sky/projects/CounterfactualHOI
+  mkdir -p "$P"
+
+  # Environment: tar of the dev node's working venvs, restored at their original absolute paths.
+  aws s3 cp "$ENV_TAR" /data/sky/h3-env.tar --only-show-errors
+  echo "$ENV_SHA256  /data/sky/h3-env.tar" | sha256sum --check
+  tar -xf /data/sky/h3-env.tar -C /
+  rm -f /data/sky/h3-env.tar
+
+  # Ref2VA weights at the pinned revision.
+  aws s3 sync "$CFHOI_S3/models/MiniMax-H3/$H3_REVISION/" "$P/models/MiniMax-H3/" --only-show-errors
+  n=$(find "$P/models/MiniMax-H3" -type f | wc -l)
+  [[ "$n" == "$H3_WEIGHT_FILES" ]] || { echo "expected $H3_WEIGHT_FILES weight files, found $n"; exit 1; }
+
+  # Code.
+  CODE_DIR="${CODE_DIR/#\~/$HOME}"
+  rm -rf "$CODE_DIR" && mkdir -p "$CODE_DIR"
+  aws s3 cp "$CODE_BUNDLE" /data/sky/cfhoi-code.tar.gz --only-show-errors
+  echo "$CODE_SHA256  /data/sky/cfhoi-code.tar.gz" | sha256sum --check
+  tar -xzf /data/sky/cfhoi-code.tar.gz -C "$CODE_DIR"
+
+  # Reference clips.
+  aws s3 sync "$CFHOI_S3/inputs/realvideos/" "$P/datasets/realvideos/" --only-show-errors
+
+  "$P/venvs/sglang-h3/bin/python" -c "import sglang, torch; print('sglang', sglang.__version__, 'torch', torch.__version__, 'gpus', torch.cuda.device_count())"
+  "$P/venvs/tools/bin/ffprobe" -version | head -1
+  nvidia-smi --query-gpu=index,name,memory.total,driver_version --format=csv
+
+run: |
+  set -euo pipefail
+  CODE_DIR="${CODE_DIR/#\~/$HOME}"
+  bash "$CODE_DIR/scripts/sky/h3_videogen_run.sh"
