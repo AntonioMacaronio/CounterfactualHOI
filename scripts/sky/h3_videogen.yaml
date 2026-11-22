@@ -43,6 +43,8 @@ envs:
   CODE_DIR: ~/cfhoi/CounterfactualHOI
   RUN_NAME: ""     # required: output prefix under $CFHOI_S3/videogen/
   CLIPS: ""        # required: space-separated clip ids from CONFIG
+  VARIANTS: ""     # optional: only these variant ids (to split one clip over several jobs)
+  JOB_TAG: ""      # optional: manifest/log name (default: CLIPS joined with +); unique per job
   CONFIG: configs/videogen/real_20261119.json
   MODES: "type_a type_b"
   SEEDS: "0"

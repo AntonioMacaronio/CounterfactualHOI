@@ -13,7 +13,8 @@ export NUM_GPUS="${NUM_GPUS:-4}"
 export VIDEOGEN_GEN_DIR="$PROJECT_STORAGE_ROOT/runs/videogen/$RUN_NAME"
 OUT_S3="$CFHOI_S3/videogen/$RUN_NAME"
 VIDEO_DIR="$PROJECT_STORAGE_ROOT/datasets/realvideos"
-TAG="${CLIPS// /+}"
+# JOB_TAG names this job's manifest and logs; set it when several jobs split one clip's VARIANTS.
+TAG="${JOB_TAG:-${CLIPS// /+}}"
 LOG_DIR="$VIDEOGEN_GEN_DIR/logs/$TAG"
 MANIFEST="$VIDEOGEN_GEN_DIR/manifests/$TAG.jsonl"
 mkdir -p "$LOG_DIR" "$(dirname "$MANIFEST")"
@@ -22,6 +23,7 @@ read -r -a MODE_ARR <<< "${MODES:-type_a type_b}"
 read -r -a SEED_ARR <<< "${SEEDS:-0}"
 GEN_ARGS=(--config "$CONFIG" --video-dir "$VIDEO_DIR" --out "$VIDEOGEN_GEN_DIR" --manifest "$MANIFEST"
           --clips "${CLIP_ARR[@]}" --modes "${MODE_ARR[@]}" --seeds "${SEED_ARR[@]}" --num-gpus "$NUM_GPUS")
+if [[ -n "${VARIANTS:-}" ]]; then read -r -a VAR_ARR <<< "$VARIANTS"; GEN_ARGS+=(--variants "${VAR_ARR[@]}"); fi
 
 # Only this job's files: its clips, their normalized sources, its manifest and logs.
 SCOPE=(--exclude '*')
@@ -35,7 +37,7 @@ aws s3 sync "$OUT_S3/" "$VIDEOGEN_GEN_DIR/" --only-show-errors "${SCOPE[@]}"
 ATTEMPT="$(date -u +%Y%m%dT%H%M%SZ)"
 {
   echo "attempt $ATTEMPT on $(hostname), job ${SKYPILOT_TASK_ID:-?}"
-  echo "clips: $CLIPS; modes: ${MODE_ARR[*]}; seeds: ${SEED_ARR[*]}; config: $CONFIG"
+  echo "clips: $CLIPS; variants: ${VARIANTS:-all}; modes: ${MODE_ARR[*]}; seeds: ${SEED_ARR[*]}; config: $CONFIG"
   echo "code: $CODE_BUNDLE sha256 $CODE_SHA256"
   echo "env: $ENV_TAR sha256 $ENV_SHA256; H3 $H3_REVISION; SGLang $H3_SGLANG_COMMIT"
   nvidia-smi --query-gpu=index,name,memory.total --format=csv,noheader
