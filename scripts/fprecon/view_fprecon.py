@@ -5,7 +5,7 @@
 
 Same viewer as scripts/choir/view_choir.py (scene, grid, camera, GeoCalib up), fed from this pipeline: the object
 is RUN/object_mesh.obj (metric, SAM3D-textured; .ply vertex-colored for CHOIR's glb) moved by RUN/object_poses.npy; the hand is Dyn-HaMR's, moved
-per frame onto the depth map (hand_scale.corrected_hands); the scene points are the hand-scaled Depth Pro 2 depth
+per frame onto the depth map (hand_scale.corrected_hands), plus RUN/hand_rigid.npz when the refinement agent wrote one; the scene points are the hand-scaled Depth Pro 2 depth
 of frame 0, so hand, object and table share one metric depth and need no rescaling.
 """
 
@@ -59,6 +59,12 @@ def load_fprecon(args):
     poses = np.load(os.path.join(rd, "object_poses.npy"))
     mesh = trimesh.load(tracked_mesh(rd), force="mesh", process=False)
     hv, hf, hvalid, _ = corrected_hands(vd, rd)
+    rigid = os.path.join(rd, "hand_rigid.npz")         # refinement agent's per-frame rigid hand motion (scripts/refine)
+    if os.path.exists(rigid):
+        z = np.load(rigid)
+        for i in range(min(len(hv), len(z["hand_off"]))):
+            c = hv[i].mean(0)
+            hv[i] = (hv[i] - c) @ Rotation.from_rotvec(z["hand_rot"][i]).as_matrix().T + c + z["hand_off"][i]
     n = min(len(poses), len(hv))
     poses, hv, hvalid = poses[:n], hv[:n], hvalid[:n]
     ok = np.nonzero(hvalid)[0]
@@ -70,6 +76,10 @@ def load_fprecon(args):
     depth0 = np.load(os.path.join(rd, "depth_dp2.npy"), mmap_mode="r")[0].astype(np.float32) * scale
     pts, cols, H, W = depth_scene_points(vd, rd, hs["side"], depth0, K, args.scene_stride)
     table = vc.fit_table(pts, up, np.random.default_rng(0))
+    tj = os.path.join(rd, "table.json")                  # refinement export: the table at the object's resting height
+    if table is not None and os.path.exists(tj):
+        t = json.load(open(tj))
+        table = dict(table, normal=np.array(t["normal_up"], float), point=np.array(t["point"], float))
     rot, trans = poses[:, :3, :3], poses[:, :3, 3]
     heights = None
     if table is not None:
