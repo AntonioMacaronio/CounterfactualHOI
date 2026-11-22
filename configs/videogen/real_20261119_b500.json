@@ -1,0 +1,6219 @@
+{
+ "_comment": "Diverse Type B swaps from videogen/catalog.py (python -m videogen.catalog --base configs/videogen/real_20261119.json --per-clip 50 --seed 0): 156 object types dealt round-robin after a seeded shuffle, 50 distinct types per clip, one appearance per variant, every (type, appearance) unique. 'target' fills [TARGET_OBJECT_DESCRIPTION] together with group_prompts.TYPE_B_CATALOG_LINE; 'cls' is the short object name.",
+ "clips": {
+  "pp_anthony_real_1": {
+   "file": "pickplace/pp_anthony_real_1.MOV",
+   "task": "pick_place",
+   "object": "small metal case",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "coconut_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "coconut",
+     "target": "A light brown coconut. It is round and hairy and is about 11 cm across.",
+     "appearance": {
+      "look": "light brown"
+     }
+    },
+    {
+     "id": "eraser_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "eraser",
+     "target": "A forest green rubber eraser with a speckled finish. It is a small rectangular block and is about 6 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "forest green",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "stacking_ring_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "stacking ring",
+     "target": "A magenta painted wooden stacking ring with a hot pink floral print. It is a thick ring and is about 8 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "magenta",
+      "pattern": " with a hot pink floral print",
+      "accent": "hot pink"
+     }
+    },
+    {
+     "id": "cricket_ball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "cricket ball",
+     "target": "A white cricket ball. It is a hard leather sphere with a raised seam and is about 7 cm across.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "coffee_mug_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "coffee mug",
+     "target": "A turquoise matte stoneware coffee mug with a lime green floral print. It has a cylindrical body and one side handle and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "turquoise",
+      "pattern": " with a lime green floral print",
+      "accent": "lime green"
+     }
+    },
+    {
+     "id": "spray_paint_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spray paint can",
+     "target": "A mint green printed metal spray paint can. It is a tall cylinder with a cap and is about 19 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cat_figurine_1",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "cat figurine",
+     "target": "A turquoise glazed ceramic cat figurine. It is a sitting cat shape and is about 11 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "carrot_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "carrot",
+     "target": "A deep orange carrot. It is long and tapered and is about 17 cm long.",
+     "appearance": {
+      "look": "deep orange"
+     }
+    },
+    {
+     "id": "game_controller_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "game controller",
+     "target": "A chocolate brown matte plastic game controller. It is a curved body with two grips and buttons and is about 15 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hairbrush_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "hairbrush",
+     "target": "A reddish cherry wooden hairbrush. It has an oval paddle head with bristles and a handle and is about 22 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "reddish cherry",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "grapefruit_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "grapefruit",
+     "target": "A pale yellow grapefruit. It is large and round and is about 11 cm across.",
+     "appearance": {
+      "look": "pale yellow"
+     }
+    },
+    {
+     "id": "zucchini_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "zucchini",
+     "target": "A dark green zucchini. It is a long cylinder with a stem end and is about 18 cm long.",
+     "appearance": {
+      "look": "dark green"
+     }
+    },
+    {
+     "id": "juice_box_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "juice box",
+     "target": "A tan cardboard juice box with a printed tomato red label with bold lettering. It is a small rectangular carton with a straw on the side and is about 10 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "tan",
+      "pattern": " with a printed tomato red label with bold lettering",
+      "accent": "tomato red"
+     }
+    },
+    {
+     "id": "tomato_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "tomato",
+     "target": "A red tomato. It is round and slightly flattened with a green stem cap and is about 7 cm across.",
+     "appearance": {
+      "look": "red"
+     }
+    },
+    {
+     "id": "flashlight_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "flashlight",
+     "target": "A teal glossy plastic flashlight. It is a cylinder with a wider head and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dumbbell_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "small dumbbell",
+     "target": "A black rubber small dumbbell. It is a short bar with hexagonal weights at both ends and is about 16 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "black",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yo_yo_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "yo-yo",
+     "target": "A turquoise glossy plastic yo-yo with thin mustard yellow stripes. It is two discs joined at the center and is about 6 cm across.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "turquoise",
+      "pattern": " with thin mustard yellow stripes",
+      "accent": "mustard yellow"
+     }
+    },
+    {
+     "id": "measuring_cup_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "measuring cup",
+     "target": "A purple enamel-coated metal measuring cup. It is a small cylindrical cup with a straight handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "oil_bottle_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "oil bottle",
+     "target": "A chocolate brown matte stoneware oil bottle. It is a slim bottle with a narrow neck and a cork stopper and is about 20 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_car_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy car",
+     "target": "A cobalt blue glossy plastic toy car. It is a small car with four wheels and is about 9 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yogurt_cup_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "yogurt cup",
+     "target": "A lavender matte plastic yogurt cup. It is a short tapered cup with a foil lid and is about 8 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "lime_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lime",
+     "target": "A glossy green lime. It is small and round and is about 5 cm across.",
+     "appearance": {
+      "look": "glossy green"
+     }
+    },
+    {
+     "id": "triangle_block_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "triangular prism block",
+     "target": "A chocolate brown glossy plastic triangular prism block with a turquoise checkered pattern. It is a triangular prism with flat ends and is about 9 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "chocolate brown",
+      "pattern": " with a turquoise checkered pattern",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "rubber_stamp_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "rubber stamp",
+     "target": "A rubber stamp with a forest green painted wooden handle. It has a knob handle on a square base and is about 7 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tennis_ball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "tennis ball",
+     "target": "An orange tennis ball. It is a fuzzy sphere with a curved white seam and is about 7 cm across.",
+     "appearance": {
+      "look": "orange"
+     }
+    },
+    {
+     "id": "tumbler_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "tumbler cup",
+     "target": "A turquoise enamel-coated metal tumbler cup with crimson polka dots. It is a straight-sided cylindrical cup without a handle and is about 11 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "turquoise",
+      "pattern": " with crimson polka dots",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "mango_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "mango",
+     "target": "An orange-red blushed mango. It is oval and slightly flattened and is about 12 cm long.",
+     "appearance": {
+      "look": "orange-red blushed"
+     }
+    },
+    {
+     "id": "brick_1",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "brick",
+     "target": "A brown clay brick. It is a solid rectangular block and is about 20 cm long.",
+     "appearance": {
+      "look": "brown clay"
+     }
+    },
+    {
+     "id": "pencil_sharpener_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pencil sharpener",
+     "target": "A lavender glossy plastic pencil sharpener. It is a small rectangular block with a hole in one end and is about 5 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "owl_figurine_1",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "owl figurine",
+     "target": "A pink-veined marble owl figurine. It is a sitting owl shape and is about 10 cm tall.",
+     "appearance": {
+      "material": "stone",
+      "color": "pink-veined marble",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hockey_puck_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "hockey puck",
+     "target": "A blue hockey puck. It is a flat rubber disc and is about 8 cm across.",
+     "appearance": {
+      "look": "blue"
+     }
+    },
+    {
+     "id": "sanding_block_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "sanding block",
+     "target": "A coral matte plastic sanding block. It is a rectangular block with a grip on top and is about 11 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "deodorant_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "deodorant stick",
+     "target": "A navy blue glossy plastic deodorant stick with a printed chocolate brown label with bold lettering. It is an oval cylinder with a cap and is about 13 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "navy blue",
+      "pattern": " with a printed chocolate brown label with bold lettering",
+      "accent": "chocolate brown"
+     }
+    },
+    {
+     "id": "kiwi_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "kiwi fruit",
+     "target": "A golden-brown kiwi fruit. It is a small oval with fuzzy skin and is about 6 cm long.",
+     "appearance": {
+      "look": "golden-brown"
+     }
+    },
+    {
+     "id": "candle_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "pillar candle",
+     "target": "A cream wax pillar candle with a white zigzag pattern. It is a thick cylinder with a wick and is about 10 cm tall.",
+     "appearance": {
+      "material": "wax",
+      "color": "cream",
+      "pattern": " with a white zigzag pattern",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "corn_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "corn cob",
+     "target": "A yellow-and-white corn cob. It is a cylinder covered in rows of kernels and is about 18 cm long.",
+     "appearance": {
+      "look": "yellow-and-white"
+     }
+    },
+    {
+     "id": "toy_bowling_pin_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy bowling pin",
+     "target": "A tomato red painted wooden toy bowling pin with a marbled white swirl. It is a bottle shape with a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "tomato red",
+      "pattern": " with a marbled white swirl",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "rubber_duck_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy duck",
+     "target": "A purple glossy plastic toy duck. It has a round body, a head and a flat beak and is about 9 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "kitchen_timer_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "kitchen timer",
+     "target": "A gold-toned brushed metal kitchen timer. It is egg-shaped with a twist dial and is about 7 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "big_die_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "large die",
+     "target": "A dark walnut wooden large die. It is a cube with rounded corners and dots on each face and is about 6 cm on each side.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "dark walnut",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "padlock_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "padlock",
+     "target": "A gunmetal gray brushed metal padlock. It is a rectangular body with a curved shackle and is about 6 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gunmetal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tape_measure_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "tape measure",
+     "target": "A mint green rubber tape measure. It is a rounded square case with a belt clip and is about 7 cm across.",
+     "appearance": {
+      "material": "rubber",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "air_freshener_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "air freshener can",
+     "target": "A tomato red printed metal air freshener can. It is a tall slim cylinder with a spray cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "tomato red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_boat_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy boat",
+     "target": "A black glossy plastic toy boat with a marbled pastel pink swirl. It is a small boat with a cabin and is about 14 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "black",
+      "pattern": " with a marbled pastel pink swirl",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "citrus_juicer_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "citrus juicer",
+     "target": "A light oak wooden citrus juicer. It is a ribbed dome on a round base and is about 10 cm across.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pomegranate_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pomegranate",
+     "target": "A dark crimson pomegranate. It is round with a small crown on top and is about 9 cm across.",
+     "appearance": {
+      "look": "dark crimson"
+     }
+    },
+    {
+     "id": "shampoo_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "shampoo bottle",
+     "target": "A red glossy plastic shampoo bottle. It is an oval bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "ice_cream_scoop_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "ice cream scoop",
+     "target": "A gunmetal gray brushed metal ice cream scoop. It has a thick handle and a round scoop and is about 18 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gunmetal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "d_battery_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "D battery",
+     "target": "A large D-size battery with a forest green printed metal casing with a printed mint green label with bold lettering. It is a thick cylinder with a terminal bump and is about 6 cm long.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "forest green",
+      "pattern": " with a printed mint green label with bold lettering",
+      "accent": "mint green"
+     }
+    },
+    {
+     "id": "tea_tin_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tea tin",
+     "target": "A pastel pink printed metal tea tin. It is a rectangular tin with a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "pp_anthony_real_2": {
+   "file": "pickplace/pp_anthony_real_2.MOV",
+   "task": "pick_place",
+   "object": "blue tape roll",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "thermos_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "thermos flask",
+     "target": "A purple enamel-coated metal thermos flask. It is a tall cylinder with a domed cup lid and is about 22 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "teapot_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small teapot",
+     "target": "A cobalt blue enamel-coated metal small teapot with lavender polka dots. It has a round body, a spout, a handle and a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "cobalt blue",
+      "pattern": " with lavender polka dots",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "chocolate_bar_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "chocolate bar",
+     "target": "A tomato red cardboard chocolate bar with lavender stripes and a small printed logo. It is a thick flat rectangular bar in a wrapper and is about 15 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "tomato red",
+      "pattern": " with lavender stripes and a small printed logo",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "tuna_can_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tuna can",
+     "target": "A coral printed metal tuna can with lavender stripes and a small printed logo. It is a short wide cylinder and is about 4 cm tall and 9 cm across.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "coral",
+      "pattern": " with lavender stripes and a small printed logo",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "lemon_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lemon",
+     "target": "A pale yellow lemon. It is oval with pointed ends and is about 7 cm long.",
+     "appearance": {
+      "look": "pale yellow"
+     }
+    },
+    {
+     "id": "sweet_potato_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "sweet potato",
+     "target": "A reddish-brown sweet potato. It is long and tapered and is about 15 cm long.",
+     "appearance": {
+      "look": "reddish-brown"
+     }
+    },
+    {
+     "id": "spirit_level_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spirit level",
+     "target": "A purple anodized aluminum spirit level. It is a long rectangular bar with a bubble vial and is about 23 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_brick_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy building brick",
+     "target": "A sky blue glossy plastic toy building brick. It is a large rectangular brick with round studs on top and is about 8 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "mortar_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "mortar bowl",
+     "target": "A lime green matte stoneware mortar bowl. It is a heavy round bowl with thick walls and is about 10 cm across.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "lime green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sugar_bowl_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "sugar bowl",
+     "target": "A pastel pink matte stoneware sugar bowl with a crimson checkered pattern. It is a round bowl with a lid and two small handles and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "pastel pink",
+      "pattern": " with a crimson checkered pattern",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "pear_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pear",
+     "target": "A golden-brown russet pear. It is teardrop-shaped with a short stem and is about 10 cm tall.",
+     "appearance": {
+      "look": "golden-brown russet"
+     }
+    },
+    {
+     "id": "speaker_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "portable speaker",
+     "target": "A tan rubber portable speaker. It is a squat cylinder with a fabric grille and is about 10 cm tall.",
+     "appearance": {
+      "material": "rubber",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wood_cylinder_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cylinder block",
+     "target": "A sky blue painted wooden cylinder block. It is a solid cylinder and is about 8 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "door_stop_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "door stop",
+     "target": "A pale birch wooden door stop. It is a wedge and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "pale birch",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "peach_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "peach",
+     "target": "A rosy pink-orange peach. It is round with a soft crease down one side and is about 7 cm across.",
+     "appearance": {
+      "look": "rosy pink-orange"
+     }
+    },
+    {
+     "id": "wrench_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "wrench",
+     "target": "A white enamel-coated metal wrench. It is a flat bar with open jaws at one end and is about 18 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_dinosaur_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy dinosaur",
+     "target": "A tan matte plastic toy dinosaur with cream polka dots. It is a standing four-legged dinosaur figure and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tan",
+      "pattern": " with cream polka dots",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "egg_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "egg",
+     "target": "A pale blue egg. It is oval with one narrower end and is about 6 cm long.",
+     "appearance": {
+      "look": "pale blue"
+     }
+    },
+    {
+     "id": "marker_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "marker pen",
+     "target": "A mint green matte plastic marker pen. It is a fat cylindrical pen with a cap and is about 14 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_rocket_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy rocket",
+     "target": "A pastel pink painted wooden toy rocket. It is a cylinder with fins and a pointed nose and is about 15 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "desk_clock_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "desk clock",
+     "target": "A cream glossy plastic desk clock with cobalt blue polka dots. It is a round face on a small stand and is about 10 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "cream",
+      "pattern": " with cobalt blue polka dots",
+      "accent": "cobalt blue"
+     }
+    },
+    {
+     "id": "food_container_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "food storage box",
+     "target": "A gold-toned brushed metal food storage box. It is a rectangular box with a snap-on lid and is about 15 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "board_eraser_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "whiteboard eraser",
+     "target": "A lemon yellow matte plastic whiteboard eraser. It is a rectangular block with a felt base and is about 13 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "scrub_brush_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "scrub brush",
+     "target": "A bamboo wooden scrub brush. It is a block with stiff bristles underneath and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "bamboo",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pepper_grinder_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "pepper grinder",
+     "target": "A gunmetal gray brushed metal pepper grinder. It is a tall cylinder with a rounded knob on top and is about 16 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gunmetal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "smartphone_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "smartphone",
+     "target": "A smartphone in a cobalt blue glossy plastic case with teal polka dots. It is a thin rectangular slab and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "cobalt blue",
+      "pattern": " with teal polka dots",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "river_stone_1",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "river stone",
+     "target": "A rust-red river stone. It is a smooth flattened oval and is about 8 cm long.",
+     "appearance": {
+      "look": "rust-red"
+     }
+    },
+    {
+     "id": "candle_holder_1",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "candle holder",
+     "target": "A pale birch wooden candle holder. It is a short column with a cup on top and is about 9 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "pale birch",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_robot_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy robot",
+     "target": "A coral glossy plastic toy robot. It is a boxy figure with arms and legs and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pencil_case_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "hard pencil case",
+     "target": "A charcoal gray matte plastic hard pencil case. It is a rectangular box with a lid and is about 20 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "eggplant_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "eggplant",
+     "target": "A white eggplant. It is an elongated teardrop with a green cap and is about 15 cm long.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "trophy_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small trophy",
+     "target": "A gunmetal gray brushed metal small trophy. It is a cup on a square base and is about 15 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gunmetal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "bocce_ball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "bocce ball",
+     "target": "A mustard yellow glossy plastic bocce ball. It is a heavy solid sphere and is about 10 cm across.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "honey_pot_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "honey pot",
+     "target": "A lemon yellow glazed ceramic honey pot with a marbled navy blue swirl. It has a round belly and a lid and is about 10 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "lemon yellow",
+      "pattern": " with a marbled navy blue swirl",
+      "accent": "navy blue"
+     }
+    },
+    {
+     "id": "cucumber_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "cucumber",
+     "target": "A dark green cucumber. It is long and cylindrical and is about 18 cm long.",
+     "appearance": {
+      "look": "dark green"
+     }
+    },
+    {
+     "id": "sauce_bottle_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "squeeze sauce bottle",
+     "target": "A tan glossy plastic squeeze sauce bottle with a printed teal label with bold lettering. It is a tall bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "tan",
+      "pattern": " with a printed teal label with bold lettering",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "screwdriver_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "screwdriver",
+     "target": "A screwdriver with a black glossy plastic handle. It has a ribbed handle and a long metal shaft and is about 20 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "black",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wooden_spoon_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spoon",
+     "target": "A honey-colored pine wooden spoon. It has a long handle and an oval bowl and is about 25 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hex_block_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "hexagonal prism block",
+     "target": "A gold-toned brushed metal hexagonal prism block. It is a hexagonal prism with flat ends and is about 8 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "ping_pong_ball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "table tennis ball",
+     "target": "An orange table tennis ball. It is a small light hollow sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "orange"
+     }
+    },
+    {
+     "id": "crisps_tube_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "crisps tube",
+     "target": "A pastel pink cardboard crisps tube with a printed sky blue label with bold lettering. It is a tall cylinder with a plastic lid and is about 20 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "pastel pink",
+      "pattern": " with a printed sky blue label with bold lettering",
+      "accent": "sky blue"
+     }
+    },
+    {
+     "id": "duct_tape_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "roll of tape",
+     "target": "A roll of crimson matte plastic tape. It is a thick ring and is about 10 cm across.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "crimson",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dish_soap_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "dish soap bottle",
+     "target": "A red glossy plastic dish soap bottle with a printed tan label with bold lettering. It is a tall bottle with a flip-top cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "red",
+      "pattern": " with a printed tan label with bold lettering",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "teacup_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "teacup",
+     "target": "A purple glazed ceramic teacup with a marbled charcoal gray swirl. It has a rounded flared cup and a small loop handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "purple",
+      "pattern": " with a marbled charcoal gray swirl",
+      "accent": "charcoal gray"
+     }
+    },
+    {
+     "id": "wood_offcut_1",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "wood block",
+     "target": "A red cedar wood block. It is a rectangular block with sawn ends and is about 12 cm long.",
+     "appearance": {
+      "look": "red cedar"
+     }
+    },
+    {
+     "id": "camera_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "compact camera",
+     "target": "A silver brushed metal compact camera. It is a small boxy body with a round lens and is about 11 cm wide.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "power_bank_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "power bank",
+     "target": "A hot pink anodized aluminum power bank. It is a flat rounded rectangle and is about 12 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "hot pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "potato_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "potato",
+     "target": "A golden potato. It is a lumpy oval and is about 9 cm long.",
+     "appearance": {
+      "look": "golden"
+     }
+    },
+    {
+     "id": "clay_pot_1",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "small clay pot",
+     "target": "A turquoise matte stoneware small clay pot with a crimson checkered pattern. It is a round pot with a rolled rim and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "turquoise",
+      "pattern": " with a crimson checkered pattern",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "rolling_pin_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "rolling pin",
+     "target": "A cobalt blue painted wooden rolling pin. It is a cylinder with rounded handles at both ends and is about 25 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "pp_anthony_real_3": {
+   "file": "pickplace/pp_anthony_real_3.MOV",
+   "task": "pick_place",
+   "object": "black spatula",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "glue_stick_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "glue stick",
+     "target": "A chocolate brown matte plastic glue stick. It is a slim cylinder with a cap and is about 9 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "small_bowl_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small bowl",
+     "target": "A honey-colored pine wooden small bowl. It is a shallow rounded bowl and is about 12 cm across.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "egg_cup_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "egg cup",
+     "target": "A cobalt blue glazed ceramic egg cup. It is a small goblet shape and is about 6 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "nut_butter_jar_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "peanut butter jar",
+     "target": "A white matte plastic peanut butter jar with a printed tomato red label with bold lettering. It is a wide cylindrical jar with a screw lid and is about 11 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "white",
+      "pattern": " with a printed tomato red label with bold lettering",
+      "accent": "tomato red"
+     }
+    },
+    {
+     "id": "pipe_elbow_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "pipe elbow fitting",
+     "target": "A teal matte plastic pipe elbow fitting. It is a short pipe bent at a right angle and is about 8 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "apple_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "apple",
+     "target": "A bright green apple. It is round with a short stem and is about 8 cm across.",
+     "appearance": {
+      "look": "bright green"
+     }
+    },
+    {
+     "id": "succulent_pot_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "potted succulent",
+     "target": "A small teal matte stoneware pot with a tan checkered pattern holding a green succulent. It is a small pot holding a green succulent and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "teal",
+      "pattern": " with a tan checkered pattern",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "computer_mouse_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "computer mouse",
+     "target": "A mint green glossy plastic computer mouse. It is a rounded oval body and is about 11 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "chess_king_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "chess king",
+     "target": "A gray slate chess king. It is a tall turned piece with a cross on top and is about 10 cm tall.",
+     "appearance": {
+      "material": "stone",
+      "color": "gray slate",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_train_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy train engine",
+     "target": "A hot pink glossy plastic toy train engine with a speckled finish. It is a small locomotive with wheels and a chimney and is about 12 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "hot pink",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "star_block_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "star block",
+     "target": "A sky blue painted wooden star block with a marbled hot pink swirl. It is a thick five-pointed star and is about 9 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "sky blue",
+      "pattern": " with a marbled hot pink swirl",
+      "accent": "hot pink"
+     }
+    },
+    {
+     "id": "soda_can_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soda can",
+     "target": "A white printed metal soda can with a printed pastel pink label with bold lettering. It is a cylinder with a pull tab on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "white",
+      "pattern": " with a printed pastel pink label with bold lettering",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "solid_sphere_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "solid ball",
+     "target": "A navy blue painted wooden solid ball with a chocolate brown zigzag pattern. It is a solid sphere and is about 7 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "navy blue",
+      "pattern": " with a chocolate brown zigzag pattern",
+      "accent": "chocolate brown"
+     }
+    },
+    {
+     "id": "puzzle_cube_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "puzzle cube",
+     "target": "A blue-and-white puzzle cube. It is a cube covered in small square tiles and is about 6 cm on each side.",
+     "appearance": {
+      "look": "blue-and-white"
+     }
+    },
+    {
+     "id": "bell_pepper_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "bell pepper",
+     "target": "A red bell pepper. It is blocky with four lobes and a green stem and is about 9 cm tall.",
+     "appearance": {
+      "look": "red"
+     }
+    },
+    {
+     "id": "orange_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "orange",
+     "target": "A deep reddish-orange orange. It is round with a dimpled peel and is about 8 cm across.",
+     "appearance": {
+      "look": "deep reddish-orange"
+     }
+    },
+    {
+     "id": "spray_bottle_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "spray bottle",
+     "target": "A black matte plastic spray bottle with a printed cream label with bold lettering. It is a bottle with a trigger sprayer and is about 22 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "black",
+      "pattern": " with a printed cream label with bold lettering",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "soap_bar_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "bar of soap",
+     "target": "A pale yellow bar of soap. It is a rounded rectangular bar and is about 9 cm long.",
+     "appearance": {
+      "material": "soap",
+      "color": "pale yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wood_cone_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cone block",
+     "target": "A red painted wooden cone block. It is a solid cone with a flat base and is about 9 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "avocado_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "avocado",
+     "target": "A green-and-purple avocado. It is pear-shaped with bumpy skin and is about 10 cm long.",
+     "appearance": {
+      "look": "green-and-purple"
+     }
+    },
+    {
+     "id": "water_bottle_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "water bottle",
+     "target": "A purple anodized aluminum water bottle. It has a cylindrical body and a screw cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "anodized",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "arch_block_1",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "arch block",
+     "target": "A forest green painted wooden arch block with a marbled crimson swirl. It is a rectangular block with a half-round cutout and is about 10 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "forest green",
+      "pattern": " with a marbled crimson swirl",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "baseball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "baseball",
+     "target": "A yellow with red stitching baseball. It is a leather sphere with curved stitching and is about 7 cm across.",
+     "appearance": {
+      "look": "yellow with red stitching"
+     }
+    },
+    {
+     "id": "cereal_box_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cereal box",
+     "target": "A hot pink cardboard cereal box with a printed mustard yellow label with bold lettering. It is a tall thin rectangular box and is about 18 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "hot pink",
+      "pattern": " with a printed mustard yellow label with bold lettering",
+      "accent": "mustard yellow"
+     }
+    },
+    {
+     "id": "cookie_tin_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cookie tin",
+     "target": "A coral enamel-coated metal cookie tin with a speckled finish. It is a round tin with a lid and is about 15 cm across.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "coral",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "paintbrush_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "paintbrush",
+     "target": "A paintbrush with a turquoise glossy plastic handle. It has a handle, a metal band and a flat head of bristles and is about 20 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sunscreen_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "sunscreen bottle",
+     "target": "A cream glossy plastic sunscreen bottle with a printed lavender label with bold lettering. It is a flat oval bottle with a cap and is about 15 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "cream",
+      "pattern": " with a printed lavender label with bold lettering",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "soup_can_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soup can",
+     "target": "A hot pink printed metal soup can with a printed purple label with bold lettering. It is a cylinder with ridged sides and is about 10 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "hot pink",
+      "pattern": " with a printed purple label with bold lettering",
+      "accent": "purple"
+     }
+    },
+    {
+     "id": "highlighter_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "highlighter",
+     "target": "A teal matte plastic highlighter. It is a flat-sided pen with a cap and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "golf_ball_1",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "golf ball",
+     "target": "A pink golf ball. It is a small dimpled sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "pink"
+     }
+    },
+    {
+     "id": "pen_cup_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pen holder cup",
+     "target": "A hot pink glazed ceramic pen holder cup with thin tan stripes. It is an open cylinder and is about 10 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "hot pink",
+      "pattern": " with thin tan stripes",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "piggy_bank_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "piggy bank",
+     "target": "A mustard yellow glossy plastic piggy bank with a charcoal gray checkered pattern. It is a pig shape with a coin slot on its back and is about 12 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "mustard yellow",
+      "pattern": " with a charcoal gray checkered pattern",
+      "accent": "charcoal gray"
+     }
+    },
+    {
+     "id": "lotion_pump_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "lotion pump bottle",
+     "target": "A black glossy plastic lotion pump bottle with a printed orange label with bold lettering. It is a cylinder with a pump top and is about 17 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "black",
+      "pattern": " with a printed orange label with bold lettering",
+      "accent": "orange"
+     }
+    },
+    {
+     "id": "calculator_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "calculator",
+     "target": "A charcoal gray matte plastic calculator. It is a flat rectangular body with buttons and is about 15 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "garlic_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "garlic bulb",
+     "target": "A pale pink garlic bulb. It is round with a pointed top and is about 6 cm across.",
+     "appearance": {
+      "look": "pale pink"
+     }
+    },
+    {
+     "id": "conch_shell_1",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "conch shell",
+     "target": "An orange-banded conch shell. It is a spiral with a flared opening and is about 10 cm long.",
+     "appearance": {
+      "look": "orange-banded"
+     }
+    },
+    {
+     "id": "tape_dispenser_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "tape dispenser",
+     "target": "A turquoise enamel-coated metal tape dispenser. It is a weighted body holding a tape roll and is about 14 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "spice_tin_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spice tin",
+     "target": "A hot pink printed metal spice tin with orange stripes and a small printed logo. It is a short cylindrical tin with a screw lid and is about 9 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "hot pink",
+      "pattern": " with orange stripes and a small printed logo",
+      "accent": "orange"
+     }
+    },
+    {
+     "id": "hand_bell_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "hand bell",
+     "target": "A rose-gold brushed metal hand bell. It is a bell with a wooden handle and is about 12 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "rose-gold",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "candy_box_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "candy box",
+     "target": "A chocolate brown cardboard candy box with a printed pastel pink label with bold lettering. It is a small rectangular box and is about 10 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "chocolate brown",
+      "pattern": " with a printed pastel pink label with bold lettering",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "pine_cone_1",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "pine cone",
+     "target": "A dark brown pine cone. It is oval with overlapping scales and is about 9 cm tall.",
+     "appearance": {
+      "look": "dark brown"
+     }
+    },
+    {
+     "id": "alarm_clock_1",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "alarm clock",
+     "target": "A lavender glossy plastic alarm clock. It is a round body with two bells on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "utility_knife_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "utility knife",
+     "target": "A lemon yellow anodized aluminum utility knife. It is a slim handle with the blade retracted and is about 15 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "salt_shaker_1",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "salt shaker",
+     "target": "A bamboo wooden salt shaker. It is a small cylinder with a perforated dome top and is about 8 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "bamboo",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "bud_vase_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small vase",
+     "target": "A mint green glazed ceramic small vase with a marbled teal swirl. It has a bulbous body and a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "mint green",
+      "pattern": " with a marbled teal swirl",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "milk_carton_1",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "milk carton",
+     "target": "A red cardboard milk carton with a printed crimson label with bold lettering. It is a small carton with a gabled top and is about 12 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "red",
+      "pattern": " with a printed crimson label with bold lettering",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "paperweight_1",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "paperweight",
+     "target": "A green jade paperweight. It is a smooth dome and is about 8 cm across.",
+     "appearance": {
+      "look": "green jade"
+     }
+    },
+    {
+     "id": "razor_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "razor",
+     "target": "A copper-toned brushed metal razor. It is a slim handle with a shaving head and is about 14 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "glue_bottle_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "glue bottle",
+     "target": "A lavender glossy plastic glue bottle with a printed orange label with bold lettering. It is a squat bottle with a pointed nozzle cap and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": " with a printed orange label with bold lettering",
+      "accent": "orange"
+     }
+    },
+    {
+     "id": "spinning_top_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "spinning top",
+     "target": "A forest green glossy plastic spinning top. It is a cone with a short stem on top and is about 7 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "pp_anthony_real_4": {
+   "file": "pickplace/pp_anthony_real_4.MOV",
+   "task": "pick_place",
+   "object": "gray mug",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "compact_1",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "makeup compact",
+     "target": "A gunmetal gray brushed metal makeup compact. It is a round flat case and is about 7 cm across.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gunmetal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tv_remote_1",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "TV remote",
+     "target": "A purple glossy plastic TV remote. It is a long flat bar with buttons and is about 17 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hammer_1",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "hammer",
+     "target": "A hammer with a black rubber handle. It has a straight handle and a steel head and is about 25 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "black",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "onion_1",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "onion",
+     "target": "A light brown onion. It is round with a pointed top and papery skin and is about 8 cm across.",
+     "appearance": {
+      "look": "light brown"
+     }
+    },
+    {
+     "id": "nesting_doll_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "nesting doll",
+     "target": "A charcoal gray painted wooden nesting doll. It is a rounded doll shape with a painted face and is about 12 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_block_1",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy block",
+     "target": "A honey-colored pine wooden toy block. It is a cube and is about 6 cm on each side.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "coconut_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "coconut",
+     "target": "A dark brown coconut. It is round and hairy and is about 11 cm across.",
+     "appearance": {
+      "look": "dark brown"
+     }
+    },
+    {
+     "id": "eraser_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "eraser",
+     "target": "A lavender rubber eraser with navy blue polka dots. It is a small rectangular block and is about 6 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "lavender",
+      "pattern": " with navy blue polka dots",
+      "accent": "navy blue"
+     }
+    },
+    {
+     "id": "stacking_ring_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "stacking ring",
+     "target": "A magenta rubber stacking ring. It is a thick ring and is about 8 cm across.",
+     "appearance": {
+      "material": "rubber",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cricket_ball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "cricket ball",
+     "target": "A pink cricket ball. It is a hard leather sphere with a raised seam and is about 7 cm across.",
+     "appearance": {
+      "look": "pink"
+     }
+    },
+    {
+     "id": "coffee_mug_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "coffee mug",
+     "target": "A lavender enamel-coated metal coffee mug with orange polka dots. It has a cylindrical body and one side handle and is about 9 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "lavender",
+      "pattern": " with orange polka dots",
+      "accent": "orange"
+     }
+    },
+    {
+     "id": "spray_paint_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spray paint can",
+     "target": "A white printed metal spray paint can. It is a tall cylinder with a cap and is about 19 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cat_figurine_2",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "cat figurine",
+     "target": "A gray slate cat figurine. It is a sitting cat shape and is about 11 cm tall.",
+     "appearance": {
+      "material": "stone",
+      "color": "gray slate",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "carrot_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "carrot",
+     "target": "A bright orange carrot. It is long and tapered and is about 17 cm long.",
+     "appearance": {
+      "look": "bright orange"
+     }
+    },
+    {
+     "id": "game_controller_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "game controller",
+     "target": "An orange matte plastic game controller. It is a curved body with two grips and buttons and is about 15 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "orange",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hairbrush_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "hairbrush",
+     "target": "A coral glossy plastic hairbrush. It has an oval paddle head with bristles and a handle and is about 22 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "grapefruit_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "grapefruit",
+     "target": "A pink-blushed yellow grapefruit. It is large and round and is about 11 cm across.",
+     "appearance": {
+      "look": "pink-blushed yellow"
+     }
+    },
+    {
+     "id": "zucchini_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "zucchini",
+     "target": "A light green zucchini. It is a long cylinder with a stem end and is about 18 cm long.",
+     "appearance": {
+      "look": "light green"
+     }
+    },
+    {
+     "id": "juice_box_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "juice box",
+     "target": "A crimson cardboard juice box with a printed mint green label with bold lettering. It is a small rectangular carton with a straw on the side and is about 10 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "crimson",
+      "pattern": " with a printed mint green label with bold lettering",
+      "accent": "mint green"
+     }
+    },
+    {
+     "id": "tomato_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "tomato",
+     "target": "A dark red tomato. It is round and slightly flattened with a green stem cap and is about 7 cm across.",
+     "appearance": {
+      "look": "dark red"
+     }
+    },
+    {
+     "id": "flashlight_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "flashlight",
+     "target": "A turquoise glossy plastic flashlight. It is a cylinder with a wider head and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dumbbell_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "small dumbbell",
+     "target": "A teal enamel-coated metal small dumbbell. It is a short bar with hexagonal weights at both ends and is about 16 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yo_yo_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "yo-yo",
+     "target": "A tan glossy plastic yo-yo with a turquoise floral print. It is two discs joined at the center and is about 6 cm across.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "tan",
+      "pattern": " with a turquoise floral print",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "measuring_cup_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "measuring cup",
+     "target": "A crimson matte plastic measuring cup. It is a small cylindrical cup with a straight handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "crimson",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "oil_bottle_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "oil bottle",
+     "target": "A magenta matte stoneware oil bottle with a crimson zigzag pattern. It is a slim bottle with a narrow neck and a cork stopper and is about 20 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "magenta",
+      "pattern": " with a crimson zigzag pattern",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "toy_car_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy car",
+     "target": "A tan enamel-coated metal toy car. It is a small car with four wheels and is about 9 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yogurt_cup_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "yogurt cup",
+     "target": "A tomato red matte plastic yogurt cup with tan stripes and a small printed logo. It is a short tapered cup with a foil lid and is about 8 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tomato red",
+      "pattern": " with tan stripes and a small printed logo",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "lime_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lime",
+     "target": "A yellow-green lime. It is small and round and is about 5 cm across.",
+     "appearance": {
+      "look": "yellow-green"
+     }
+    },
+    {
+     "id": "triangle_block_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "triangular prism block",
+     "target": "An orange painted wooden triangular prism block with mustard yellow polka dots. It is a triangular prism with flat ends and is about 9 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "orange",
+      "pattern": " with mustard yellow polka dots",
+      "accent": "mustard yellow"
+     }
+    },
+    {
+     "id": "rubber_stamp_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "rubber stamp",
+     "target": "A rubber stamp with a dark walnut wooden handle. It has a knob handle on a square base and is about 7 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "dark walnut",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tennis_ball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "tennis ball",
+     "target": "A bright green tennis ball. It is a fuzzy sphere with a curved white seam and is about 7 cm across.",
+     "appearance": {
+      "look": "bright green"
+     }
+    },
+    {
+     "id": "tumbler_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "tumbler cup",
+     "target": "A lime green matte plastic tumbler cup with thin crimson stripes. It is a straight-sided cylindrical cup without a handle and is about 11 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lime green",
+      "pattern": " with thin crimson stripes",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "mango_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "mango",
+     "target": "A green-and-red mango. It is oval and slightly flattened and is about 12 cm long.",
+     "appearance": {
+      "look": "green-and-red"
+     }
+    },
+    {
+     "id": "brick_2",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "brick",
+     "target": "A gray concrete brick. It is a solid rectangular block and is about 20 cm long.",
+     "appearance": {
+      "look": "gray concrete"
+     }
+    },
+    {
+     "id": "pencil_sharpener_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pencil sharpener",
+     "target": "A silver brushed metal pencil sharpener. It is a small rectangular block with a hole in one end and is about 5 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "owl_figurine_2",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "owl figurine",
+     "target": "A charcoal gray glazed ceramic owl figurine with thin magenta stripes. It is a sitting owl shape and is about 10 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "charcoal gray",
+      "pattern": " with thin magenta stripes",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "hockey_puck_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "hockey puck",
+     "target": "An orange hockey puck. It is a flat rubber disc and is about 8 cm across.",
+     "appearance": {
+      "look": "orange"
+     }
+    },
+    {
+     "id": "sanding_block_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "sanding block",
+     "target": "A crimson matte plastic sanding block. It is a rectangular block with a grip on top and is about 11 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "crimson",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "deodorant_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "deodorant stick",
+     "target": "A forest green matte plastic deodorant stick. It is an oval cylinder with a cap and is about 13 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "kiwi_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "kiwi fruit",
+     "target": "A brown kiwi fruit. It is a small oval with fuzzy skin and is about 6 cm long.",
+     "appearance": {
+      "look": "brown"
+     }
+    },
+    {
+     "id": "candle_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "pillar candle",
+     "target": "A cobalt blue wax pillar candle. It is a thick cylinder with a wick and is about 10 cm tall.",
+     "appearance": {
+      "material": "wax",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "corn_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "corn cob",
+     "target": "A yellow corn cob. It is a cylinder covered in rows of kernels and is about 18 cm long.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "toy_bowling_pin_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy bowling pin",
+     "target": "A tomato red painted wooden toy bowling pin with a magenta zigzag pattern. It is a bottle shape with a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "tomato red",
+      "pattern": " with a magenta zigzag pattern",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "rubber_duck_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy duck",
+     "target": "A charcoal gray glossy plastic toy duck with a cobalt blue zigzag pattern. It has a round body, a head and a flat beak and is about 9 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "charcoal gray",
+      "pattern": " with a cobalt blue zigzag pattern",
+      "accent": "cobalt blue"
+     }
+    },
+    {
+     "id": "kitchen_timer_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "kitchen timer",
+     "target": "A magenta glossy plastic kitchen timer with thin cream stripes. It is egg-shaped with a twist dial and is about 7 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "magenta",
+      "pattern": " with thin cream stripes",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "big_die_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "large die",
+     "target": "A pale birch wooden large die. It is a cube with rounded corners and dots on each face and is about 6 cm on each side.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "pale birch",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "padlock_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "padlock",
+     "target": "A lavender enamel-coated metal padlock. It is a rectangular body with a curved shackle and is about 6 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tape_measure_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "tape measure",
+     "target": "A purple rubber tape measure. It is a rounded square case with a belt clip and is about 7 cm across.",
+     "appearance": {
+      "material": "rubber",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "air_freshener_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "air freshener can",
+     "target": "A cream printed metal air freshener can with a printed purple label with bold lettering. It is a tall slim cylinder with a spray cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "cream",
+      "pattern": " with a printed purple label with bold lettering",
+      "accent": "purple"
+     }
+    },
+    {
+     "id": "toy_boat_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy boat",
+     "target": "A chocolate brown painted wooden toy boat with a magenta checkered pattern. It is a small boat with a cabin and is about 14 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "chocolate brown",
+      "pattern": " with a magenta checkered pattern",
+      "accent": "magenta"
+     }
+    }
+   ]
+  },
+  "pp_anthony_real_5": {
+   "file": "pickplace/pp_anthony_real_5.MOV",
+   "task": "pick_place",
+   "object": "dish soap bottle",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "citrus_juicer_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "citrus juicer",
+     "target": "A reddish cherry wooden citrus juicer. It is a ribbed dome on a round base and is about 10 cm across.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "reddish cherry",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pomegranate_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pomegranate",
+     "target": "A deep red pomegranate. It is round with a small crown on top and is about 9 cm across.",
+     "appearance": {
+      "look": "deep red"
+     }
+    },
+    {
+     "id": "shampoo_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "shampoo bottle",
+     "target": "A pastel pink matte plastic shampoo bottle with a printed white label with bold lettering. It is an oval bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": " with a printed white label with bold lettering",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "ice_cream_scoop_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "ice cream scoop",
+     "target": "A white anodized aluminum ice cream scoop. It has a thick handle and a round scoop and is about 18 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "d_battery_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "D battery",
+     "target": "A large D-size battery with a magenta printed metal casing with cream stripes and a small printed logo. It is a thick cylinder with a terminal bump and is about 6 cm long.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "magenta",
+      "pattern": " with cream stripes and a small printed logo",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "tea_tin_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tea tin",
+     "target": "A tomato red enamel-coated metal tea tin. It is a rectangular tin with a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tomato red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "thermos_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "thermos flask",
+     "target": "A gold-toned brushed metal thermos flask. It is a tall cylinder with a domed cup lid and is about 22 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "teapot_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small teapot",
+     "target": "A forest green enamel-coated metal small teapot with a turquoise checkered pattern. It has a round body, a spout, a handle and a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "forest green",
+      "pattern": " with a turquoise checkered pattern",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "chocolate_bar_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "chocolate bar",
+     "target": "A navy blue cardboard chocolate bar with a printed purple label with bold lettering. It is a thick flat rectangular bar in a wrapper and is about 15 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "navy blue",
+      "pattern": " with a printed purple label with bold lettering",
+      "accent": "purple"
+     }
+    },
+    {
+     "id": "tuna_can_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tuna can",
+     "target": "A sky blue printed metal tuna can with a printed crimson label with bold lettering. It is a short wide cylinder and is about 4 cm tall and 9 cm across.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "sky blue",
+      "pattern": " with a printed crimson label with bold lettering",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "lemon_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lemon",
+     "target": "A glossy lemon-yellow lemon. It is oval with pointed ends and is about 7 cm long.",
+     "appearance": {
+      "look": "glossy lemon-yellow"
+     }
+    },
+    {
+     "id": "sweet_potato_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "sweet potato",
+     "target": "A pinkish sweet potato. It is long and tapered and is about 15 cm long.",
+     "appearance": {
+      "look": "pinkish"
+     }
+    },
+    {
+     "id": "spirit_level_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spirit level",
+     "target": "A mustard yellow anodized aluminum spirit level. It is a long rectangular bar with a bubble vial and is about 23 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_brick_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy building brick",
+     "target": "A purple glossy plastic toy building brick. It is a large rectangular brick with round studs on top and is about 8 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "mortar_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "mortar bowl",
+     "target": "A forest green matte stoneware mortar bowl. It is a heavy round bowl with thick walls and is about 10 cm across.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sugar_bowl_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "sugar bowl",
+     "target": "A teal matte stoneware sugar bowl with a speckled finish. It is a round bowl with a lid and two small handles and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "teal",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "pear_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pear",
+     "target": "A yellow pear. It is teardrop-shaped with a short stem and is about 10 cm tall.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "speaker_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "portable speaker",
+     "target": "A pastel pink matte plastic portable speaker. It is a squat cylinder with a fabric grille and is about 10 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wood_cylinder_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cylinder block",
+     "target": "A reddish cherry wooden cylinder block. It is a solid cylinder and is about 8 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "reddish cherry",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "door_stop_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "door stop",
+     "target": "A honey-colored pine wooden door stop. It is a wedge and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "peach_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "peach",
+     "target": "A deep red-blushed peach. It is round with a soft crease down one side and is about 7 cm across.",
+     "appearance": {
+      "look": "deep red-blushed"
+     }
+    },
+    {
+     "id": "wrench_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "wrench",
+     "target": "A cream enamel-coated metal wrench. It is a flat bar with open jaws at one end and is about 18 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "cream",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_dinosaur_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy dinosaur",
+     "target": "A mint green matte plastic toy dinosaur. It is a standing four-legged dinosaur figure and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "egg_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "egg",
+     "target": "A brown egg. It is oval with one narrower end and is about 6 cm long.",
+     "appearance": {
+      "look": "brown"
+     }
+    },
+    {
+     "id": "marker_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "marker pen",
+     "target": "A tan matte plastic marker pen. It is a fat cylindrical pen with a cap and is about 14 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_rocket_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy rocket",
+     "target": "A forest green glossy plastic toy rocket. It is a cylinder with fins and a pointed nose and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "desk_clock_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "desk clock",
+     "target": "A magenta enamel-coated metal desk clock. It is a round face on a small stand and is about 10 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "food_container_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "food storage box",
+     "target": "A coral matte plastic food storage box. It is a rectangular box with a snap-on lid and is about 15 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "board_eraser_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "whiteboard eraser",
+     "target": "An orange matte plastic whiteboard eraser. It is a rectangular block with a felt base and is about 13 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "orange",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "scrub_brush_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "scrub brush",
+     "target": "A honey-colored pine wooden scrub brush. It is a block with stiff bristles underneath and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pepper_grinder_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "pepper grinder",
+     "target": "A silver brushed metal pepper grinder. It is a tall cylinder with a rounded knob on top and is about 16 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "smartphone_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "smartphone",
+     "target": "A smartphone in a purple glossy plastic case with cream polka dots. It is a thin rectangular slab and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "purple",
+      "pattern": " with cream polka dots",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "river_stone_2",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "river stone",
+     "target": "A white river stone. It is a smooth flattened oval and is about 8 cm long.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "candle_holder_2",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "candle holder",
+     "target": "A cobalt blue glazed ceramic candle holder with a speckled finish. It is a short column with a cup on top and is about 9 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "cobalt blue",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_robot_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy robot",
+     "target": "A hot pink printed metal toy robot. It is a boxy figure with arms and legs and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "hot pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pencil_case_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "hard pencil case",
+     "target": "A black enamel-coated metal hard pencil case with a speckled finish. It is a rectangular box with a lid and is about 20 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "black",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "eggplant_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "eggplant",
+     "target": "A light purple eggplant. It is an elongated teardrop with a green cap and is about 15 cm long.",
+     "appearance": {
+      "look": "light purple"
+     }
+    },
+    {
+     "id": "trophy_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small trophy",
+     "target": "A copper-toned brushed metal small trophy. It is a cup on a square base and is about 15 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "bocce_ball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "bocce ball",
+     "target": "A forest green enamel-coated metal bocce ball with a chocolate brown floral print. It is a heavy solid sphere and is about 10 cm across.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "forest green",
+      "pattern": " with a chocolate brown floral print",
+      "accent": "chocolate brown"
+     }
+    },
+    {
+     "id": "honey_pot_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "honey pot",
+     "target": "A tan glazed ceramic honey pot. It has a round belly and a lid and is about 10 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cucumber_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "cucumber",
+     "target": "A striped green cucumber. It is long and cylindrical and is about 18 cm long.",
+     "appearance": {
+      "look": "striped green"
+     }
+    },
+    {
+     "id": "sauce_bottle_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "squeeze sauce bottle",
+     "target": "A turquoise glossy plastic squeeze sauce bottle. It is a tall bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "screwdriver_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "screwdriver",
+     "target": "A screwdriver with a bamboo wooden handle. It has a ribbed handle and a long metal shaft and is about 20 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "bamboo",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wooden_spoon_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spoon",
+     "target": "A dark walnut wooden spoon. It has a long handle and an oval bowl and is about 25 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "dark walnut",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hex_block_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "hexagonal prism block",
+     "target": "A rose-gold brushed metal hexagonal prism block. It is a hexagonal prism with flat ends and is about 8 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "rose-gold",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "ping_pong_ball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "table tennis ball",
+     "target": "A pink table tennis ball. It is a small light hollow sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "pink"
+     }
+    },
+    {
+     "id": "crisps_tube_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "crisps tube",
+     "target": "A mustard yellow cardboard crisps tube. It is a tall cylinder with a plastic lid and is about 20 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "duct_tape_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "roll of tape",
+     "target": "A roll of chocolate brown matte plastic tape. It is a thick ring and is about 10 cm across.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dish_soap_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "dish soap bottle",
+     "target": "A mustard yellow glossy plastic dish soap bottle. It is a tall bottle with a flip-top cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "teacup_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "teacup",
+     "target": "A crimson glazed ceramic teacup. It has a rounded flared cup and a small loop handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "crimson",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "prp_anthony_real_1": {
+   "file": "pickrotateplace/prp_anthony_real_1.MOV",
+   "task": "pick_rotate_place",
+   "object": "small metal case",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "wood_offcut_2",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "wood block",
+     "target": "A light pine wood block. It is a rectangular block with sawn ends and is about 12 cm long.",
+     "appearance": {
+      "look": "light pine"
+     }
+    },
+    {
+     "id": "camera_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "compact camera",
+     "target": "A chocolate brown matte plastic compact camera. It is a small boxy body with a round lens and is about 11 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "power_bank_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "power bank",
+     "target": "A white matte plastic power bank. It is a flat rounded rectangle and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "potato_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "potato",
+     "target": "A light brown potato. It is a lumpy oval and is about 9 cm long.",
+     "appearance": {
+      "look": "light brown"
+     }
+    },
+    {
+     "id": "clay_pot_2",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "small clay pot",
+     "target": "A lavender glazed ceramic small clay pot with white polka dots. It is a round pot with a rolled rim and is about 9 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "lavender",
+      "pattern": " with white polka dots",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "rolling_pin_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "rolling pin",
+     "target": "A white painted wooden rolling pin. It is a cylinder with rounded handles at both ends and is about 25 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "glue_stick_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "glue stick",
+     "target": "A mint green matte plastic glue stick. It is a slim cylinder with a cap and is about 9 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "small_bowl_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small bowl",
+     "target": "A lime green glazed ceramic small bowl with thin turquoise stripes. It is a shallow rounded bowl and is about 12 cm across.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "lime green",
+      "pattern": " with thin turquoise stripes",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "egg_cup_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "egg cup",
+     "target": "An orange glazed ceramic egg cup with lavender polka dots. It is a small goblet shape and is about 6 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "orange",
+      "pattern": " with lavender polka dots",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "nut_butter_jar_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "peanut butter jar",
+     "target": "A sky blue matte plastic peanut butter jar with a printed turquoise label with bold lettering. It is a wide cylindrical jar with a screw lid and is about 11 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "sky blue",
+      "pattern": " with a printed turquoise label with bold lettering",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "pipe_elbow_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "pipe elbow fitting",
+     "target": "A silver brushed metal pipe elbow fitting. It is a short pipe bent at a right angle and is about 8 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "apple_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "apple",
+     "target": "A golden yellow apple. It is round with a short stem and is about 8 cm across.",
+     "appearance": {
+      "look": "golden yellow"
+     }
+    },
+    {
+     "id": "succulent_pot_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "potted succulent",
+     "target": "A small hot pink glazed ceramic pot with a marbled navy blue swirl holding a green succulent. It is a small pot holding a green succulent and is about 9 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "hot pink",
+      "pattern": " with a marbled navy blue swirl",
+      "accent": "navy blue"
+     }
+    },
+    {
+     "id": "computer_mouse_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "computer mouse",
+     "target": "A red glossy plastic computer mouse. It is a rounded oval body and is about 11 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "chess_king_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "chess king",
+     "target": "A charcoal gray painted wooden chess king. It is a tall turned piece with a cross on top and is about 10 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_train_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy train engine",
+     "target": "A magenta glossy plastic toy train engine. It is a small locomotive with wheels and a chimney and is about 12 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "star_block_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "star block",
+     "target": "A cream painted wooden star block. It is a thick five-pointed star and is about 9 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "cream",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "soda_can_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soda can",
+     "target": "A charcoal gray printed metal soda can with a printed white label with bold lettering. It is a cylinder with a pull tab on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "charcoal gray",
+      "pattern": " with a printed white label with bold lettering",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "solid_sphere_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "solid ball",
+     "target": "A forest green painted wooden solid ball with a sky blue floral print. It is a solid sphere and is about 7 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "forest green",
+      "pattern": " with a sky blue floral print",
+      "accent": "sky blue"
+     }
+    },
+    {
+     "id": "puzzle_cube_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "puzzle cube",
+     "target": "A pastel-colored puzzle cube. It is a cube covered in small square tiles and is about 6 cm on each side.",
+     "appearance": {
+      "look": "pastel-colored"
+     }
+    },
+    {
+     "id": "bell_pepper_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "bell pepper",
+     "target": "A yellow bell pepper. It is blocky with four lobes and a green stem and is about 9 cm tall.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "orange_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "orange",
+     "target": "A bright orange orange. It is round with a dimpled peel and is about 8 cm across.",
+     "appearance": {
+      "look": "bright orange"
+     }
+    },
+    {
+     "id": "spray_bottle_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "spray bottle",
+     "target": "A white glossy plastic spray bottle. It is a bottle with a trigger sprayer and is about 22 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "soap_bar_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "bar of soap",
+     "target": "A cream bar of soap with red polka dots. It is a rounded rectangular bar and is about 9 cm long.",
+     "appearance": {
+      "material": "soap",
+      "color": "cream",
+      "pattern": " with red polka dots",
+      "accent": "red"
+     }
+    },
+    {
+     "id": "wood_cone_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cone block",
+     "target": "A charcoal gray painted wooden cone block with a magenta floral print. It is a solid cone with a flat base and is about 9 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "charcoal gray",
+      "pattern": " with a magenta floral print",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "avocado_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "avocado",
+     "target": "A bright green avocado. It is pear-shaped with bumpy skin and is about 10 cm long.",
+     "appearance": {
+      "look": "bright green"
+     }
+    },
+    {
+     "id": "water_bottle_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "water bottle",
+     "target": "A pastel pink matte plastic water bottle. It has a cylindrical body and a screw cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "arch_block_2",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "arch block",
+     "target": "A turquoise painted wooden arch block with a sky blue checkered pattern. It is a rectangular block with a half-round cutout and is about 10 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "turquoise",
+      "pattern": " with a sky blue checkered pattern",
+      "accent": "sky blue"
+     }
+    },
+    {
+     "id": "baseball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "baseball",
+     "target": "A blue-and-white baseball. It is a leather sphere with curved stitching and is about 7 cm across.",
+     "appearance": {
+      "look": "blue-and-white"
+     }
+    },
+    {
+     "id": "cereal_box_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cereal box",
+     "target": "A tomato red cardboard cereal box with a printed turquoise label with bold lettering. It is a tall thin rectangular box and is about 18 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "tomato red",
+      "pattern": " with a printed turquoise label with bold lettering",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "cookie_tin_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cookie tin",
+     "target": "A mustard yellow printed metal cookie tin with a cream zigzag pattern. It is a round tin with a lid and is about 15 cm across.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "mustard yellow",
+      "pattern": " with a cream zigzag pattern",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "paintbrush_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "paintbrush",
+     "target": "A paintbrush with a charcoal gray painted wooden handle. It has a handle, a metal band and a flat head of bristles and is about 20 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sunscreen_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "sunscreen bottle",
+     "target": "A lavender glossy plastic sunscreen bottle with magenta stripes and a small printed logo. It is a flat oval bottle with a cap and is about 15 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": " with magenta stripes and a small printed logo",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "soup_can_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soup can",
+     "target": "A lavender printed metal soup can with a printed teal label with bold lettering. It is a cylinder with ridged sides and is about 10 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "lavender",
+      "pattern": " with a printed teal label with bold lettering",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "highlighter_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "highlighter",
+     "target": "A lemon yellow matte plastic highlighter. It is a flat-sided pen with a cap and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "golf_ball_2",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "golf ball",
+     "target": "A white golf ball. It is a small dimpled sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "pen_cup_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pen holder cup",
+     "target": "A copper-toned brushed metal pen holder cup. It is an open cylinder and is about 10 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "piggy_bank_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "piggy bank",
+     "target": "A navy blue glazed ceramic piggy bank with a pastel pink checkered pattern. It is a pig shape with a coin slot on its back and is about 12 cm long.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "navy blue",
+      "pattern": " with a pastel pink checkered pattern",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "lotion_pump_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "lotion pump bottle",
+     "target": "A black matte plastic lotion pump bottle with teal stripes and a small printed logo. It is a cylinder with a pump top and is about 17 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "black",
+      "pattern": " with teal stripes and a small printed logo",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "calculator_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "calculator",
+     "target": "A crimson matte plastic calculator. It is a flat rectangular body with buttons and is about 15 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "crimson",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "garlic_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "garlic bulb",
+     "target": "A purple-streaked garlic bulb. It is round with a pointed top and is about 6 cm across.",
+     "appearance": {
+      "look": "purple-streaked"
+     }
+    },
+    {
+     "id": "conch_shell_2",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "conch shell",
+     "target": "A pink conch shell. It is a spiral with a flared opening and is about 10 cm long.",
+     "appearance": {
+      "look": "pink"
+     }
+    },
+    {
+     "id": "tape_dispenser_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "tape dispenser",
+     "target": "A crimson enamel-coated metal tape dispenser with hot pink polka dots. It is a weighted body holding a tape roll and is about 14 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "crimson",
+      "pattern": " with hot pink polka dots",
+      "accent": "hot pink"
+     }
+    },
+    {
+     "id": "spice_tin_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spice tin",
+     "target": "A mustard yellow matte plastic spice tin. It is a short cylindrical tin with a screw lid and is about 9 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hand_bell_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "hand bell",
+     "target": "A white enamel-coated metal hand bell. It is a bell with a wooden handle and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "candy_box_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "candy box",
+     "target": "A sky blue cardboard candy box. It is a small rectangular box and is about 10 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pine_cone_2",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "pine cone",
+     "target": "A light tan pine cone. It is oval with overlapping scales and is about 9 cm tall.",
+     "appearance": {
+      "look": "light tan"
+     }
+    },
+    {
+     "id": "alarm_clock_2",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "alarm clock",
+     "target": "A mint green enamel-coated metal alarm clock. It is a round body with two bells on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "utility_knife_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "utility knife",
+     "target": "A magenta glossy plastic utility knife. It is a slim handle with the blade retracted and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "salt_shaker_2",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "salt shaker",
+     "target": "A silver brushed metal salt shaker. It is a small cylinder with a perforated dome top and is about 8 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "prp_anthony_real_2": {
+   "file": "pickrotateplace/prp_anthony_real_2.MOV",
+   "task": "pick_rotate_place",
+   "object": "blue tape roll",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "bud_vase_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small vase",
+     "target": "A turquoise matte stoneware small vase. It has a bulbous body and a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "milk_carton_2",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "milk carton",
+     "target": "A turquoise cardboard milk carton with a printed tan label with bold lettering. It is a small carton with a gabled top and is about 12 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "turquoise",
+      "pattern": " with a printed tan label with bold lettering",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "paperweight_2",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "paperweight",
+     "target": "A gray granite paperweight. It is a smooth dome and is about 8 cm across.",
+     "appearance": {
+      "look": "gray granite"
+     }
+    },
+    {
+     "id": "razor_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "razor",
+     "target": "A silver brushed metal razor. It is a slim handle with a shaving head and is about 14 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "glue_bottle_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "glue bottle",
+     "target": "A coral glossy plastic glue bottle with pastel pink stripes and a small printed logo. It is a squat bottle with a pointed nozzle cap and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": " with pastel pink stripes and a small printed logo",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "spinning_top_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "spinning top",
+     "target": "A lemon yellow painted wooden spinning top. It is a cone with a short stem on top and is about 7 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "compact_2",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "makeup compact",
+     "target": "A silver brushed metal makeup compact. It is a round flat case and is about 7 cm across.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "silver",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tv_remote_2",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "TV remote",
+     "target": "A navy blue glossy plastic TV remote. It is a long flat bar with buttons and is about 17 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "navy blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hammer_2",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "hammer",
+     "target": "A hammer with a cobalt blue rubber handle. It has a straight handle and a steel head and is about 25 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "onion_2",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "onion",
+     "target": "A golden-brown onion. It is round with a pointed top and papery skin and is about 8 cm across.",
+     "appearance": {
+      "look": "golden-brown"
+     }
+    },
+    {
+     "id": "nesting_doll_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "nesting doll",
+     "target": "A turquoise painted wooden nesting doll with a crimson floral print. It is a rounded doll shape with a painted face and is about 12 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "turquoise",
+      "pattern": " with a crimson floral print",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "toy_block_2",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy block",
+     "target": "A dark walnut wooden toy block. It is a cube and is about 6 cm on each side.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "dark walnut",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "coconut_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "coconut",
+     "target": "A reddish-brown coconut. It is round and hairy and is about 11 cm across.",
+     "appearance": {
+      "look": "reddish-brown"
+     }
+    },
+    {
+     "id": "eraser_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "eraser",
+     "target": "A lavender rubber eraser with a marbled tomato red swirl. It is a small rectangular block and is about 6 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "lavender",
+      "pattern": " with a marbled tomato red swirl",
+      "accent": "tomato red"
+     }
+    },
+    {
+     "id": "stacking_ring_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "stacking ring",
+     "target": "A black painted wooden stacking ring. It is a thick ring and is about 8 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "black",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cricket_ball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "cricket ball",
+     "target": "A worn dark red cricket ball. It is a hard leather sphere with a raised seam and is about 7 cm across.",
+     "appearance": {
+      "look": "worn dark red"
+     }
+    },
+    {
+     "id": "coffee_mug_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "coffee mug",
+     "target": "A charcoal gray glazed ceramic coffee mug. It has a cylindrical body and one side handle and is about 9 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "spray_paint_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spray paint can",
+     "target": "A navy blue printed metal spray paint can with cream stripes and a small printed logo. It is a tall cylinder with a cap and is about 19 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "navy blue",
+      "pattern": " with cream stripes and a small printed logo",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "cat_figurine_3",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "cat figurine",
+     "target": "A magenta matte stoneware cat figurine with a turquoise checkered pattern. It is a sitting cat shape and is about 11 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "magenta",
+      "pattern": " with a turquoise checkered pattern",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "carrot_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "carrot",
+     "target": "A yellow carrot. It is long and tapered and is about 17 cm long.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "game_controller_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "game controller",
+     "target": "A pastel pink matte plastic game controller. It is a curved body with two grips and buttons and is about 15 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hairbrush_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "hairbrush",
+     "target": "A magenta glossy plastic hairbrush. It has an oval paddle head with bristles and a handle and is about 22 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "grapefruit_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "grapefruit",
+     "target": "An orange-yellow grapefruit. It is large and round and is about 11 cm across.",
+     "appearance": {
+      "look": "orange-yellow"
+     }
+    },
+    {
+     "id": "zucchini_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "zucchini",
+     "target": "A speckled green zucchini. It is a long cylinder with a stem end and is about 18 cm long.",
+     "appearance": {
+      "look": "speckled green"
+     }
+    },
+    {
+     "id": "juice_box_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "juice box",
+     "target": "A navy blue cardboard juice box with a printed white label with bold lettering. It is a small rectangular carton with a straw on the side and is about 10 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "navy blue",
+      "pattern": " with a printed white label with bold lettering",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "tomato_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "tomato",
+     "target": "A yellow tomato. It is round and slightly flattened with a green stem cap and is about 7 cm across.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "flashlight_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "flashlight",
+     "target": "A magenta rubber flashlight. It is a cylinder with a wider head and is about 15 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dumbbell_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "small dumbbell",
+     "target": "A purple rubber small dumbbell. It is a short bar with hexagonal weights at both ends and is about 16 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "purple",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yo_yo_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "yo-yo",
+     "target": "A red painted wooden yo-yo with thin pastel pink stripes. It is two discs joined at the center and is about 6 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "red",
+      "pattern": " with thin pastel pink stripes",
+      "accent": "pastel pink"
+     }
+    },
+    {
+     "id": "measuring_cup_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "measuring cup",
+     "target": "A copper-toned brushed metal measuring cup. It is a small cylindrical cup with a straight handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "oil_bottle_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "oil bottle",
+     "target": "A lavender enamel-coated metal oil bottle. It is a slim bottle with a narrow neck and a cork stopper and is about 20 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_car_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy car",
+     "target": "A white enamel-coated metal toy car with thin lemon yellow stripes. It is a small car with four wheels and is about 9 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "white",
+      "pattern": " with thin lemon yellow stripes",
+      "accent": "lemon yellow"
+     }
+    },
+    {
+     "id": "yogurt_cup_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "yogurt cup",
+     "target": "A mint green matte plastic yogurt cup. It is a short tapered cup with a foil lid and is about 8 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "lime_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lime",
+     "target": "A bright green lime. It is small and round and is about 5 cm across.",
+     "appearance": {
+      "look": "bright green"
+     }
+    },
+    {
+     "id": "triangle_block_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "triangular prism block",
+     "target": "A coral glossy plastic triangular prism block with lemon yellow polka dots. It is a triangular prism with flat ends and is about 9 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": " with lemon yellow polka dots",
+      "accent": "lemon yellow"
+     }
+    },
+    {
+     "id": "rubber_stamp_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "rubber stamp",
+     "target": "A rubber stamp with a coral painted wooden handle. It has a knob handle on a square base and is about 7 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tennis_ball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "tennis ball",
+     "target": "A pink tennis ball. It is a fuzzy sphere with a curved white seam and is about 7 cm across.",
+     "appearance": {
+      "look": "pink"
+     }
+    },
+    {
+     "id": "tumbler_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "tumbler cup",
+     "target": "A gold-toned brushed metal tumbler cup. It is a straight-sided cylindrical cup without a handle and is about 11 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "mango_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "mango",
+     "target": "A green mango. It is oval and slightly flattened and is about 12 cm long.",
+     "appearance": {
+      "look": "green"
+     }
+    },
+    {
+     "id": "brick_3",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "brick",
+     "target": "A white-painted brick. It is a solid rectangular block and is about 20 cm long.",
+     "appearance": {
+      "look": "white-painted"
+     }
+    },
+    {
+     "id": "pencil_sharpener_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pencil sharpener",
+     "target": "A cream glossy plastic pencil sharpener. It is a small rectangular block with a hole in one end and is about 5 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "cream",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "owl_figurine_3",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "owl figurine",
+     "target": "A light oak wooden owl figurine. It is a sitting owl shape and is about 10 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hockey_puck_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "hockey puck",
+     "target": "A black hockey puck. It is a flat rubber disc and is about 8 cm across.",
+     "appearance": {
+      "look": "black"
+     }
+    },
+    {
+     "id": "sanding_block_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "sanding block",
+     "target": "A chocolate brown rubber sanding block. It is a rectangular block with a grip on top and is about 11 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "deodorant_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "deodorant stick",
+     "target": "A charcoal gray matte plastic deodorant stick with lemon yellow stripes and a small printed logo. It is an oval cylinder with a cap and is about 13 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "charcoal gray",
+      "pattern": " with lemon yellow stripes and a small printed logo",
+      "accent": "lemon yellow"
+     }
+    },
+    {
+     "id": "kiwi_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "kiwi fruit",
+     "target": "A light brown kiwi fruit. It is a small oval with fuzzy skin and is about 6 cm long.",
+     "appearance": {
+      "look": "light brown"
+     }
+    },
+    {
+     "id": "candle_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "pillar candle",
+     "target": "A hot pink wax pillar candle with a tomato red zigzag pattern. It is a thick cylinder with a wick and is about 10 cm tall.",
+     "appearance": {
+      "material": "wax",
+      "color": "hot pink",
+      "pattern": " with a tomato red zigzag pattern",
+      "accent": "tomato red"
+     }
+    },
+    {
+     "id": "corn_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "corn cob",
+     "target": "A multicolored corn cob. It is a cylinder covered in rows of kernels and is about 18 cm long.",
+     "appearance": {
+      "look": "multicolored"
+     }
+    },
+    {
+     "id": "toy_bowling_pin_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy bowling pin",
+     "target": "A lavender painted wooden toy bowling pin with thin red stripes. It is a bottle shape with a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "lavender",
+      "pattern": " with thin red stripes",
+      "accent": "red"
+     }
+    },
+    {
+     "id": "rubber_duck_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy duck",
+     "target": "A cream rubber toy duck with crimson polka dots. It has a round body, a head and a flat beak and is about 9 cm tall.",
+     "appearance": {
+      "material": "rubber",
+      "color": "cream",
+      "pattern": " with crimson polka dots",
+      "accent": "crimson"
+     }
+    }
+   ]
+  },
+  "prp_anthony_real_3": {
+   "file": "pickrotateplace/prp_anthony_real_3.MOV",
+   "task": "pick_rotate_place",
+   "object": "black spatula",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "kitchen_timer_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "kitchen timer",
+     "target": "A copper-toned brushed metal kitchen timer. It is egg-shaped with a twist dial and is about 7 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "big_die_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "large die",
+     "target": "A tan matte plastic large die. It is a cube with rounded corners and dots on each face and is about 6 cm on each side.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "padlock_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "padlock",
+     "target": "A hot pink enamel-coated metal padlock. It is a rectangular body with a curved shackle and is about 6 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "hot pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tape_measure_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "tape measure",
+     "target": "A white rubber tape measure. It is a rounded square case with a belt clip and is about 7 cm across.",
+     "appearance": {
+      "material": "rubber",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "air_freshener_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "air freshener can",
+     "target": "A lime green printed metal air freshener can with a printed purple label with bold lettering. It is a tall slim cylinder with a spray cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "lime green",
+      "pattern": " with a printed purple label with bold lettering",
+      "accent": "purple"
+     }
+    },
+    {
+     "id": "toy_boat_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy boat",
+     "target": "A pastel pink painted wooden toy boat with a speckled finish. It is a small boat with a cabin and is about 14 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "pastel pink",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "citrus_juicer_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "citrus juicer",
+     "target": "A lemon yellow glazed ceramic citrus juicer. It is a ribbed dome on a round base and is about 10 cm across.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pomegranate_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pomegranate",
+     "target": "A reddish-orange pomegranate. It is round with a small crown on top and is about 9 cm across.",
+     "appearance": {
+      "look": "reddish-orange"
+     }
+    },
+    {
+     "id": "shampoo_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "shampoo bottle",
+     "target": "A magenta matte plastic shampoo bottle with a printed hot pink label with bold lettering. It is an oval bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "magenta",
+      "pattern": " with a printed hot pink label with bold lettering",
+      "accent": "hot pink"
+     }
+    },
+    {
+     "id": "ice_cream_scoop_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "ice cream scoop",
+     "target": "A turquoise anodized aluminum ice cream scoop. It has a thick handle and a round scoop and is about 18 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "d_battery_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "D battery",
+     "target": "A large D-size battery with a sky blue printed metal casing with red stripes and a small printed logo. It is a thick cylinder with a terminal bump and is about 6 cm long.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "sky blue",
+      "pattern": " with red stripes and a small printed logo",
+      "accent": "red"
+     }
+    },
+    {
+     "id": "tea_tin_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tea tin",
+     "target": "A pastel pink enamel-coated metal tea tin with a printed tan label with bold lettering. It is a rectangular tin with a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "pastel pink",
+      "pattern": " with a printed tan label with bold lettering",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "thermos_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "thermos flask",
+     "target": "A tan enamel-coated metal thermos flask. It is a tall cylinder with a domed cup lid and is about 22 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "teapot_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small teapot",
+     "target": "A lavender enamel-coated metal small teapot with a marbled black swirl. It has a round body, a spout, a handle and a lid and is about 12 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "lavender",
+      "pattern": " with a marbled black swirl",
+      "accent": "black"
+     }
+    },
+    {
+     "id": "chocolate_bar_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "chocolate bar",
+     "target": "A teal cardboard chocolate bar with a printed lavender label with bold lettering. It is a thick flat rectangular bar in a wrapper and is about 15 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "teal",
+      "pattern": " with a printed lavender label with bold lettering",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "tuna_can_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "tuna can",
+     "target": "A charcoal gray printed metal tuna can. It is a short wide cylinder and is about 4 cm tall and 9 cm across.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "lemon_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lemon",
+     "target": "A yellow-green lemon. It is oval with pointed ends and is about 7 cm long.",
+     "appearance": {
+      "look": "yellow-green"
+     }
+    },
+    {
+     "id": "sweet_potato_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "sweet potato",
+     "target": "A purple-skinned sweet potato. It is long and tapered and is about 15 cm long.",
+     "appearance": {
+      "look": "purple-skinned"
+     }
+    },
+    {
+     "id": "spirit_level_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spirit level",
+     "target": "A white glossy plastic spirit level. It is a long rectangular bar with a bubble vial and is about 23 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_brick_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy building brick",
+     "target": "A coral glossy plastic toy building brick. It is a large rectangular brick with round studs on top and is about 8 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "mortar_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "mortar bowl",
+     "target": "A white marble mortar bowl. It is a heavy round bowl with thick walls and is about 10 cm across.",
+     "appearance": {
+      "material": "stone",
+      "color": "white marble",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sugar_bowl_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "sugar bowl",
+     "target": "A cobalt blue matte stoneware sugar bowl. It is a round bowl with a lid and two small handles and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pear_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "pear",
+     "target": "A green pear. It is teardrop-shaped with a short stem and is about 10 cm tall.",
+     "appearance": {
+      "look": "green"
+     }
+    },
+    {
+     "id": "speaker_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "portable speaker",
+     "target": "A turquoise matte plastic portable speaker. It is a squat cylinder with a fabric grille and is about 10 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wood_cylinder_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cylinder block",
+     "target": "A mustard yellow painted wooden cylinder block. It is a solid cylinder and is about 8 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "door_stop_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "door stop",
+     "target": "A light oak wooden door stop. It is a wedge and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "peach_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "peach",
+     "target": "A golden peach. It is round with a soft crease down one side and is about 7 cm across.",
+     "appearance": {
+      "look": "golden"
+     }
+    },
+    {
+     "id": "wrench_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "wrench",
+     "target": "A rose-gold brushed metal wrench. It is a flat bar with open jaws at one end and is about 18 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "rose-gold",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_dinosaur_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy dinosaur",
+     "target": "A cream rubber toy dinosaur with a coral floral print. It is a standing four-legged dinosaur figure and is about 12 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "cream",
+      "pattern": " with a coral floral print",
+      "accent": "coral"
+     }
+    },
+    {
+     "id": "egg_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "egg",
+     "target": "A white egg. It is oval with one narrower end and is about 6 cm long.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "marker_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "marker pen",
+     "target": "A pastel pink matte plastic marker pen. It is a fat cylindrical pen with a cap and is about 14 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_rocket_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy rocket",
+     "target": "A coral glossy plastic toy rocket. It is a cylinder with fins and a pointed nose and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "desk_clock_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "desk clock",
+     "target": "A bamboo wooden desk clock. It is a round face on a small stand and is about 10 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "bamboo",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "food_container_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "food storage box",
+     "target": "An orange matte plastic food storage box. It is a rectangular box with a snap-on lid and is about 15 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "orange",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "board_eraser_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "whiteboard eraser",
+     "target": "A reddish cherry wooden whiteboard eraser. It is a rectangular block with a felt base and is about 13 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "reddish cherry",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "scrub_brush_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "scrub brush",
+     "target": "A dark walnut wooden scrub brush. It is a block with stiff bristles underneath and is about 12 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "dark walnut",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pepper_grinder_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "pepper grinder",
+     "target": "A light oak wooden pepper grinder. It is a tall cylinder with a rounded knob on top and is about 16 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "smartphone_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "smartphone",
+     "target": "A smartphone in a lavender silicone case with a orange checkered pattern. It is a thin rectangular slab and is about 15 cm long.",
+     "appearance": {
+      "material": "silicone",
+      "color": "lavender",
+      "pattern": " with a orange checkered pattern",
+      "accent": "orange"
+     }
+    },
+    {
+     "id": "river_stone_3",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "river stone",
+     "target": "A black river stone. It is a smooth flattened oval and is about 8 cm long.",
+     "appearance": {
+      "look": "black"
+     }
+    },
+    {
+     "id": "candle_holder_3",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "candle holder",
+     "target": "A gold-toned brushed metal candle holder. It is a short column with a cup on top and is about 9 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_robot_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy robot",
+     "target": "A lemon yellow printed metal toy robot with lime green polka dots. It is a boxy figure with arms and legs and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "lemon yellow",
+      "pattern": " with lime green polka dots",
+      "accent": "lime green"
+     }
+    },
+    {
+     "id": "pencil_case_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "hard pencil case",
+     "target": "A charcoal gray matte plastic hard pencil case with a chocolate brown floral print. It is a rectangular box with a lid and is about 20 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "charcoal gray",
+      "pattern": " with a chocolate brown floral print",
+      "accent": "chocolate brown"
+     }
+    },
+    {
+     "id": "eggplant_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "eggplant",
+     "target": "A glossy deep purple eggplant. It is an elongated teardrop with a green cap and is about 15 cm long.",
+     "appearance": {
+      "look": "glossy deep purple"
+     }
+    },
+    {
+     "id": "trophy_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small trophy",
+     "target": "A rose-gold brushed metal small trophy. It is a cup on a square base and is about 15 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "rose-gold",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "bocce_ball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "bocce ball",
+     "target": "A tan enamel-coated metal bocce ball. It is a heavy solid sphere and is about 10 cm across.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "honey_pot_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "honey pot",
+     "target": "A red matte stoneware honey pot with a speckled finish. It has a round belly and a lid and is about 10 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "red",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "cucumber_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "cucumber",
+     "target": "A light green cucumber. It is long and cylindrical and is about 18 cm long.",
+     "appearance": {
+      "look": "light green"
+     }
+    },
+    {
+     "id": "sauce_bottle_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "squeeze sauce bottle",
+     "target": "A lavender glossy plastic squeeze sauce bottle with a printed hot pink label with bold lettering. It is a tall bottle with a flip cap and is about 18 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": " with a printed hot pink label with bold lettering",
+      "accent": "hot pink"
+     }
+    },
+    {
+     "id": "screwdriver_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "screwdriver",
+     "target": "A screwdriver with a pale birch wooden handle. It has a ribbed handle and a long metal shaft and is about 20 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "pale birch",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wooden_spoon_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spoon",
+     "target": "A navy blue silicone spoon. It has a long handle and an oval bowl and is about 25 cm long.",
+     "appearance": {
+      "material": "silicone",
+      "color": "navy blue",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  },
+  "prp_anthony_real_4": {
+   "file": "pickrotateplace/prp_anthony_real_4.MOV",
+   "task": "pick_rotate_place",
+   "object": "gray mug",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "hex_block_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "hexagonal prism block",
+     "target": "A chocolate brown painted wooden hexagonal prism block. It is a hexagonal prism with flat ends and is about 8 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "ping_pong_ball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "table tennis ball",
+     "target": "A white table tennis ball. It is a small light hollow sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "crisps_tube_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "crisps tube",
+     "target": "A lavender cardboard crisps tube with a printed magenta label with bold lettering. It is a tall cylinder with a plastic lid and is about 20 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "lavender",
+      "pattern": " with a printed magenta label with bold lettering",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "duct_tape_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "roll of tape",
+     "target": "A roll of turquoise matte plastic tape. It is a thick ring and is about 10 cm across.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dish_soap_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "dish soap bottle",
+     "target": "A charcoal gray glossy plastic dish soap bottle with a printed lavender label with bold lettering. It is a tall bottle with a flip-top cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "charcoal gray",
+      "pattern": " with a printed lavender label with bold lettering",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "teacup_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "teacup",
+     "target": "A coral glazed ceramic teacup with a crimson zigzag pattern. It has a rounded flared cup and a small loop handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "coral",
+      "pattern": " with a crimson zigzag pattern",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "wood_offcut_3",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "wood block",
+     "target": "A dark walnut wood block. It is a rectangular block with sawn ends and is about 12 cm long.",
+     "appearance": {
+      "look": "dark walnut"
+     }
+    },
+    {
+     "id": "camera_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "compact camera",
+     "target": "A lemon yellow matte plastic compact camera. It is a small boxy body with a round lens and is about 11 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "power_bank_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "power bank",
+     "target": "A navy blue matte plastic power bank. It is a flat rounded rectangle and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "navy blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "potato_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "potato",
+     "target": "A dusty brown potato. It is a lumpy oval and is about 9 cm long.",
+     "appearance": {
+      "look": "dusty brown"
+     }
+    },
+    {
+     "id": "clay_pot_3",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "small clay pot",
+     "target": "A black matte stoneware small clay pot. It is a round pot with a rolled rim and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "black",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "rolling_pin_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "rolling pin",
+     "target": "A white marble rolling pin. It is a cylinder with rounded handles at both ends and is about 25 cm long.",
+     "appearance": {
+      "material": "stone",
+      "color": "white marble",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "glue_stick_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "glue stick",
+     "target": "A magenta matte plastic glue stick. It is a slim cylinder with a cap and is about 9 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "magenta",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "small_bowl_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "small bowl",
+     "target": "A light oak wooden small bowl. It is a shallow rounded bowl and is about 12 cm across.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "egg_cup_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "egg cup",
+     "target": "A hot pink painted wooden egg cup. It is a small goblet shape and is about 6 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "hot pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "nut_butter_jar_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "peanut butter jar",
+     "target": "A sky blue matte plastic peanut butter jar. It is a wide cylindrical jar with a screw lid and is about 11 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pipe_elbow_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "pipe elbow fitting",
+     "target": "A white matte plastic pipe elbow fitting. It is a short pipe bent at a right angle and is about 8 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "white",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "apple_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "apple",
+     "target": "A red-and-yellow streaked apple. It is round with a short stem and is about 8 cm across.",
+     "appearance": {
+      "look": "red-and-yellow streaked"
+     }
+    },
+    {
+     "id": "succulent_pot_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "potted succulent",
+     "target": "A small coral matte stoneware pot with a cream checkered pattern holding a green succulent. It is a small pot holding a green succulent and is about 9 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "coral",
+      "pattern": " with a cream checkered pattern",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "computer_mouse_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "computer mouse",
+     "target": "A coral matte plastic computer mouse. It is a rounded oval body and is about 11 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "chess_king_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "chess king",
+     "target": "A black granite chess king. It is a tall turned piece with a cross on top and is about 10 cm tall.",
+     "appearance": {
+      "material": "stone",
+      "color": "black granite",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_train_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy train engine",
+     "target": "A red glossy plastic toy train engine. It is a small locomotive with wheels and a chimney and is about 12 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "star_block_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "star block",
+     "target": "A turquoise painted wooden star block with a speckled finish. It is a thick five-pointed star and is about 9 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "turquoise",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "soda_can_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soda can",
+     "target": "A chocolate brown printed metal soda can. It is a cylinder with a pull tab on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "solid_sphere_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "solid ball",
+     "target": "A turquoise painted wooden solid ball with mint green polka dots. It is a solid sphere and is about 7 cm across.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "turquoise",
+      "pattern": " with mint green polka dots",
+      "accent": "mint green"
+     }
+    },
+    {
+     "id": "puzzle_cube_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "puzzle cube",
+     "target": "A black-and-gold puzzle cube. It is a cube covered in small square tiles and is about 6 cm on each side.",
+     "appearance": {
+      "look": "black-and-gold"
+     }
+    },
+    {
+     "id": "bell_pepper_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "bell pepper",
+     "target": "A green bell pepper. It is blocky with four lobes and a green stem and is about 9 cm tall.",
+     "appearance": {
+      "look": "green"
+     }
+    },
+    {
+     "id": "orange_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "orange",
+     "target": "A pale orange orange. It is round with a dimpled peel and is about 8 cm across.",
+     "appearance": {
+      "look": "pale orange"
+     }
+    },
+    {
+     "id": "spray_bottle_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "spray bottle",
+     "target": "A pastel pink glossy plastic spray bottle with a printed lavender label with bold lettering. It is a bottle with a trigger sprayer and is about 22 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "pastel pink",
+      "pattern": " with a printed lavender label with bold lettering",
+      "accent": "lavender"
+     }
+    },
+    {
+     "id": "soap_bar_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "bar of soap",
+     "target": "A pastel pink bar of soap. It is a rounded rectangular bar and is about 9 cm long.",
+     "appearance": {
+      "material": "soap",
+      "color": "pastel pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "wood_cone_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "cone block",
+     "target": "An orange painted wooden cone block. It is a solid cone with a flat base and is about 9 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "orange",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "avocado_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "avocado",
+     "target": "A dark green avocado. It is pear-shaped with bumpy skin and is about 10 cm long.",
+     "appearance": {
+      "look": "dark green"
+     }
+    },
+    {
+     "id": "water_bottle_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "water bottle",
+     "target": "A pastel pink matte plastic water bottle with a cream checkered pattern. It has a cylindrical body and a screw cap and is about 20 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "pastel pink",
+      "pattern": " with a cream checkered pattern",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "arch_block_3",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "arch block",
+     "target": "A hot pink painted wooden arch block. It is a rectangular block with a half-round cutout and is about 10 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "hot pink",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "baseball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "baseball",
+     "target": "A worn off-white with red stitching baseball. It is a leather sphere with curved stitching and is about 7 cm across.",
+     "appearance": {
+      "look": "worn off-white with red stitching"
+     }
+    },
+    {
+     "id": "cereal_box_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cereal box",
+     "target": "A lavender cardboard cereal box with a printed charcoal gray label with bold lettering. It is a tall thin rectangular box and is about 18 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "lavender",
+      "pattern": " with a printed charcoal gray label with bold lettering",
+      "accent": "charcoal gray"
+     }
+    },
+    {
+     "id": "cookie_tin_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "cookie tin",
+     "target": "A magenta printed metal cookie tin with a marbled cream swirl. It is a round tin with a lid and is about 15 cm across.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "magenta",
+      "pattern": " with a marbled cream swirl",
+      "accent": "cream"
+     }
+    },
+    {
+     "id": "paintbrush_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "paintbrush",
+     "target": "A paintbrush with a bamboo wooden handle. It has a handle, a metal band and a flat head of bristles and is about 20 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "bamboo",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "sunscreen_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "sunscreen bottle",
+     "target": "A chocolate brown glossy plastic sunscreen bottle with magenta stripes and a small printed logo. It is a flat oval bottle with a cap and is about 15 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "chocolate brown",
+      "pattern": " with magenta stripes and a small printed logo",
+      "accent": "magenta"
+     }
+    },
+    {
+     "id": "soup_can_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "soup can",
+     "target": "A chocolate brown printed metal soup can. It is a cylinder with ridged sides and is about 10 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "chocolate brown",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "highlighter_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "highlighter",
+     "target": "A lavender matte plastic highlighter. It is a flat-sided pen with a cap and is about 12 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "golf_ball_3",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "golf ball",
+     "target": "A neon yellow golf ball. It is a small dimpled sphere and is about 4 cm across.",
+     "appearance": {
+      "look": "neon yellow"
+     }
+    },
+    {
+     "id": "pen_cup_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pen holder cup",
+     "target": "A turquoise matte plastic pen holder cup. It is an open cylinder and is about 10 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "turquoise",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "piggy_bank_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "piggy bank",
+     "target": "A tan glossy plastic piggy bank with a speckled finish. It is a pig shape with a coin slot on its back and is about 12 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "tan",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "lotion_pump_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "lotion pump bottle",
+     "target": "A tan matte plastic lotion pump bottle with a printed crimson label with bold lettering. It is a cylinder with a pump top and is about 17 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tan",
+      "pattern": " with a printed crimson label with bold lettering",
+      "accent": "crimson"
+     }
+    },
+    {
+     "id": "calculator_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "calculator",
+     "target": "A mint green matte plastic calculator. It is a flat rectangular body with buttons and is about 15 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "garlic_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "garlic bulb",
+     "target": "A white garlic bulb. It is round with a pointed top and is about 6 cm across.",
+     "appearance": {
+      "look": "white"
+     }
+    },
+    {
+     "id": "conch_shell_3",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "conch shell",
+     "target": "A cream with brown speckles conch shell. It is a spiral with a flared opening and is about 10 cm long.",
+     "appearance": {
+      "look": "cream with brown speckles"
+     }
+    },
+    {
+     "id": "tape_dispenser_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "tape dispenser",
+     "target": "A tomato red glossy plastic tape dispenser. It is a weighted body holding a tape roll and is about 14 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "tomato red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "spice_tin_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "spice tin",
+     "target": "A mint green printed metal spice tin with a printed navy blue label with bold lettering. It is a short cylindrical tin with a screw lid and is about 9 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "mint green",
+      "pattern": " with a printed navy blue label with bold lettering",
+      "accent": "navy blue"
+     }
+    }
+   ]
+  },
+  "prp_anthony_real_5": {
+   "file": "pickrotateplace/prp_anthony_real_5.MOV",
+   "task": "pick_rotate_place",
+   "object": "dish soap bottle",
+   "hand": "right",
+   "variants": [
+    {
+     "id": "hand_bell_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "hand bell",
+     "target": "A copper-toned brushed metal hand bell. It is a bell with a wooden handle and is about 12 cm tall.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "copper-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "candy_box_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "candy box",
+     "target": "A cobalt blue cardboard candy box. It is a small rectangular box and is about 10 cm long.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "pine_cone_3",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "pine cone",
+     "target": "A gray-brown pine cone. It is oval with overlapping scales and is about 9 cm tall.",
+     "appearance": {
+      "look": "gray-brown"
+     }
+    },
+    {
+     "id": "alarm_clock_3",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "alarm clock",
+     "target": "A teal glossy plastic alarm clock. It is a round body with two bells on top and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "utility_knife_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "utility knife",
+     "target": "A cobalt blue anodized aluminum utility knife. It is a slim handle with the blade retracted and is about 15 cm long.",
+     "appearance": {
+      "material": "anodized",
+      "color": "cobalt blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "salt_shaker_3",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "salt shaker",
+     "target": "A honey-colored pine wooden salt shaker. It is a small cylinder with a perforated dome top and is about 8 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "honey-colored pine",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "bud_vase_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "small vase",
+     "target": "A lavender matte stoneware small vase. It has a bulbous body and a narrow neck and is about 15 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "lavender",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "milk_carton_3",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "milk carton",
+     "target": "A red cardboard milk carton with a printed charcoal gray label with bold lettering. It is a small carton with a gabled top and is about 12 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "red",
+      "pattern": " with a printed charcoal gray label with bold lettering",
+      "accent": "charcoal gray"
+     }
+    },
+    {
+     "id": "paperweight_3",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "paperweight",
+     "target": "A white marble paperweight. It is a smooth dome and is about 8 cm across.",
+     "appearance": {
+      "look": "white marble"
+     }
+    },
+    {
+     "id": "razor_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "razor",
+     "target": "A charcoal gray glossy plastic razor. It is a slim handle with a shaving head and is about 14 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "charcoal gray",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "glue_bottle_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "glue bottle",
+     "target": "A magenta glossy plastic glue bottle with a printed lemon yellow label with bold lettering. It is a squat bottle with a pointed nozzle cap and is about 12 cm tall.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "magenta",
+      "pattern": " with a printed lemon yellow label with bold lettering",
+      "accent": "lemon yellow"
+     }
+    },
+    {
+     "id": "spinning_top_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "spinning top",
+     "target": "A lemon yellow painted wooden spinning top with a mint green floral print. It is a cone with a short stem on top and is about 7 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "lemon yellow",
+      "pattern": " with a mint green floral print",
+      "accent": "mint green"
+     }
+    },
+    {
+     "id": "compact_3",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "makeup compact",
+     "target": "A gold-toned brushed metal makeup compact. It is a round flat case and is about 7 cm across.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tv_remote_3",
+     "mode": "type_b",
+     "category": "household",
+     "cls": "TV remote",
+     "target": "A red matte plastic TV remote. It is a long flat bar with buttons and is about 17 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hammer_3",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "hammer",
+     "target": "A hammer with a lime green rubber handle. It has a straight handle and a steel head and is about 25 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "lime green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "onion_3",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "onion",
+     "target": "A red onion. It is round with a pointed top and papery skin and is about 8 cm across.",
+     "appearance": {
+      "look": "red"
+     }
+    },
+    {
+     "id": "nesting_doll_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "nesting doll",
+     "target": "A mustard yellow painted wooden nesting doll. It is a rounded doll shape with a painted face and is about 12 cm tall.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_block_3",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy block",
+     "target": "A sky blue painted wooden toy block. It is a cube and is about 6 cm on each side.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "coconut_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "coconut",
+     "target": "A brown coconut. It is round and hairy and is about 11 cm across.",
+     "appearance": {
+      "look": "brown"
+     }
+    },
+    {
+     "id": "eraser_4",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "eraser",
+     "target": "A coral rubber eraser. It is a small rectangular block and is about 6 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "coral",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "stacking_ring_4",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "stacking ring",
+     "target": "A black glossy plastic stacking ring with a marbled white swirl. It is a thick ring and is about 8 cm across.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "black",
+      "pattern": " with a marbled white swirl",
+      "accent": "white"
+     }
+    },
+    {
+     "id": "cricket_ball_4",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "cricket ball",
+     "target": "A red cricket ball. It is a hard leather sphere with a raised seam and is about 7 cm across.",
+     "appearance": {
+      "look": "red"
+     }
+    },
+    {
+     "id": "coffee_mug_4",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "coffee mug",
+     "target": "A lemon yellow glazed ceramic coffee mug. It has a cylindrical body and one side handle and is about 9 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "lemon yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "spray_paint_4",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "spray paint can",
+     "target": "A forest green printed metal spray paint can. It is a tall cylinder with a cap and is about 19 cm tall.",
+     "appearance": {
+      "material": "printed_tin",
+      "color": "forest green",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "cat_figurine_4",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "cat figurine",
+     "target": "A sandstone cat figurine. It is a sitting cat shape and is about 11 cm tall.",
+     "appearance": {
+      "material": "stone",
+      "color": "sandstone",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "carrot_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "carrot",
+     "target": "A purple carrot. It is long and tapered and is about 17 cm long.",
+     "appearance": {
+      "look": "purple"
+     }
+    },
+    {
+     "id": "game_controller_4",
+     "mode": "type_b",
+     "category": "electronics",
+     "cls": "game controller",
+     "target": "A cream matte plastic game controller. It is a curved body with two grips and buttons and is about 15 cm wide.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "cream",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "hairbrush_4",
+     "mode": "type_b",
+     "category": "bathroom",
+     "cls": "hairbrush",
+     "target": "A pale birch wooden hairbrush. It has an oval paddle head with bristles and a handle and is about 22 cm long.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "pale birch",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "grapefruit_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "grapefruit",
+     "target": "A yellow grapefruit. It is large and round and is about 11 cm across.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "zucchini_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "zucchini",
+     "target": "A yellow zucchini. It is a long cylinder with a stem end and is about 18 cm long.",
+     "appearance": {
+      "look": "yellow"
+     }
+    },
+    {
+     "id": "juice_box_4",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "juice box",
+     "target": "A cream cardboard juice box with a printed purple label with bold lettering. It is a small rectangular carton with a straw on the side and is about 10 cm tall.",
+     "appearance": {
+      "material": "cardboard",
+      "color": "cream",
+      "pattern": " with a printed purple label with bold lettering",
+      "accent": "purple"
+     }
+    },
+    {
+     "id": "tomato_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "tomato",
+     "target": "An orange tomato. It is round and slightly flattened with a green stem cap and is about 7 cm across.",
+     "appearance": {
+      "look": "orange"
+     }
+    },
+    {
+     "id": "flashlight_4",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "flashlight",
+     "target": "A sky blue glossy plastic flashlight. It is a cylinder with a wider head and is about 15 cm long.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "sky blue",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "dumbbell_4",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "small dumbbell",
+     "target": "A teal rubber small dumbbell. It is a short bar with hexagonal weights at both ends and is about 16 cm long.",
+     "appearance": {
+      "material": "rubber",
+      "color": "teal",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "yo_yo_4",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "yo-yo",
+     "target": "A lavender glossy plastic yo-yo with a tomato red zigzag pattern. It is two discs joined at the center and is about 6 cm across.",
+     "appearance": {
+      "material": "glossy_plastic",
+      "color": "lavender",
+      "pattern": " with a tomato red zigzag pattern",
+      "accent": "tomato red"
+     }
+    },
+    {
+     "id": "measuring_cup_4",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "measuring cup",
+     "target": "A tan enamel-coated metal measuring cup. It is a small cylindrical cup with a straight handle and is about 7 cm tall.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tan",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "oil_bottle_4",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "oil bottle",
+     "target": "A mustard yellow matte stoneware oil bottle. It is a slim bottle with a narrow neck and a cork stopper and is about 20 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "mustard yellow",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "toy_car_4",
+     "mode": "type_b",
+     "category": "toys",
+     "cls": "toy car",
+     "target": "A tomato red enamel-coated metal toy car with a marbled teal swirl. It is a small car with four wheels and is about 9 cm long.",
+     "appearance": {
+      "material": "enamel_metal",
+      "color": "tomato red",
+      "pattern": " with a marbled teal swirl",
+      "accent": "teal"
+     }
+    },
+    {
+     "id": "yogurt_cup_4",
+     "mode": "type_b",
+     "category": "packaging",
+     "cls": "yogurt cup",
+     "target": "A tomato red matte plastic yogurt cup. It is a short tapered cup with a foil lid and is about 8 cm tall.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "tomato red",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "lime_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "lime",
+     "target": "A dark green lime. It is small and round and is about 5 cm across.",
+     "appearance": {
+      "look": "dark green"
+     }
+    },
+    {
+     "id": "triangle_block_4",
+     "mode": "type_b",
+     "category": "shapes",
+     "cls": "triangular prism block",
+     "target": "A charcoal gray painted wooden triangular prism block with a speckled finish. It is a triangular prism with flat ends and is about 9 cm long.",
+     "appearance": {
+      "material": "painted_wood",
+      "color": "charcoal gray",
+      "pattern": " with a speckled finish",
+      "accent": null
+     }
+    },
+    {
+     "id": "rubber_stamp_4",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "rubber stamp",
+     "target": "A rubber stamp with a light oak wooden handle. It has a knob handle on a square base and is about 7 cm tall.",
+     "appearance": {
+      "material": "natural_wood",
+      "color": "light oak",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "tennis_ball_4",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "tennis ball",
+     "target": "An optic yellow tennis ball. It is a fuzzy sphere with a curved white seam and is about 7 cm across.",
+     "appearance": {
+      "look": "optic yellow"
+     }
+    },
+    {
+     "id": "tumbler_4",
+     "mode": "type_b",
+     "category": "kitchen",
+     "cls": "tumbler cup",
+     "target": "A navy blue matte stoneware tumbler cup with a turquoise checkered pattern. It is a straight-sided cylindrical cup without a handle and is about 11 cm tall.",
+     "appearance": {
+      "material": "stoneware",
+      "color": "navy blue",
+      "pattern": " with a turquoise checkered pattern",
+      "accent": "turquoise"
+     }
+    },
+    {
+     "id": "mango_4",
+     "mode": "type_b",
+     "category": "produce",
+     "cls": "mango",
+     "target": "A golden yellow mango. It is oval and slightly flattened and is about 12 cm long.",
+     "appearance": {
+      "look": "golden yellow"
+     }
+    },
+    {
+     "id": "brick_4",
+     "mode": "type_b",
+     "category": "nature",
+     "cls": "brick",
+     "target": "A red clay brick. It is a solid rectangular block and is about 20 cm long.",
+     "appearance": {
+      "look": "red clay"
+     }
+    },
+    {
+     "id": "pencil_sharpener_4",
+     "mode": "type_b",
+     "category": "office",
+     "cls": "pencil sharpener",
+     "target": "A gold-toned brushed metal pencil sharpener. It is a small rectangular block with a hole in one end and is about 5 cm long.",
+     "appearance": {
+      "material": "brushed_metal",
+      "color": "gold-toned",
+      "pattern": "",
+      "accent": null
+     }
+    },
+    {
+     "id": "owl_figurine_4",
+     "mode": "type_b",
+     "category": "decor",
+     "cls": "owl figurine",
+     "target": "A forest green glazed ceramic owl figurine with tan polka dots. It is a sitting owl shape and is about 10 cm tall.",
+     "appearance": {
+      "material": "glazed_ceramic",
+      "color": "forest green",
+      "pattern": " with tan polka dots",
+      "accent": "tan"
+     }
+    },
+    {
+     "id": "hockey_puck_4",
+     "mode": "type_b",
+     "category": "sports",
+     "cls": "hockey puck",
+     "target": "A red hockey puck. It is a flat rubber disc and is about 8 cm across.",
+     "appearance": {
+      "look": "red"
+     }
+    },
+    {
+     "id": "sanding_block_4",
+     "mode": "type_b",
+     "category": "tools",
+     "cls": "sanding block",
+     "target": "A mint green matte plastic sanding block. It is a rectangular block with a grip on top and is about 11 cm long.",
+     "appearance": {
+      "material": "matte_plastic",
+      "color": "mint green",
+      "pattern": "",
+      "accent": null
+     }
+    }
+   ]
+  }
+ }
+}

@@ -62,6 +62,15 @@ the config carry a `mode`, so each A/B id only pairs with its own mode:
 python -m videogen.generate --config configs/videogen/real_20261119.json --modes type_a type_b --dry-run   # 100 prompts
 ```
 
+For more varied swaps, `catalog.py` holds about 150 everyday rigid objects. Each variant gets a concrete object with
+its own appearance (colour, material, pattern or label), which goes in `[TARGET_OBJECT_DESCRIPTION]`. The plain
+B01-B10 shapes come out in default colours, and H3 sometimes reuses an object already in the scene.
+
+```bash
+python -m videogen.catalog --base configs/videogen/real_20261119.json --per-clip 50 --out configs/videogen/real_20261119_b500.json
+python -m videogen.build_html outputs/minimax_h3/real_20261119_b500    # browse a run (open RUN/index.html)
+```
+
 ## Managed jobs on ll-smo H200s
 
 The shared dev node can't launch managed jobs, so launch them from the laptop. `scripts/sky/h3_videogen.yaml` runs

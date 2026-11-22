@@ -24,6 +24,15 @@ TYPE_B_SIZE_LINE = (
     "scale. Keep it rigid throughout the action. Adapt the grasp and local motion to its geometry."
 )
 
+# Catalog swaps (videogen/catalog.py) fill [TARGET_OBJECT_DESCRIPTION] with a concrete object and appearance followed
+# by this line instead of TYPE_B_SIZE_LINE: the object keeps its natural size rather than the source's scale, and the
+# last sentence stops H3 from reusing an object already in the scene (it turned "a narrow-neck bottle" into the
+# hot sauce bottle on the counter).
+TYPE_B_CATALOG_LINE = (
+    "Show it at its natural real-world size, rigid and in one piece, so the same hand can manipulate it. It must "
+    "look different from every other object in the scene. Adapt the grasp and local motion to its geometry."
+)
+
 TYPE_B_OBJECTS = {
     "B01": ("Cylindrical can", "A closed cylindrical beverage can with straight sides, a flat circular base, and a metallic surface."),
     "B02": ("Narrow-neck bottle", "A capped rigid bottle with a rounded body, narrow neck, and flat base."),
@@ -285,10 +294,17 @@ def edit_info(mode: str, edit_id: str) -> tuple[str, str]:
     return table[edit_id]
 
 
-def build_group_prompt(task: str, mode: str, edit_id: str) -> str:
-    """task: 'pick_rotate_place' or 'pick_place'. mode: 'type_a' or 'type_b'. edit_id: e.g. 'A03' or 'B07'."""
+def build_group_prompt(task: str, mode: str, edit_id: str, target: str | None = None) -> str:
+    """task: 'pick_rotate_place' or 'pick_place'. mode: 'type_a' or 'type_b'. edit_id: e.g. 'A03' or 'B07'.
+
+    target: a catalog object description (videogen/catalog.py) to use instead of looking edit_id up in the tables.
+    """
     if (mode, task) not in TEMPLATES:
         raise ValueError(f"no group prompt for mode={mode!r}, task={task!r}")
+    if target is not None:
+        if mode != "type_b":
+            raise ValueError("catalog targets are Type B object swaps")
+        return TEMPLATES[mode, task].replace("[TARGET_OBJECT_DESCRIPTION]", f"{target}\n{TYPE_B_CATALOG_LINE}").strip()
     _, text = edit_info(mode, edit_id)
     if mode == "type_a":
         return TEMPLATES[mode, task].replace("[GEOMETRIC_TRANSFORMATION]", text).strip()

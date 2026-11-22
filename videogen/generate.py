@@ -129,11 +129,12 @@ def main(argv=None):
         (out_dir / f"seed{seed}.prompt.txt").write_text(prompt)
         category = None
         if variant:
-            category = edit_info(mode, vid)[0] if mode in GROUP_MODES else variant.get("category")
+            category = variant.get("category") or (edit_info(mode, vid)[0] if mode in GROUP_MODES else None)
         record = {
             "clip": clip_id, "task": clip.get("task"), "mode": mode, "variant": vid,
             "category": category,
             "dims_cm": variant.get("dims_cm") if variant else None,
+            "cls": variant.get("cls") if variant else None,
             "seed": seed, "steps": args.steps,
             "prompt_sha1": hashlib.sha1(prompt.encode()).hexdigest(),
             "source": str(src), "source_info": src_info, "reference_images": ref_images, "output": str(out_mp4),

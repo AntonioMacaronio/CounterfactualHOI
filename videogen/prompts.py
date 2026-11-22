@@ -53,8 +53,9 @@ def build_prompt(clip: dict, mode: str, variant: dict | None = None) -> str:
     if mode != "identity" and variant is None:
         raise ValueError(f"mode {mode!r} needs a variant")
     if mode in GROUP_MODES:
-        # variant["id"] is the edit/object id (A01..A05, B01..B10); clip["task"] picks the prp or pp template.
-        return build_group_prompt(clip["task"], mode, variant["id"])
+        # variant["id"] is the edit/object id (A01..A05, B01..B10), or a catalog variant carrying its own "target"
+        # text (videogen/catalog.py); clip["task"] picks the prp or pp template.
+        return build_group_prompt(clip["task"], mode, variant["id"], variant.get("target"))
     if mode == "prism":
         # src: clip "name" without the article, e.g. "white case"; cls: the variant's short description.
         src = clip.get("name", "the object").removeprefix("the ")

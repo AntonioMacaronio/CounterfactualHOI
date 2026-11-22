@@ -49,6 +49,7 @@ def edit_label(mode: str, variant: str) -> tuple[str, str]:
 
 def collect(run: Path, cfg: dict) -> list[dict]:
     manifest = load_manifest(run)
+    cfg_variants = {(c, v["id"]): v for c, cl in cfg.get("clips", {}).items() for v in cl.get("variants", [])}
     clips = {}
     for mp4 in sorted(run.glob("*/*/*/seed*.mp4")):
         if mp4.name.endswith("_compare.mp4") or mp4.parts[-4] in SKIP_DIRS:
@@ -56,7 +57,11 @@ def collect(run: Path, cfg: dict) -> list[dict]:
         clip, mode, variant = mp4.parts[-4], mp4.parts[-3], mp4.parts[-2]
         seed = int(re.fullmatch(r"seed(\d+)\.mp4", mp4.name).group(1))
         rec = manifest.get((clip, mode, variant, seed), {})
-        category, text = edit_label(mode, variant)
+        v = cfg_variants.get((clip, variant), {})
+        if v.get("target"):  # catalog swap (videogen/catalog.py): short name + full description
+            category, text = f'{v.get("cls", variant)} ({v.get("category", "")})', v["target"]
+        else:
+            category, text = edit_label(mode, variant)
         prompt_file = mp4.with_suffix(".prompt.txt")
         compare = mp4.with_name(f"seed{seed}_compare.mp4")
         info = rec.get("output_info") or {}
