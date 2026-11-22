@@ -1,10 +1,13 @@
 """Build one HTML page with offline viser viewers of the hand-object reconstructions of the real videos.
 
-  python scripts/choir/build_choir_html.py [--method choir|fprecon] [--out DIR] [--index-only]   (sam3d env)
+  python scripts/choir/build_choir_html.py [--method choir|fprecon|refine] [--out DIR] [--index-only]   (sam3d env)
 
 --method choir (default, -> ../outputs/choir_viser): Open-CHOIR's final output (scripts/choir/view_choir.py).
 --method fprecon (-> ../outputs/fprecon_viser): FoundationPose on hand-scaled Depth Pro 2 depth
 (scripts/fprecon/view_fprecon.py, runs in $PROJECT_STORAGE_ROOT/runs/fprecon/<VID>).
+--method refine (-> ../outputs/refine_viser): the fprecon result after the agentic refinement (scripts/refine, runs
+in $PROJECT_STORAGE_ROOT/runs/refine/<VID>, or runs/refine_<REFINE_TAG> -> refine_viser_<REFINE_TAG>); captions
+from its summary.json (scripts/refine/summarize.py), with its before/after QC sheet and the agent's report.
 Writes OUT/<VID>.html per clip (hand + object + frame-0 scene points, gravity aligned; works from file://, no
 server), OUT/<VID>.json (QC numbers) and OUT/index.html with two tabs, "pp" and "prp", each a grid of that set's
 five clips. Only the active tab's iframes are loaded (each is a WebGL context). Clips without a finished
@@ -23,6 +26,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 PROJECT_ROOT = os.path.dirname(os.path.dirname(HERE))
 CHOIR_ROOT = os.environ.get("CHOIR_ROOT", "/data/sky/projects/CounterfactualHOI/build/CHOIR")
 FPRECON_RUNS = os.path.join(os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI"), "runs", "fprecon")
+REFINE_TAG = "_" + os.environ["REFINE_TAG"] if os.environ.get("REFINE_TAG") else ""
+REFINE_RUNS = os.path.join(os.path.dirname(FPRECON_RUNS), "refine" + REFINE_TAG)
 sys.path.insert(0, os.path.join(HERE, "..", "daid"))
 from build_recon_html import camera_query  # noqa: E402
 
@@ -47,6 +52,16 @@ textured object, the frame-0 depth points of the scene (hand/object pixels remov
 with the current video frame. Hand, object and table come from the same metric depth; the scene is rotated so
 GeoCalib's gravity points down (grid = table height). "QC frames"
 shows 12 video frames per clip with the tracked object rendered (orange), its SAM3 mask (green) and the hand (blue)."""),
+    "refine": dict(
+        title="Agent-refined 4D hand–object reconstructions of the real videos",
+        sub=INTRO + """The FoundationPose + Depth Pro 2 reconstructions after agentic refinement:
+Claude (Opus 5.5) looks at overlays of the reconstruction on the video and gravity-aligned side/top views, labels the
+motion phases, and edits the object's 6-DoF poses and the hand's rigid motion with tools (rotate/translate about
+named axes, interpolate, hold, snap to the table, gradient-free fits to the masks, keypoints and depth), checking
+each edit's before/after images and numbers and reverting what does not help. A blind A/B verifier then compares the
+initial and the refined reconstruction chunk by chunk and reverts chunks where the initial one looks better.
+Captions: medians before → after. "QC frames" shows the initial and refined overlays and a side view per phase;
+"report" is the agent's own account of what it changed."""),
 }
 
 
@@ -73,6 +88,17 @@ def panel(out_dir, vid, obj, missing="no reconstruction yet"):
             cap += f" · object ends {h1:.0f} cm {'above' if h1 >= 0 else 'below'} the table{' ⚠' if abs(h1) > 5 else ''}"
     if qc.get("iou_first_last"):
         cap += f" · mask IoU first/last {qc['iou_first_last'][0]:.2f}/{qc['iou_first_last'][1]:.2f}"
+    summ = os.path.join(out_dir, "summary", f"{vid}.json")
+    if os.path.exists(summ):                      # refine: medians before -> after
+        sm = json.load(open(summ))
+        ba = lambda part, k, d=2: (f"{sm[part][k][0]:.{d}f} → {sm[part][k][1]:.{d}f}" if None not in sm[part][k] else "—")
+        cap = (f"{sm['frames']} frames · hand keypoint error {ba('all', 'hand_kp_px', 1)} px · object mask IoU "
+               f"{ba('all', 'iou')} (held {ba('held', 'iou')}) · penetration while held {ba('held', 'penetration_cm')} cm · "
+               f"flagged frames {sm['flagged_frames'][0]} → {sm['flagged_frames'][1]} · verifier kept "
+               f"{len(sm['verifier']) - sm['reverted']}/{len(sm['verifier'])} chunks · {sm['n_versions']} versions in "
+               f"{sm['agent_minutes']:.0f} min")
+        if os.path.exists(os.path.join(out_dir, "reports", f"{vid}.html")):
+            cap += f' · <a href="reports/{vid}.html" target="_blank">report</a>'
     if os.path.exists(os.path.join(out_dir, "qc", f"{vid}.jpg")):
         cap += f' · <a href="qc/{vid}.jpg" target="_blank">QC frames</a>'
     src = f"{vid}.html" + camera_query(viewer)
@@ -143,10 +169,11 @@ Drag to orbit, scroll to zoom; the playback bar is at the bottom of each viewer.
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--method", choices=sorted(METHODS), default="choir")
-    ap.add_argument("--out", default=None, help="default: ../outputs/{choir,fprecon}_viser")
+    ap.add_argument("--out", default=None, help="default: ../outputs/{choir,fprecon,refine}_viser")
     ap.add_argument("--index-only", action="store_true", help="only rewrite index.html")
     args = ap.parse_args()
-    args.out = args.out or os.path.join(os.path.dirname(PROJECT_ROOT), "outputs", f"{args.method}_viser")
+    args.out = args.out or os.path.join(os.path.dirname(PROJECT_ROOT), "outputs", f"{args.method}_viser"
+                                        + (REFINE_TAG if args.method == "refine" else ""))
     os.makedirs(args.out, exist_ok=True)
     if not args.index_only:
         for s in SETS:
@@ -156,6 +183,11 @@ def main():
                 if args.method == "choir":
                     ready = os.path.isdir(os.path.join(vd, "stage3", "final", "optimized_meshes", "hand"))
                     cmd = [os.path.join(HERE, "view_choir.py"), "--video-dir", vd, "--export-html", out_html]
+                elif args.method == "refine":
+                    rd = os.path.join(REFINE_RUNS, vid, "export")
+                    ready = os.path.exists(os.path.join(rd, "hand_rigid.npz"))
+                    cmd = [os.path.join(HERE, "..", "fprecon", "view_fprecon.py"), "--video-dir", vd, "--run-dir", rd,
+                           "--export-html", out_html]
                 else:
                     rd = os.path.join(FPRECON_RUNS, vid)
                     ready = os.path.exists(os.path.join(rd, "fpose_qc.json"))
@@ -172,6 +204,20 @@ def main():
                 src = os.path.join(FPRECON_RUNS, vid, "overlay.jpg")
                 if os.path.exists(src):
                     shutil.copyfile(src, os.path.join(args.out, "qc", f"{vid}.jpg"))
+    if args.method == "refine":                   # summary numbers, QC sheet and the agent's report per clip
+        for sub in ("qc", "summary", "reports"):
+            os.makedirs(os.path.join(args.out, sub), exist_ok=True)
+        for s in SETS:
+            for vid, _obj in clips(s):
+                for src, dst in (("qc.jpg", f"qc/{vid}.jpg"), ("summary.json", f"summary/{vid}.json")):
+                    if os.path.exists(os.path.join(REFINE_RUNS, vid, src)):
+                        shutil.copyfile(os.path.join(REFINE_RUNS, vid, src), os.path.join(args.out, dst))
+                rep = os.path.join(REFINE_RUNS, vid, "report.md")
+                if os.path.exists(rep):           # as plain text in a page (static hosts serve .md as a download)
+                    open(os.path.join(args.out, "reports", f"{vid}.html"), "w").write(
+                        f'<!doctype html><meta charset="utf-8"><title>{vid} refinement report</title>'
+                        f'<pre style="white-space: pre-wrap; font: 14px/1.45 system-ui, sans-serif; max-width: 1000px; '
+                        f'margin: 24px auto">{html.escape(open(rep).read())}</pre>')
     write_index(args.out, args.method)
     print(f"wrote {os.path.join(args.out, 'index.html')}")
 
