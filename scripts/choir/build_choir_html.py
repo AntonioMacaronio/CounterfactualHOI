@@ -54,14 +54,16 @@ GeoCalib's gravity points down (grid = table height). "QC frames"
 shows 12 video frames per clip with the tracked object rendered (orange), its SAM3 mask (green) and the hand (blue)."""),
     "refine": dict(
         title="Agent-refined 4D hand–object reconstructions of the real videos",
-        sub=INTRO + """The FoundationPose + Depth Pro 2 reconstructions after agentic refinement:
-Claude (Opus 5.5) looks at overlays of the reconstruction on the video and gravity-aligned side/top views, labels the
-motion phases, and edits the object's 6-DoF poses and the hand's rigid motion with tools (rotate/translate about
-named axes, interpolate, hold, snap to the table, gradient-free fits to the masks, keypoints and depth), checking
-each edit's before/after images and numbers and reverting what does not help. A blind A/B verifier then compares the
-initial and the refined reconstruction chunk by chunk and reverts chunks where the initial one looks better.
-Captions: medians before → after. "QC frames" shows the initial and refined overlays and a side view per phase;
-"report" is the agent's own account of what it changed."""),
+        sub=INTRO + """The FoundationPose + Depth Pro 2 reconstructions after agentic refinement.
+An automatic gradient-free fit (hand to its keypoints, mask and depth; object to its mask and depth; each finger's
+flexion with no hand triangle through the object's surface) is followed by Claude (Opus 5.5), which looks at
+overlays on the video, the 3D scene from any side (hand red where it passes through the object, green where it
+touches it) and motion plots, labels the motion phases, and fixes what a per-frame fit cannot: contact while the
+object is held, fingers through it, a still object at rest, jumps. Every edit is a new version, checked before /
+after. A blind A/B verifier then compares each changed range with the automatic fit (overlays, 3D views from three
+sides, motion plot) and keeps the fit where the agent's edit loses. Captions: medians before → after. "QC frames"
+shows, per phase, the initial and refined overlays and the 3D scene from behind and from the left; "report" is
+the agent's own account of what it changed."""),
 }
 
 
@@ -94,6 +96,7 @@ def panel(out_dir, vid, obj, missing="no reconstruction yet"):
         ba = lambda part, k, d=2: (f"{sm[part][k][0]:.{d}f} → {sm[part][k][1]:.{d}f}" if None not in sm[part][k] else "—")
         cap = (f"{sm['frames']} frames · hand keypoint error {ba('all', 'hand_kp_px', 1)} px · object mask IoU "
                f"{ba('all', 'iou')} (held {ba('held', 'iou')}) · penetration while held {ba('held', 'penetration_cm')} cm · "
+               + (f"hand triangles through the object while held {ba('held', 'n_cross', 0)} · " if "n_cross" in sm["held"] else "") +
                f"flagged frames {sm['flagged_frames'][0]} → {sm['flagged_frames'][1]} · verifier kept "
                f"{len(sm['verifier']) - sm['reverted']}/{len(sm['verifier'])} chunks · {sm['n_versions']} versions in "
                f"{sm['agent_minutes']:.0f} min")

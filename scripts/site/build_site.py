@@ -12,9 +12,9 @@ a link to all of that method's viewers:
   3. our pipeline (Depth Pro 2 + hand scale, SAM3, textured SAM3D, FoundationPose)   -> recon/ours/
   4. agentic refinement of 3 (Claude edits the poses, a blind verifier checks)       -> recon/agent/
 then the generated-video gallery (videos/) and the retargeting test (img/). Sources: ../outputs/{recon_viser,
-choir_viser,fprecon_viser,refine_viser_r3,minimax_h3} (scripts/daid/build_recon_html.py,
+choir_viser,fprecon_viser,refine_viser_r4,minimax_h3} (scripts/daid/build_recon_html.py,
 scripts/choir/build_choir_html.py [--method fprecon|refine]), the refinement comparisons in
-$PROJECT_STORAGE_ROOT/runs/compare/*_final (scripts/refine/compare.py --tag final) and ../videos/grid2x2.mp4. The
+$PROJECT_STORAGE_ROOT/runs/compare/*_final4 (scripts/refine/compare.py --tag final4) and ../videos/grid2x2.mp4. The
 viser viewers are self-contained HTML files, so the site is
 plain static files (plus .nojekyll so GitHub Pages serves them untouched). Re-run after new results.
 """
@@ -125,7 +125,7 @@ def results_table(rows):
 
 def refine_table(rdir):
     """Per-clip medians before -> after the agentic refinement, from build_choir_html.py --method refine's summaries."""
-    rows, agg = [], {k: [] for k in ("kp", "iou", "pen")}
+    rows, agg = [], {k: [] for k in ("kp", "iou", "pen", "cross")}
     for st in ("pp", "prp"):
         for i in range(1, 6):
             f = os.path.join(rdir, "summary", f"{st}_anthony_real_{i}.json")
@@ -136,29 +136,32 @@ def refine_table(rdir):
             agg["kp"].append(sm["all"]["hand_kp_px"])
             agg["iou"].append(sm["all"]["iou"])
             agg["pen"].append(sm["held"]["penetration_cm"])
+            agg["cross"].append(sm["held"].get("n_cross", [None, None]))
             rows.append(f"<tr><td>{sm['video_id']}</td><td>{ba('all', 'hand_kp_px', 1)}</td><td>{ba('all', 'iou')}</td>"
-                        f"<td>{ba('held', 'penetration_cm')}</td><td>{sm['flagged_frames'][0]} → <b>{sm['flagged_frames'][1]}</b></td>"
+                        f"<td>{ba('held', 'penetration_cm')}</td><td>{ba('held', 'n_cross', 0) if 'n_cross' in sm['held'] else '—'}</td>"
+                        f"<td>{sm['flagged_frames'][0]} → <b>{sm['flagged_frames'][1]}</b></td>"
                         f"<td>{len(sm['verifier']) - sm['reverted']} / {len(sm['verifier'])}</td>"
                         f"<td>{sm['agent_minutes']:.0f} min</td></tr>")
     if not rows:
         return "", None
     table = ("<table><tr><th>clip</th><th>hand keypoint error (px)</th><th>object mask IoU</th>"
-             "<th>hand–object penetration while held (cm)</th><th>flagged frames</th><th>verifier kept (chunks)</th>"
+             "<th>hand–object penetration while held (cm)</th><th>hand triangles through the object while held</th>"
+             "<th>flagged frames</th><th>verifier kept (chunks)</th>"
              "<th>agent time</th></tr>" + "".join(rows) + "</table>")
     import statistics as stt
-    med = {k: (stt.median(a for a, _ in v if a is not None), stt.median(b for _, b in v if b is not None)) for k, v in agg.items()}
+    med = {k: (stt.median([a for a, _ in v if a is not None] or [0]), stt.median([b for _, b in v if b is not None] or [0]))
+           for k, v in agg.items()}
     return table, med
 
 
 def ablation_rows():
     """Blind A/B comparisons (scripts/refine/compare.py) as (label a, label b, wins a, wins b, ties)."""
-    names = {"initial": "initial (no refinement)", "refine_script": "automatic fit only (no agent)",
-             "refine": "agent from the initial reconstruction (round 1)", "refine_r2": "agent from the initial reconstruction (round 2)",
-             "refine_r3": "automatic fit + agent (final)"}
+    names = {"initial": "initial (no refinement)", "refine_r4_auto": "automatic fit only (no agent)",
+             "refine_r3": "previous version (no finger tools, no 3D views)", "refine_r4": "automatic fit + agent (final)"}
     out = []
     root = os.path.join(STORAGE, "runs", "compare")
     for d in sorted(os.listdir(root)) if os.path.isdir(root) else []:
-        if not d.endswith("_final"):                   # the final runs (judge with the motion plot); others: earlier rounds
+        if not d.endswith("_final4"):                  # the final runs (judge with 3D views + motion plot); others: earlier rounds
             continue
         js = [json.load(open(os.path.join(root, d, f))) for f in sorted(os.listdir(os.path.join(root, d))) if f.endswith(".json")]
         if not js:
@@ -202,7 +205,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(WORKDIR, "CounterfactualHOI-site"))
     ap.add_argument("--featured", default="prp_anthony_real_4", help="real clip shown for CHOIR and ours")
-    ap.add_argument("--refine", default="refine_viser_r3", help="outputs/ dir of the agent-refined viewers")
+    ap.add_argument("--refine", default="refine_viser_r4", help="outputs/ dir of the agent-refined viewers")
     args = ap.parse_args()
     out, feat = args.out, args.featured
     os.makedirs(out, exist_ok=True)
@@ -256,38 +259,43 @@ def main():
     agent_section = "" if not rtable else f"""
 <h2>4 · Agentic refinement of our reconstructions</h2>
 <p>Instead of a gradient-based optimizer, an agent refines the reconstruction's parameters by looking at it against
-the video. Three stages per clip (4–9 minutes):</p>
+the video. Three stages per clip (5–19 minutes):</p>
 <ol>
 <li><b>Automatic fit (no LLM).</b> Gradient-free searches run frame by frame over the whole clip: the hand's rigid
-motion fitted to its 2D keypoints, SAM3 mask and depth (no penetration into the object), then the object's 6-DoF
-pose fitted to its mask outside the hand and the depth, within a trust region.</li>
+motion fitted to its 2D keypoints, SAM3 mask and depth (no penetration into the object); the object's 6-DoF pose
+fitted to its mask outside the hand and the depth, within a trust region; then each finger's flexion (MANO skinning
+on top of the hand tracker's articulation) fitted to its keypoints with no triangle of the hand through the object's
+surface (mesh–mesh intersection tests, which catch fingers through a thin wall such as a mug's), and the palm pushed
+out along the surface normal where it passes through.</li>
 <li><b>Agent.</b> Claude (Opus 5.5) sees overlays of the rendered hand and object on the frames (with the SAM3 mask,
-the detected hand keypoints and the object's axes), gravity-aligned side / top views with the table, and per-frame
-plots and numbers. It labels the motion phases (approach, grasp, lift, carry, rotate, place, release, rest) and fixes
-what a per-frame fit cannot: the hand floating off the object while it is held (re-fit with a contact term over the
-held phases), the object jittering or drifting while it rests (hold static / smooth), jumps, flips and lag. Its tools
-edit the poses over frame ranges: rotate about the object's own axes or gravity, translate, move along the viewing
-ray, interpolate, hold static, snap to the table, smooth, re-run the searches, or pick among FoundationPose's
-re-registration hypotheses. Every edit is a new version with before / after images and numbers; it reverts what
+the detected hand keypoints and the object's axes), the 3D scene from any side (hand red where it passes through
+the object, green where it touches), and per-frame plots and numbers. It labels the motion phases (approach, grasp, lift, carry, rotate, place, release, rest) and fixes
+what a per-frame fit cannot: the hand or fingers off the object while it is held (re-fit with a contact term over
+the held phases, curl fingers), fingers through it, the object jittering or drifting while it rests (hold static /
+smooth), jumps, flips and lag. Its tools edit the poses over frame ranges: rotate about the object's own axes or
+gravity, translate, move along the viewing ray, interpolate, hold static, snap to the table, smooth, curl / open
+fingers, re-run the searches, or pick among FoundationPose's re-registration hypotheses. Every edit is a new version with before / after images and numbers; it reverts what
 does not help.</li>
 <li><b>Verifier.</b> A separate blind A/B judge (fresh context, random order) compares the agent's result with the
-automatic fit on each changed range, from overlays, side views and a plot of the motion, and keeps the automatic fit
-wherever the agent's version looks worse.</li>
+automatic fit on each changed range, from overlays, 3D views from three sides and a plot of the motion, and keeps
+the automatic fit wherever the agent's version looks worse.</li>
 </ol>
 {viewer(f"recon/agent/{feat}.html", out, "agent " + feat, agent_cap)}
 <p>Medians over each clip's frames, initial reconstruction → final.</p>
 {rtable}
 {("<p>Blind A/B judgements over every frame of the 10 clips, in chunks at phase boundaries (≤ 60 frames), by the "
-  "same judge as the verifier. The last row is not an independent test: the verifier already used that judge to "
-  "keep the automatic fit wherever the agent's edit lost.</p>" + abl_table) if abl_table else ""}
-<p class="verdict">Summary: the hand improves most (median keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px,
-penetration while held {rmed["pen"][0]:.2f} → {rmed["pen"][1]:.2f} cm); the object, already tracked well by
-FoundationPose, changes less (median IoU {rmed["iou"][0]:.2f} → {rmed["iou"][1]:.2f}). The automatic fit alone already
-wins most comparisons against the initial reconstruction; the agent's phase-aware edits (contact while held, a still
-object at rest) win most of the rest against the automatic fit. Still open: the object can rest at heights up to
-~1 cm apart before and after being moved, and with object 1 (the RealSense-style camera) the mesh's unseen underside
-puts the object ~1 cm into the measured table while its outline and depth fit; the export puts the simulated table
-at the object's resting height.</p>
+  "same judge as the verifier, which sees overlays, 3D views from three sides and a motion plot. "
+  "<i>Automatic fit vs final</i> is not an independent test: the verifier already used that judge to keep the "
+  "automatic fit wherever the agent's edit lost.</p>" + abl_table) if abl_table else ""}
+<p class="verdict">Summary: the hand improves most (median keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px)
+and is now physically consistent with the object: the median number of hand triangles through the object's surface
+while it is held goes from {rmed["cross"][0]:.0f} to {rmed["cross"][1]:.0f} (fingers inside the mug and the tape roll, the
+palm inside the bottle), penetration {rmed["pen"][0]:.2f} → {rmed["pen"][1]:.2f} cm. The object, already tracked well by
+FoundationPose, changes less (median IoU {rmed["iou"][0]:.2f} → {rmed["iou"][1]:.2f}). Still open: on a few frames of the mug
+clips a fingertip is still inside the cup (only the ring of triangles where it crosses the wall counts as crossing,
+so the measure undercounts it); the object can rest at heights up to ~1 cm apart before and after being moved; and
+with object 1 (the RealSense-style camera) the mesh's unseen underside puts the object ~1 cm into the measured table
+(the export puts the simulated table at the object's resting height).</p>
 <p class="more"><a href="recon/agent/index.html">→ All 10 refined viewers (with captions, QC frames and the agent's reports)</a></p>
 """
     page = f"""<!doctype html>

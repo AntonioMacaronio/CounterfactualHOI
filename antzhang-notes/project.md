@@ -75,15 +75,24 @@ The parameters the agent edits:
 
 | Type | Tool | Returns |
 |---|---|---|
-| look | `contact_sheet(frames)` | grid of video frames with the render, masks and hand drawn on |
-| look | `render_overlay(frame)`, `render_view(frame, side\|top)` | one frame up close; a gravity‑aligned 3D view (table contact, hand–object gap) |
-| look | `crop(frame, box)` | zoomed region; this is the single biggest lever for vision accuracy |
-| look | `plot(signal, frames)` | chart of object velocity, hand–object distance, height above the table |
-| measure | `metrics(range)` | coverage, spill, depth residual, table height, contact distance, penetration, velocity spikes |
-| edit | `set_phases`, `edit_keyframe`, `flip_about_axis`, `lock_hand_to_object`, `snap_to_table`, `set_scale` | a new version, with before/after metrics |
-| search | `reregister(frame, k)` | FoundationPose's top‑k pose guesses as rendered images, for the agent to pick from |
-| search | `local_search(params, range, objective)` | gradient‑free fine search (e.g. CMA‑ES) over a subset the agent chooses |
-| control | `compare(a, b, frames)`, `commit`, `revert`, `finish(report)` | |
+| look | `inspect(frames, mode=outline\|blend)` | up to 9 frames, cropped to the hand and object: rendered object (orange), hand (blue), SAM3 mask (green), 2D keypoints vs MANO joints, object axes |
+| look | `inspect(frames, mode=side\|top\|front)` | gravity-aligned virtual views with the table (5 cm grid): heights, contact |
+| look | **`view3d(frames, azimuths, elevation, zoom=action\|contact)`** (new) | up to 4 frames × 4 sides (0 = camera's right, 90 = from behind, 180 = left, 270 = camera side), or a close-up of where hand and object meet; hand red where it passes through / is inside the object, green where it touches |
+| look | `zoom(frame, box)` | full-resolution crop of one overlay |
+| look | `plot(signals, range)` | per-frame curves, current vs initial: fit, keypoint error, contact, penetration, **triangles through the object** (new), height, speed |
+| measure | `metrics(range, window)` | windowed medians + flagged frame runs (incl. "hand through the object's surface (fingers)") |
+| phases | `set_phases(phases)` | approach / grasp / lift / carry / rotate / place / release / rest; drives the contact terms |
+| edit object | `rotate_object`, `translate_object`, `move_along_ray`, `interpolate_object`, `hold_object_static`, `snap_object_to_table`, `smooth_object` | a new version with before/after numbers and overlays |
+| search object | `fit_object_silhouette(range)` | per-frame 6-DoF fit to the mask outside the hand + depth (gradient-free, trust region) |
+| search object | `polish_object(range)` | FoundationPose's refiner per frame, kept only where the fit improves |
+| search object | `propose_object_poses(frame, k)`, `apply_candidate` | FoundationPose's top-k registration hypotheses, rendered to choose from |
+| edit hand | `move_hand`, `attach_hand_to_object` | rigid hand edits |
+| edit hand | **`curl_finger(range, fingers, delta_deg)`** (new) | flex / open fingers on top of Dyn-HaMR's articulation (MANO skinning) |
+| search hand | `polish_hand(range)` | rigid hand fit to 2D keypoints (MANO joint regressor) + mask + depth, no penetration, contact while held |
+| search hand | **`fit_fingers(range, fingers)`** (new) | per-finger flexion search: keypoints, no triangles through the object's surface (FCL mesh-mesh), contact of the last segment while held |
+| search hand | **`separate_hand(range, max_cm)`** (new) | pushes the hand out along the surface normal where the palm passes through the object (keeps the keypoint fit) |
+| control | `history`, `revert(version)`, `finish(summary)` | |
+| verify (no agent) | blind A/B judge per changed range | overlays + 3D views from three sides + motion plot, vs the automatic fit; keeps the fit where the agent's edit loses |
 
 Agentic Framework Loop:
 1. Automatic start, no LLM: run the current pipeline, compute metrics, flag suspect frames.
@@ -95,29 +104,42 @@ Agentic Framework Loop:
 It plugs in as a new refine step after run_fprecon.sh, and the website gets a fourth section, "agent‑refined".
 
 ### Implementation (`scripts/refine`) and results
-`bash scripts/refine/run_refine.sh VID [GPU]` (Claude Opus 5.5 on Bedrock, `AnthropicBedrock`, us-west-2), 4–9 min
-per clip; outputs in `/data/.../runs/refine_r3/VID` (report.md, transcript, versions/, export/ for the viewer and
-retargeting, table.json = the table at the object's resting height) and `outputs/refine_viser_r3/`.
-- **State:** per-frame object SE(3) + rigid hand offset/rotation + phase labels; every edit is a new version.
-- **Final design (round 3):** (1) automatic fit, no LLM: `polish_hand` (gradient-free fit of the hand to ViTPose
-  keypoints via the MANO joint regressor + SAM3 mask + depth, no penetration) and `fit_object_silhouette` (object
-  pose vs mask outside the hand + depth) over the whole clip; (2) the agent starts from that, labels phases, and fixes
-  what per-frame fits can't see: contact while held (re-fit with a contact term), a still object at rest
-  (`hold_object_static` / `smooth_object`), jumps, flips; (3) a blind A/B verifier (overlays + side views + a plot of
-  the motion) compares each changed range against the automatic fit and keeps the fit where the agent's edit loses.
-- **Metrics (initial → final, medians):** hand keypoint error 19–41 → 8–12 px; object mask IoU (hand = occluder)
-  0.86–0.93 → 0.90–0.96; penetration while held e.g. 2.5 → 0.1 cm (pp_5), 0.9 → 0.01 cm (prp_2); flagged frames
-  235 → 80 (prp_1), 89 → 1 (pp_4). Table: `runs/refine_r3/summary.md`.
-- **Blind A/B over all frames of the 10 clips** (`scripts/refine/compare.py`, chunks ≤ 60 frames at phase
-  boundaries): automatic fit vs initial 58:16 (1 tie); final vs initial 66:11 (1 tie); final vs automatic fit 55:2
-  (21 ties). The last is not independent (the verifier used the same judge to select). A human check is still needed.
-- **What we learned:** rounds 1–2 started the agent from the initial reconstruction; a non-agentic script of its own
-  search tools (`scripts/refine/baseline.py`) matched it (22:19, 34 ties). Agents are bad at hand-tuning numbers and
-  good at what needs understanding of the motion; the judge only credits that when it sees the motion (plot), not
-  just still frames.
-- **Known issues:** the object can rest at heights up to ~1 cm apart before and after a move (e.g. pp_2); object 1's
-  mesh underside sits ~1 cm into the measured table (handled by table.json); the table estimate near the object needs
-  table pixels around it (fixed: widen the ring before falling back to the global plane, which can be 5 cm off).
+`bash scripts/refine/run_refine.sh VID [GPU]` (Claude Opus 5.5 on Bedrock, `AnthropicBedrock`, us-west-2), 5–19 min
+per clip; outputs in `/data/.../runs/refine_r4/VID` (report.md, transcript, versions/, export/ for the viewer and
+retargeting incl. hand_verts.npy = the final hand mesh per frame, table.json = the table at the object's resting
+height) and `outputs/refine_viser_r4/`.
+- **State:** per-frame object SE(3), rigid hand offset/rotation, per-finger flexion (MANO skinning on top of
+  Dyn-HaMR's articulation), phase labels; every edit is a new version.
+- **Final design (round 4):** (1) automatic fit, no LLM: `polish_hand` (hand to ViTPose keypoints via the MANO joint
+  regressor + SAM3 mask + depth), `fit_object_silhouette` (object pose vs mask outside the hand + depth),
+  `fit_fingers` (no hand triangle through the object's surface: FCL mesh-mesh tests), `separate_hand` (palm out along
+  the surface normal); (2) the agent starts from that, labels phases, looks at the 3D scene from several sides
+  (`view3d`: red = through / inside, green = touching) and fixes what per-frame fits can't see: contact while held
+  (`polish_hand` + `fit_fingers` with contact terms, `curl_finger`), a still object at rest, jumps, flips; (3) a blind
+  A/B verifier (overlays + 3D views from three sides + a motion plot) compares each changed range with the automatic
+  fit and keeps the fit where the agent's edit loses.
+- **Metrics (initial → final, medians):** hand keypoint error 19–41 → 9–13 px; object mask IoU (hand = occluder)
+  0.86–0.93 → 0.90–0.96; hand triangles through the object while held 143 → 0 (pp_4 mug), 221 → 11 (prp_4 mug),
+  170 → 0 (prp_5 bottle), 122 → 0 (prp_2 tape roll), median over clips 73 → 0; penetration ~0 everywhere; flagged
+  frames 261 → 43 (prp_1), 119 → 27 (pp_4). Table: `runs/refine_r4/summary.md`.
+- **Blind A/B over all frames of the 10 clips** (`scripts/refine/compare.py --tag final4`, chunks ≤ 60 frames at
+  phase boundaries, judge sees 3D views): final vs initial 78:0; final vs round 3 (no finger tools, no 3D views)
+  64:13 (1 tie); final vs automatic fit 43:7 (28 ties; not independent, the verifier selected with the same judge).
+  A human check is still needed.
+- **What we learned:** (a) rounds 1–2 started the agent from the initial reconstruction; a non-agentic script of its
+  own search tools (`scripts/refine/baseline.py`) matched it (22:19, 34 ties). Agents are bad at hand-tuning numbers
+  and good at what needs understanding of the motion; the judge only credits that when it sees the motion. (b) Round
+  3 changed the 3D reconstruction by ~0 cm on top of the automatic fit: it looked at 2–3 virtual views per clip, all
+  from the camera's right, and could not move fingers; from behind / the left the fingers were inside the mug.
+  Measured afterwards, round 3 still had hand triangles through the object while held on 9 of 10 clips (median
+  6-219, e.g. 219 prp_4, 98 pp_4, 75 prp_5). With 3D views from any side, finger tools and a mesh-mesh crossing
+  measure, round 4 gets 0-11 (64:13 vs round 3 in the blind A/B).
+  (c) The rigid hand fit cannot see thin walls (the SDF grid is ~3-4 mm): it now keeps the previous pose where it
+  would push the hand through the object (after round 4, which the verifier had to correct on prp_4).
+- **Known issues:** on a few frames of the mug clips a fingertip is still inside the cup (only the ring of triangles
+  where a finger crosses the wall counts, so the measure undercounts a finger fully through it; next: a per-finger
+  parity test along the bones); the object can rest at heights up to ~1 cm apart before and after a move (e.g. pp_2);
+  object 1's mesh underside sits ~1 cm into the measured table (handled by table.json).
 
 ## 1.3 Retarget to robot morphology
 We will retarget to a Sharpa URDF using `do-as-i-do`'s retargeting pipeline.
