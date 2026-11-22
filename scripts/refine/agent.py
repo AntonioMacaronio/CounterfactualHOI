@@ -33,7 +33,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ops  # noqa: E402
 import render as R  # noqa: E402
-from clip import Clip, State, Versions, flag, phase_of, se3_interp, summarize  # noqa: E402
+from clip import FINGERS, Clip, State, Versions, flag, phase_of, se3_interp, summarize  # noqa: E402
 
 OBJECTS = {1: "small metal device (a RealSense-style depth camera)", 2: "blue tape roll", 3: "black spatula",
            4: "gray mug", 5: "dish soap bottle"}
@@ -43,10 +43,10 @@ PHASES = ["approach", "grasp", "lift", "carry", "rotate", "place", "release", "r
 AXES = ["object_long", "object_mid", "object_short", "world_up", "world_right", "world_forward",
         "camera_x", "camera_y", "camera_z", "ray"]
 SIGNALS = ["coverage", "spill", "iou", "depth_res_cm", "depth_bias_cm", "hand_kp_px", "hand_coverage", "hand_spill",
-           "hand_depth_bias_cm", "contact_cm", "penetration_cm", "obj_height_cm", "hand_height_cm",
+           "hand_depth_bias_cm", "contact_cm", "penetration_cm", "n_cross", "obj_height_cm", "hand_height_cm",
            "ang_speed_deg_per_frame", "speed_cm_per_frame"]
 REPORT_KEYS = ["coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "contact_cm", "penetration_cm",
-               "obj_height_cm", "ang_speed_deg_per_frame"]
+               "n_cross", "obj_height_cm", "ang_speed_deg_per_frame"]
 
 SYSTEM = """You refine a 4D reconstruction of a hand manipulating a rigid object, filmed by a static camera. The
 reconstruction will be retargeted to a robot hand and simulated, so it must match the video and be physically
@@ -55,7 +55,8 @@ the hand or the table, and moves smoothly.
 
 What you are editing (all metric, in the real camera's frame):
 - the object's pose in every frame (a textured mesh reconstructed from the first frame);
-- the hand's rigid motion in every frame (its finger articulation comes from a hand tracker and stays as is);
+- the hand's rigid motion in every frame, and each finger's flexion (curl > 0, open < 0, in degrees on top of the
+  hand tracker's articulation);
 - motion phases (approach, grasp, lift, carry, rotate, place, release, rest) that you label.
 
 How to read the images:
@@ -64,8 +65,13 @@ How to read the images:
   to the hand model's joints (blue dots), and the object's axes from its center: long = red, mid = green, short = blue.
   "blend" mode paints the textured object render over the frame instead. A correct object pose puts the orange outline
   on the real object's silhouette, including thin parts (handles, the spatula's blade), with the texture lining up.
-- "side", "top" and "front" are gravity-aligned virtual views (table in gray with a 5 cm grid): use them for heights,
-  contact, and penetration, which the camera view cannot show.
+- "side", "top" and "front" are gravity-aligned virtual views (table in gray with a 5 cm grid), and view3d shows the
+  scene from any side (azimuth 0 = from the camera's right, 90 = from behind the object looking back at the camera,
+  180 = from the left, 270 = from the camera's side; elevation; zoom "contact" for a close-up of where hand and object
+  meet). In these views the hand is blue, RED where it passes through the object's surface or is inside it, and GREEN
+  where it touches it. The camera view cannot show depth: fingers that look wrapped around an object in the video can
+  be inside it or through its wall (a mug, a tape roll) in 3D, which only other viewpoints reveal. n_cross counts the
+  hand's triangles that cross the object's surface (0 is right; a few at a firm grip are fine).
 - The segmentation masks and keypoints are evidence, not truth: masks sometimes miss parts of the object or the
   object entirely, keypoints of occluded fingers are guesses. When a mask is clearly wrong, trust what you see in the
   frame. Metrics (coverage/spill/depth vs the masks and the depth map, keypoint error, contact, height) are computed
@@ -81,19 +87,25 @@ Edits (each makes a new version and shows you before/after numbers and images of
   (the tracker's refiner) sharpen poses within a trust region; they will not fix a wrong orientation or a jump.
   Your own rotate/translate edits are for what search cannot do: flips, wrong sides, jumps, lag, structure.
 - Hand: polish_hand fits the hand's rigid motion to its keypoints, mask and depth, and keeps it touching the object in
-  the held phases you labeled (so label phases first); move_hand and attach_hand_to_object for what the fit cannot
-  see. Keypoints of fingers hidden behind the object are guesses, so in held phases contact matters more than them.
+  the held phases you labeled (so label phases first); fit_fingers searches each finger's flexion against its
+  keypoints, the object's surface (no triangles through it) and, in held phases, contact of its last segment with
+  the object; separate_hand pushes the hand out along the surface normal where the palm passes through the object;
+  curl_finger and move_hand / attach_hand_to_object for what the fits cannot see. Keypoints of fingers hidden behind
+  the object are guesses, so in held phases contact and no crossing matter more than them.
 - Range edits apply fully on [start, end] and fade out over `falloff` frames on each side.
 
 How to work:
-Unless the overview says otherwise, you start from v1, the automatic fit: polish_hand and fit_object_silhouette run
-frame by frame over the whole clip. It is usually more precise per frame than the initial reconstruction (v0), and a
+Unless the overview says otherwise, you start from v1, the automatic fit: polish_hand, fit_object_silhouette,
+fit_fingers, separate_hand and fit_fingers again, run frame by frame over the whole clip. It is usually more precise per frame than the initial reconstruction (v0), and a
 verifier will compare your result against v1, chunk by chunk, keeping v1 wherever yours looks worse. The automatic
 fit knows nothing about the motion: it fits every frame on its own, so it can make the object jitter or drift while
 it rests, leave the hand floating off the object while it is held (no phases yet, so no contact term), follow a bad
 mask, or keep a wrong orientation it started from. Fixing that is your job:
 1. Look at the overview and label the phases with set_phases first (frame ranges covering the whole clip).
-2. Contact: re-run polish_hand over the held phases (grasp to place) so the hand touches the object there.
+2. Contact: re-run polish_hand, then fit_fingers, over the held phases (grasp to place) so the hand and its fingers
+   touch the object there. Then look at held frames in 3D from at least three sides (view3d, azimuths 0, 90, 180,
+   270; zoom "contact"): fingers must wrap on the outside of the object, none red; where the palm is red use
+   separate_hand, where a finger is red or floats use fit_fingers or curl_finger.
 3. Rest: nobody moves the object before the grasp or after the release, so it should be still there. Where the
    rest frames jitter or drift (obj_height_cm, ang_speed / speed in plot), hold_object_static at a frame whose
    outline fits well, or smooth_object.
@@ -108,9 +120,9 @@ mask, or keep a wrong orientation it started from. Fixing that is your job:
    thin object blending into the table, not a pose error. Leave it if one move_along_ray on the rest frames raises
    depth_res_cm past ~1 cm; the export puts the simulated table at the object's resting height, so a constant
    offset is harmless. What must be fixed is a rest height that differs between rest phases or drifts within one.
-6. Before finishing, check the current version phase by phase, with outline and side views of frames from every
-   phase and a plot of the motion: while the object is held the hand must touch it (contact_cm ~0, no visible gap in
-   the side view) without passing through it; at rest the object sits still on the table; the object's outline
+6. Before finishing, check the current version phase by phase, with outline overlays, view3d from several sides
+   and a plot of the motion: while the object is held the hand must touch it (contact_cm ~0, green, no gap) without
+   passing through it (n_cross ~0, no red); at rest the object sits still on the table; the object's outline
    follows the real one through the whole motion, with no jumps. Fix what fails, then finish. Finish when the
    remaining errors are small compared to the uncertainty of the evidence; do not chase tiny metric changes, and do
    not edit frames that already look right.
@@ -166,6 +178,17 @@ TOOLS = [
          {**RANGE, "dx_cm": NUM, "dy_cm": NUM, "dz_cm": NUM, "frame": {"type": "string", "enum": ["world", "camera"]},
           "rot_axis": {"type": "string", "enum": ["none"] + AXES}, "rot_deg": NUM, **FALLOFF}),
     tool("polish_hand", "Fit the hand's rigid motion to its 2D keypoints, mask and depth (no penetration), per frame.", dict(RANGE)),
+    tool("fit_fingers", "Fit each finger's flexion per frame: its keypoints, no triangles through the object's surface, and in held phases contact of its last segment with the object.",
+         {**RANGE, "fingers": {"type": "array", "items": {"type": "string", "enum": FINGERS + ["all"]}}}),
+    tool("separate_hand", "Per frame, push the hand out of the object along the surface normal where the palm passes through it (at most max_cm; keeps the keypoint fit).",
+         {**RANGE, "max_cm": NUM}),
+    tool("curl_finger", "Add flexion to fingers (degrees, curl > 0, open < 0) on [start, end].",
+         {**RANGE, "fingers": {"type": "array", "items": {"type": "string", "enum": FINGERS + ["all"]}}, "delta_deg": NUM, **FALLOFF}),
+    tool("view3d", "3D views of object + hand + table from several sides (red = hand through / inside the object, green = touching): up to 4 frames x 4 azimuths.",
+         {"frames": {"type": "array", "items": INT, "description": "1-4 frames"},
+          "azimuths": {"type": "array", "items": NUM, "description": "degrees: 0 camera's right, 90 behind, 180 left, 270 camera side (1-4)"},
+          "elevation": {"type": "number", "description": "degrees above level (0-90, default view 25)"},
+          "zoom": {"type": "string", "enum": ["action", "contact"]}}),
     tool("attach_hand_to_object", "Keep the hand's position fixed relative to the object over [start, end], as at frame ref.", {**RANGE, "ref": INT}),
     tool("history", "List versions with their edits and key metrics.", {}),
     tool("revert", "Make version v the working version again (as a new version).", {"version": INT}),
@@ -190,10 +213,19 @@ class Session:
         c = self.clip
         st, _, n1 = ops.polish_hand(c, self.v.state, 0, c.N - 1)
         st, _, n2 = ops.fit_object_silhouette(c, st, 0, c.N - 1)
-        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n2}")
-        np.savez(os.path.join(self.out, "versions", f"v{k:03d}.npz"), obj=st.obj, hand_off=st.hand_off, hand_rot=st.hand_rot)
+        st, _, n3 = ops.fit_fingers(c, st, 0, c.N - 1)
+        st, moved, n4 = ops.separate_hand(c, st, 0, c.N - 1)
+        n5 = "no refit needed"
+        if moved:                                    # re-close the fingers where the hand was moved out
+            st, _, n5 = ops.fit_fingers(c, st, max(0, min(moved) - 3), min(c.N - 1, max(moved) + 3))
+        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n2}; {n3}; {n4}; then {n5}")
+        self.save(k, st)
         self.base = k
         return k
+
+    def save(self, k, st):
+        np.savez(os.path.join(self.out, "versions", f"v{k:03d}.npz"), obj=st.obj, hand_off=st.hand_off,
+                 hand_rot=st.hand_rot, finger=st.finger)
 
     def img(self, im, tag):
         self.n_img += 1
@@ -213,7 +245,7 @@ class Session:
         before = self.v.cur
         st, touched, note = fn(self.clip, self.v.state, *a, **kw)
         k = self.v.add(st, note)
-        np.savez(os.path.join(self.out, "versions", f"v{k:03d}.npz"), obj=st.obj, hand_off=st.hand_off, hand_rot=st.hand_rot)
+        self.save(k, st)
         if not touched:
             return [{"type": "text", "text": f"v{k}: {note}. No frames changed."}]
         mb, ma = self.metrics_of(before), self.metrics_of(k)
@@ -310,6 +342,21 @@ class Session:
                              ax, float(a["rot_deg"]), int(a["falloff"]))
         if name == "polish_hand":
             return self.edit(ops.polish_hand, cl(a["start"]), cl(a["end"]))
+        if name == "fit_fingers":
+            return self.edit(ops.fit_fingers, cl(a["start"]), cl(a["end"]), a["fingers"])
+        if name == "separate_hand":
+            return self.edit(ops.separate_hand, cl(a["start"]), cl(a["end"]), float(min(max(a["max_cm"], 0.2), 3.0)))
+        if name == "curl_finger":
+            return self.edit(ops.curl_finger, cl(a["start"]), cl(a["end"]), a["fingers"], float(a["delta_deg"]), int(a["falloff"]))
+        if name == "view3d":
+            fr = [cl(i) for i in a["frames"][:4]]
+            az = [float(x) for x in a["azimuths"][:4]] or [0.0]
+            el = float(min(max(a["elevation"], 0), 90))
+            ims = [R.view_orbit(c, st, i, z, el, a["zoom"]) for i in fr for z in az]
+            rows = self.metrics_of(self.v.cur)
+            txt = "; ".join(f"frame {i}: n_cross {rows[i]['n_cross']}" + (f" ({', '.join(rows[i]['cross_fingers'])})" if rows[i]["cross_fingers"] else "")
+                            + ", fingertip gaps cm " + ", ".join(f"{f} {g:.1f}" if g < 5 else f"{f} >5" for f, g in zip(FINGERS, rows[i]["tip_gap_cm"])) for i in fr)
+            return [{"type": "text", "text": f"v{self.v.cur}: {txt}"}, self.img(R.sheet(ims, ncols=len(az), tile_w=480), "view3d")]
         if name == "attach_hand_to_object":
             return self.edit(ops.attach_hand_to_object, cl(a["start"]), cl(a["end"]), cl(a["ref"]))
         if name == "history":
@@ -319,7 +366,7 @@ class Session:
                 extra = ""
                 if rows:
                     extra = " | " + ", ".join(f"{key} {np.nanmedian([r[key] if r.get(key) is not None else np.nan for r in rows]):.2f}"
-                                              for key in ("coverage", "spill", "hand_kp_px", "penetration_cm"))
+                                              for key in ("coverage", "spill", "hand_kp_px", "penetration_cm", "n_cross"))
                 lines.append(f"v{k}{' (current)' if k == self.v.cur else ''} <- v{self.v.parents[k]}: {note}{extra}")
             return [{"type": "text", "text": "\n".join(lines)}]
         if name == "revert":
@@ -341,6 +388,9 @@ def overview(sess):
     fr = [int(x) for x in np.linspace(0, c.N - 1, 12)]
     side = [int(x) for x in np.linspace(0, c.N - 1, 6)]
     rows = sess.metrics_of(k)
+    close = [r["frame"] for r in rows if r["hand_valid"] and r["contact_cm"] < 1.0]
+    near = [close[int(j)] for j in np.linspace(0, len(close) - 1, 3)] if len(close) >= 3 else (close or [c.N // 2])
+    near = list(dict.fromkeys(near))
     vid = c.vid
     task = TASKS[vid.split("_")[0]]
     obj = OBJECTS.get(int(vid.split("_")[-1]), "object")
@@ -351,13 +401,16 @@ def overview(sess):
                          "v0): polish_hand over the whole clip early on is usually worth it.\n")
             + f"v{k} metrics:\n" + summarize(c, st, rows) +
             f"\nImages (v{k}): (1) 12 frames, outline overlays; (2) 6 frames, side views; (3) per-frame signals"
-            + (" (v0 for comparison)." if k else "."))
+            + (" (v0 for comparison)" if k else "") + f"; (4) frames {near} where the hand is at the object, in 3D from four "
+            "sides (red = through / inside the object, green = touching).")
     return [{"type": "text", "text": text},
             sess.img(R.sheet([R.overlay(c, st, i) for i in fr], ncols=4), "overview"),
             sess.img(R.sheet([R.view(c, st, i, "side") for i in side], ncols=3), "overview_side"),
             sess.img(R.plot(c, {f"v{k}": rows, **({"initial (v0)": sess.metrics_of(0)} if k else {})},
-                            ["coverage", "spill", "hand_kp_px", "contact_cm", "obj_height_cm", "ang_speed_deg_per_frame"]),
-                     "overview_plot")]
+                            ["coverage", "spill", "hand_kp_px", "contact_cm", "n_cross", "obj_height_cm", "ang_speed_deg_per_frame"]),
+                     "overview_plot"),
+            sess.img(R.sheet([R.view_orbit(c, st, i, z) for i in near for z in (0, 90, 180, 270)], ncols=4, tile_w=440),
+                     "overview_3d")]
 
 
 def call(client, args, log, **kw):
@@ -446,7 +499,8 @@ def changed_runs(clip, s0, s1, rot_deg=1.0, trans_cm=0.3, hand_cm=0.5, gap=6):
         dt = 100 * np.linalg.norm(s1.obj[i, :3, 3] - s0.obj[i, :3, 3])
         dh = 100 * np.linalg.norm(clip.hand_verts(s1, i).mean(0) - clip.hand_verts(s0, i).mean(0))
         dhr = np.degrees(np.linalg.norm(s1.hand_rot[i] - s0.hand_rot[i]))
-        if dR > rot_deg or dt > trans_cm or dh > hand_cm or dhr > 3:
+        dfl = np.abs(s1.finger[i] - s0.finger[i]).max()
+        if dR > rot_deg or dt > trans_cm or dh > hand_cm or dhr > 3 or dfl > 3:
             ch.append(i)
     runs = []
     for i in ch:
@@ -463,7 +517,7 @@ VERIFY_SCHEMA = {"type": "object", "properties": {
     "reason": {"type": "string"}}, "required": ["winner", "confidence", "reason"], "additionalProperties": False}
 
 
-VERIFY_SIGNALS = ["obj_height_cm", "ang_speed_deg_per_frame", "speed_cm_per_frame", "contact_cm"]
+VERIFY_SIGNALS = ["obj_height_cm", "ang_speed_deg_per_frame", "speed_cm_per_frame", "contact_cm", "n_cross"]
 
 
 def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None):
@@ -477,10 +531,11 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
     tiles = []
     for i in fr:
         tiles += [R.overlay(clip, A, i, label=f"frame {i}: A"), R.overlay(clip, B, i, label=f"frame {i}: B")]
-    views = []
-    for i in fr[:2]:
-        views += [R.view(clip, A, i, "side", label=f"frame {i} side: A"), R.view(clip, B, i, "side", label=f"frame {i} side: B")]
-    im1, im2 = R.sheet(tiles, ncols=2), R.sheet(views, ncols=2)
+    views = []                                            # 3D from three sides, A's row then B's row, per frame
+    for i in (fr[0], fr[-1]) if len(fr) > 1 else fr:
+        for lab, S_ in (("A", A), ("B", B)):
+            views += [R.view_orbit(clip, S_, i, z, label=f"frame {i} {R.AZ_NAMES[z]}: {lab}") for z in (0, 90, 180)]
+    im1, im2 = R.sheet(tiles, ncols=2), R.sheet(views, ncols=3, tile_w=440)
     ims = [im1, im2]
     if rows0 is not None and rows1 is not None:
         lo, hi = max(0, a - 8), min(clip.N - 1, b + 8)
@@ -491,7 +546,9 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
     prompt = (f"Two reconstructions (A and B) of the same video frames {a}-{b}: a hand and a rigid object "
               f"({OBJECTS.get(int(clip.vid.split('_')[-1]), 'object')}). Overlays: orange outline/fill = rendered object, blue = rendered "
               "hand, green = object segmentation mask (can be wrong), white dots = detected hand keypoints, blue dots = hand "
-              "model joints. Side views: gravity-aligned, table in gray. Which reconstruction matches the video better and is "
+              "model joints. 3D views: the scene from three sides (table in gray), the hand blue, red where it passes "
+              "through the object's surface or is inside it, green where it touches it. Which reconstruction matches the "
+              "video better and is "
               "more physically plausible (object on the table when not held, hand touching the object when holding it, no "
               "interpenetration)? Judge from the images; answer tie if they are equally good or the difference is negligible.")
     if len(ims) > 2:
@@ -516,23 +573,26 @@ def merge(clip, s0, s1, runs_to_revert, blend=3):
             s.obj[i] = se3_interp(s1.obj[i], s0.obj[i], w[i])
             s.hand_off[i] = (1 - w[i]) * s1.hand_off[i] + w[i] * s0.hand_off[i]
             s.hand_rot[i] = (Rotation.from_rotvec(s1.hand_rot[i]) if w[i] < 0.5 else Rotation.from_rotvec(s0.hand_rot[i])).as_rotvec()
+            s.finger[i] = (1 - w[i]) * s1.finger[i] + w[i] * s0.finger[i]
     return s
 
 
 def export(clip, state, out):
     """Write the result and an export/ run dir (the fprecon run with refined object poses + hand motion) for the viewer."""
-    np.savez(os.path.join(out, "final.npz"), obj=state.obj, hand_off=state.hand_off, hand_rot=state.hand_rot)
+    np.savez(os.path.join(out, "final.npz"), obj=state.obj, hand_off=state.hand_off, hand_rot=state.hand_rot, finger=state.finger)
     json.dump(state.phases, open(os.path.join(out, "phases.json"), "w"), indent=1)
     ex = os.path.join(out, "export")
     os.makedirs(ex, exist_ok=True)
     for f in os.listdir(clip.run):
-        if f in ("object_poses.npy", "hand_rigid.npz"):
+        if f in ("object_poses.npy", "hand_rigid.npz", "hand_verts.npy"):
             continue
         dst = os.path.join(ex, f)
         if not os.path.lexists(dst):
             os.symlink(os.path.join(clip.run, f), dst)
     np.save(os.path.join(ex, "object_poses.npy"), state.obj)
-    np.savez(os.path.join(ex, "hand_rigid.npz"), hand_off=state.hand_off, hand_rot=state.hand_rot)
+    np.savez(os.path.join(ex, "hand_rigid.npz"), hand_off=state.hand_off, hand_rot=state.hand_rot, finger=state.finger)
+    # the final hand mesh per frame (finger flexion + rigid motion), for the viewer and retargeting
+    np.save(os.path.join(ex, "hand_verts.npy"), np.stack([clip.hand_verts(state, i) for i in range(clip.N)]).astype(np.float32))
     # The table for simulation: the fitted plane's normal, at the height the object rests at (the mesh's unseen
     # underside and the depth near the object can put the object's lowest point ~1 cm off the measured surface).
     n = clip.table_n

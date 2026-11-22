@@ -5,7 +5,9 @@ the rendered hand (blue) and the SAM3 object mask (green outline), the detected 
 to MANO's projected joints (blue dots), plus the object's axes (long = red, mid = green, short = blue), cropped to the
 hand-object region. view(): a gravity-aligned virtual camera ("side": horizontal, from
 the real camera's right; "top": looking straight down, forward = up in the image) showing object, hand and table,
-for contact and height. Also contact sheets, zoom crops and metric plots.
+for contact and height. view_orbit(): the same scene from any azimuth / elevation around the action or zoomed onto
+the contact region. In the virtual views the hand is blue, red where it crosses the object's surface or is inside
+it, green where it touches it (< 3 mm). Also contact sheets, zoom crops and metric plots.
 """
 
 import base64
@@ -155,7 +157,7 @@ def view(clip, state, i, which="side", size=(720, 540), dist=None, label=None):
                     cv2.line(img, tuple(np.int32(P[0, :2] / P[0, 2])), tuple(np.int32(P[1, :2] / P[1, 2])), (175, 170, 160), 1)
     oc, od = _render(clip, clip.mt, T_vc @ state.obj[i], Kv, H, W)
     hv = clip.hand_verts(state, i)
-    hc, hd = _render(clip, clip.hand_tensors(hv), T_vc, Kv, H, W)
+    hc, hd = _render(clip, clip.hand_tensors(hv, clip.hand_colors(state, i, hv)), T_vc, Kv, H, W)
     hd[~(hd > 0)] = np.inf
     od[~(od > 0)] = np.inf
     so, sh = np.isfinite(od) & (od <= hd), np.isfinite(hd) & (hd < od)
@@ -163,6 +165,65 @@ def view(clip, state, i, which="side", size=(720, 540), dist=None, label=None):
     img[sh] = hc[sh]
     txt = label if label is not None else f"frame {i} {which} view"
     cv2.putText(img, txt, (10, 26), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (30, 30, 30), 2)
+    return img
+
+
+AZ_NAMES = {0: "from the camera's right", 45: "right-behind", 90: "from behind", 135: "left-behind",
+            180: "from the camera's left", 225: "left-front", 270: "from the camera's side", 315: "right-front"}
+
+
+def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), label=None):
+    """Object + hand + table from azimuth `az` (degrees about gravity: 0 = from the real camera's right, 90 = from
+    behind the object looking back at the camera, 180 = from the left, 270 = from the camera's side) and elevation
+    `el` (0 = level, 90 = straight down); zoom "action" frames hand and object, "contact" the region where they meet."""
+    up, right, fwd = clip.up, clip.right, clip.fwd
+    hv = clip.hand_verts(state, i)
+    T = state.obj[i]
+    c_obj = clip.obj_center(state, i)
+    sd = clip.sdf_at((hv - T[:3, 3]) @ T[:3, :3])
+    if zoom == "contact" and clip.hand_valid[i]:
+        near = hv[sd < max(0.01, np.sort(sd)[min(20, len(sd) - 1)])]
+        c, dist = near.mean(0), 0.16
+    else:
+        c = 0.5 * (c_obj + hv.mean(0)) if clip.hand_valid[i] else c_obj
+        dist = max(0.40, 2.6 * float(clip.extent.max()))
+    a, e = np.radians(az), np.radians(el)
+    eye = np.cos(e) * (np.cos(a) * right + np.sin(a) * fwd) + np.sin(e) * up
+    z = -eye
+    y = -up - (-up @ z) * z
+    if np.linalg.norm(y) < 1e-6:                       # straight down: image up = away from the camera
+        y = -fwd - (-fwd @ z) * z
+    y /= np.linalg.norm(y)
+    x = np.cross(y, z)
+    Rv = np.stack([x, y, z])
+    t = -Rv @ (c + dist * eye)
+    Tv = np.eye(4)
+    Tv[:3, :3], Tv[:3, 3] = Rv, t
+    W, H = size
+    f = 0.9 * W
+    Kv = np.array([[f, 0, W / 2], [0, f, H / 2], [0, 0, 1.0]])
+    img = np.full((H, W, 3), 245, np.uint8)
+    n, p0 = clip.table_n, clip.table_p
+    cp = c - ((c - p0) @ n) * n
+    e1 = right - (right @ n) * n
+    e1 /= np.linalg.norm(e1)
+    e2 = np.cross(n, e1)
+    proj = lambda P: (Kv @ (Rv @ np.asarray(P).T + t[:, None])).T
+    for s_ in np.arange(-0.4, 0.4001, 0.05):            # table: 5 cm grid on the fitted plane
+        for a0, b0 in (((s_, -0.4), (s_, 0.4)), ((-0.4, s_), (0.4, s_))):
+            P = proj([cp + a0[0] * e1 + a0[1] * e2, cp + b0[0] * e1 + b0[1] * e2])
+            if (P[:, 2] > 0.01).all():
+                cv2.line(img, tuple(np.int32(P[0, :2] / P[0, 2])), tuple(np.int32(P[1, :2] / P[1, 2])), (190, 185, 175), 1)
+    oc, od = _render(clip, clip.mt, Tv @ T, Kv, H, W)
+    hc, hd = _render(clip, clip.hand_tensors(hv, clip.hand_colors(state, i, hv)), Tv, Kv, H, W)
+    hd[~(hd > 0)] = np.inf
+    od[~(od > 0)] = np.inf
+    so, sh = np.isfinite(od) & (od <= hd), np.isfinite(hd) & (hd < od)
+    img[so] = oc[so]
+    img[sh] = hc[sh]
+    name = AZ_NAMES.get(int(round(az)) % 360, f"az {az:.0f}")
+    txt = label if label is not None else f"frame {i} {name}" + (f", el {el:.0f}" if el != 25 else "") + (" (contact)" if zoom == "contact" else "")
+    cv2.putText(img, txt, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (30, 30, 30), 2)
     return img
 
 
@@ -189,7 +250,8 @@ def crop(clip, state, i, box, mode="outline"):
 
 
 MIN_SPAN = {"contact_cm": 2.0, "penetration_cm": 1.0, "obj_height_cm": 2.0, "hand_height_cm": 2.0,
-            "speed_cm_per_frame": 2.0, "ang_speed_deg_per_frame": 5.0, "hand_kp_px": 20.0, "depth_res_cm": 1.0}
+            "speed_cm_per_frame": 2.0, "ang_speed_deg_per_frame": 5.0, "hand_kp_px": 20.0, "depth_res_cm": 1.0,
+            "n_cross": 50.0}
 
 
 def plot(clip, rows_by_name, keys, start=0, end=None, phases=()):

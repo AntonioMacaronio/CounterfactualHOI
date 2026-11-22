@@ -31,8 +31,11 @@ fpose() {
   $PIP install -q --upgrade pip setuptools wheel
   $PIP install -q torch==2.6.0+cu126 torchvision==0.21.0+cu126 --index-url https://download.pytorch.org/whl/cu126
   $PIP install -q -r "$FP/requirements.txt"
-  # rtree: trimesh proximity queries (refinement agent's SDF); anthropic[bedrock]: the refinement agent (scripts/refine).
-  $PIP install -q rtree "anthropic[bedrock]"
+  # rtree: trimesh proximity queries (refinement agent's SDF); python-fcl: hand-object mesh intersections;
+  # anthropic[bedrock]: the refinement agent (scripts/refine).
+  $PIP install -q rtree python-fcl "anthropic[bedrock]"
+  # MANO skinning weights for the finger tools (from Dyn-HaMR's MANO pkls, numpy only)
+  "$E/bin/python" -I "$(dirname "${BASH_SOURCE[0]}")/../refine/extract_mano_skinning.py"
   "$E/bin/python" -c "import pytorch3d" 2>/dev/null ||
     $PIP install -q --no-build-isolation "git+https://github.com/facebookresearch/pytorch3d.git@V0.7.8"
   "$E/bin/python" -c "import nvdiffrast.torch" 2>/dev/null ||

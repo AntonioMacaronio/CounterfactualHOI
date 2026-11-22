@@ -8,8 +8,10 @@ forward = away from the camera, up) or camera axes, along the viewing ray. A ran
 Search-backed edits: polish_object runs FoundationPose's refiner from the current pose on the hand-scaled depth and
 keeps a frame's result only if it fits the SAM3 mask + depth better and stays within a trust region (so it sharpens a
 pose without jumping to another solution); polish_hand fits the hand's rigid motion to its 2D keypoints, its SAM3 mask
-and the depth by gradient-free coordinate search (penalising penetration into the object); propose_object_poses returns FoundationPose's
-top registration hypotheses at a frame for the agent to choose from (apply_candidate).
+and the depth by gradient-free coordinate search (penalising penetration into the object); fit_fingers searches each
+finger's flexion against its keypoints, the object's surface (no triangles through it) and, while held, contact;
+propose_object_poses returns FoundationPose's top registration hypotheses at a frame for the agent to choose from
+(apply_candidate).
 """
 
 import os
@@ -19,7 +21,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
-from clip import LOW, Clip, State, se3_interp  # noqa: F401
+from clip import FINGERS, LOW, TIPS, Clip, State, se3_interp  # noqa: F401
 from Utils import nvdiffrast_render  # noqa: E402
 
 _EST = {}
@@ -275,9 +277,9 @@ def polish_hand(clip, state, start, end, max_trans_cm=6.0, max_rot_deg=25.0, smo
     fr = [i for i in range(start, end + 1)
           if clip.hand_valid[i] and (clip.hm[i].sum() > 30 or np.isfinite(clip.kp2d[i, :, 0]).sum() >= 8)]
     for i in fr:
-        v0 = clip.hand_base[i].astype(np.float64)
-        c = v0.mean(0)
-        mt = clip.hand_tensors(clip.hand_base[i])
+        v0 = clip.articulate(clip.hand_base[i], state.finger[i]).astype(np.float64)   # current finger flexion
+        c = clip.hand_base[i].astype(np.float64).mean(0)                               # rigid centre, as hand_verts
+        mt = clip.hand_tensors(v0.astype(np.float32))
         r0, t0 = state.hand_rot[i].copy(), state.hand_off[i].copy()
         cur_r, cur_t = r0.copy(), t0.copy()
         held = any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in state.phases)
@@ -313,7 +315,150 @@ def polish_hand(clip, state, start, end, max_trans_cm=6.0, max_rot_deg=25.0, smo
             lo, hi = max(start, i - half), min(end, i + half)
             s.hand_off[i] = np.median(off[lo:hi + 1], 0)
             s.hand_rot[i] = Rotation.from_rotvec(rot[lo:hi + 1]).mean().as_rotvec()
-    return s, fr, f"polish hand on {start}-{end}: fitted {len(fr)} frames to keypoints + mask + depth (trust region {max_trans_cm} cm, {max_rot_deg} deg)"
+    kept = 0                                                  # the rigid fit cannot see thin walls (coarse SDF): keep
+    for i in fr:                                              # the old pose where it pushes the hand through the surface
+        if len(clip.crossing(clip.hand_verts(s, i), s.obj[i])) > len(clip.crossing(clip.hand_verts(state, i), state.obj[i])) + 5:
+            s.hand_off[i], s.hand_rot[i] = state.hand_off[i].copy(), state.hand_rot[i].copy()
+            kept += 1
+    return s, fr, (f"polish hand on {start}-{end}: fitted {len(fr)} frames to keypoints + mask + depth (trust region "
+                   f"{max_trans_cm} cm, {max_rot_deg} deg)" + (f"; kept the previous pose on {kept} frames where the fit "
+                   "pushed the hand through the object" if kept else ""))
+
+
+# ---------- fingers ----------
+def _finger_names(fingers):
+    if not fingers or fingers == "all" or fingers == ["all"]:
+        return list(FINGERS)
+    bad = [f for f in fingers if f not in FINGERS]
+    if bad:
+        raise ValueError(f"unknown fingers {bad}; use {FINGERS} or 'all'")
+    return list(fingers)
+
+
+def curl_finger(clip, state, start, end, fingers, delta_deg, falloff=0):
+    """Add `delta_deg` of flexion (curl > 0, open < 0) to the named fingers on [start, end]."""
+    s = state.copy()
+    w = weights(clip.N, start, end, falloff)
+    names = _finger_names(fingers)
+    for i in _touched(w):
+        for f in names:
+            s.finger[i, FINGERS.index(f)] += w[i] * delta_deg
+    return s, _touched(w), f"curl {', '.join(names)} by {delta_deg:+.0f} deg on {start}-{end} (falloff {falloff})"
+
+
+def _finger_cost_fn(clip, s, i, k, flex):
+    """Cost of finger k's flexion at frame i (other fingers at `flex`): robust 2D keypoint error, triangles through
+    the object's surface (FCL), penetration (SDF), and in held phases the gap of its last segment to the surface."""
+    T, base = s.obj[i], clip.hand_base[i]
+    Jb = clip.J16 @ base.astype(np.float64)
+    n = clip.palm_normal(Jb)
+    Rr = Rotation.from_rotvec(s.hand_rot[i]).as_matrix()
+    c, off = base.mean(0), s.hand_off[i]
+    others = base + sum(clip.finger_delta(base, Jb, n, j, flex[j]) for j in range(len(FINGERS)) if j != k and flex[j])
+    held = any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in s.phases)
+    f = FINGERS[k]
+    ok = np.isfinite(clip.kp2d[i, :, 0])
+    rows, kpr = clip.finger_rows[k], [r for r in clip.kp_finger[f] if ok[r]]
+    to_obj = lambda v: (v - T[:3, 3]) @ T[:3, :3]
+
+    def cost(deg):
+        v = (others + clip.finger_delta(base, Jb, n, k, deg) - c) @ Rr.T + c + off
+        pen = max(-clip.sdf_at(to_obj(v[rows])).min(), 0.0)
+        ncross = len(clip.crossing(v, T, clip.finger_faces[k], cap=300))
+        gap = min(max(clip.sdf_at(to_obj(v[clip.distal[k]])).min() - 0.003, 0.0), 0.03) if held else 0.0
+        kp = 0.0
+        if kpr:
+            P = (clip.K @ (clip.kp_reg[kpr] @ v).T).T
+            e = np.linalg.norm(P[:, :2] / P[:, 2:3] - clip.kp2d[i, kpr], axis=1) / 30.0
+            kp = float(np.mean(np.where(e < 1, 0.5 * e ** 2, e - 0.5)))
+        return kp + 0.1 * ncross + 40.0 * pen + 30.0 * gap + 0.002 * abs(deg)
+    return cost
+
+
+def fit_fingers(clip, state, start, end, fingers=None, max_curl=45.0, max_open=35.0, smooth=5):
+    """Per frame and finger, a 1-D search over the finger's flexion (on top of Dyn-HaMR's articulation) minimising
+    _finger_cost_fn: coarse grid then refinement. Then a temporal median, kept per frame and finger only where it
+    is not worse for that frame (the hand moves against the object, so a neighbour's angle can cross its surface).
+    Frames where the hand is more than 3 cm from the object are left alone."""
+    names = _finger_names(fingers)
+    s = state.copy()
+    fitted = []
+    for i in range(start, end + 1):
+        if not clip.hand_valid[i]:
+            continue
+        T = s.obj[i]
+        if clip.sdf_at((clip.hand_verts(s, i) - T[:3, 3]) @ T[:3, :3]).min() > 0.03:
+            continue
+        flex = s.finger[i].copy()
+        for f in names:
+            k = FINGERS.index(f)
+            cost = _finger_cost_fn(clip, s, i, k, flex)
+            grid = np.arange(-max_open, max_curl + 1e-6, 7.5)
+            cs = [cost(g) for g in grid]
+            best, bc = float(grid[int(np.argmin(cs))]), min(cs)
+            for step in (3.75, 1.875, 0.94):
+                for g in (best - step, best + step):
+                    if -max_open <= g <= max_curl:
+                        cg = cost(g)
+                        if cg < bc:
+                            best, bc = g, cg
+            flex[k] = best
+        s.finger[i] = flex
+        fitted.append(i)
+    if smooth > 1 and len(fitted) > smooth:
+        half, raw = smooth // 2, s.finger.copy()
+        for i in fitted:
+            lo, hi = max(start, i - half), min(end, i + half)
+            sm = np.median(raw[lo:hi + 1], 0)
+            for f in names:
+                k = FINGERS.index(f)
+                if abs(sm[k] - raw[i, k]) < 0.5:
+                    continue
+                cost = _finger_cost_fn(clip, s, i, k, s.finger[i])
+                if cost(sm[k]) <= cost(raw[i, k]) + 0.02:
+                    s.finger[i, k] = sm[k]
+    ch = np.abs(s.finger[fitted] - state.finger[fitted]) if fitted else np.zeros((1, 5))
+    return s, fitted, (f"fit fingers ({', '.join(names)}) on {start}-{end}: {len(fitted)} frames near the object; "
+                       f"median |change| per finger " + ", ".join(f"{f} {np.median(ch[:, FINGERS.index(f)]):.0f}" for f in names) + " deg")
+
+
+def separate_hand(clip, state, start, end, max_cm=1.5, step_cm=0.2, tol=3, max_kp_px=8.0):
+    """Per frame, translate the hand out of the object along the surface normal where its palm crosses the surface
+    (fingers: fit_fingers), in small steps, until at most `tol` palm triangles cross; a step that raises the
+    keypoint error by more than max_kp_px is not taken."""
+    s = state.copy()
+    moved = []
+    eps = 0.002
+    palm = clip.hand_faces_i[clip.face_finger == -1]
+    for i in range(start, end + 1):
+        T = s.obj[i]
+        v = clip.hand_verts(s, i)
+        cf = clip.crossing(v, T, palm)
+        if len(cf) <= tol:
+            continue
+        p = (v[np.unique(palm[cf])] - T[:3, 3]) @ T[:3, :3]
+        g = np.stack([(clip.sdf_at(p + eps * e) - clip.sdf_at(p - eps * e)) / (2 * eps) for e in np.eye(3)], 1)
+        nrm = T[:3, :3] @ g.mean(0)
+        if np.linalg.norm(nrm) < 1e-6:
+            continue
+        nrm /= np.linalg.norm(nrm)
+        kp0 = clip.hand_kp_err(s, i)
+        best = None
+        for k in range(1, int(round(max_cm / step_cm)) + 1):
+            trial = s.copy()
+            trial.hand_off[i] = s.hand_off[i] + nrm * k * step_cm / 100
+            kp = clip.hand_kp_err(trial, i)
+            if kp0 is not None and kp is not None and kp > kp0 + max_kp_px:
+                break
+            best = trial.hand_off[i]
+            if len(clip.crossing(clip.hand_verts(trial, i), T, palm)) <= tol:
+                break
+        if best is not None:
+            s.hand_off[i] = best
+            moved.append(i)
+    sh = [100 * np.linalg.norm(s.hand_off[i] - state.hand_off[i]) for i in moved]
+    return s, moved, (f"separate hand from the object on {start}-{end}: moved {len(moved)} frames out along the surface "
+                      f"normal where the palm crossed it (median {np.median(sh) if sh else 0:.1f} cm, max {max(sh) if sh else 0:.1f} cm)")
 
 
 # ---------- object silhouette fit ----------

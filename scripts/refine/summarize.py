@@ -21,11 +21,11 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import render as R  # noqa: E402
-from clip import Clip, State, flag, phase_of  # noqa: E402
+from clip import Clip, flag, load_state, phase_of  # noqa: E402
 
 STORAGE = os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI")
 CHOIR_ROOT = os.environ.get("CHOIR_ROOT", os.path.join(STORAGE, "build", "CHOIR"))
-KEYS = ["iou", "coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "penetration_cm", "contact_cm"]
+KEYS = ["iou", "coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "penetration_cm", "contact_cm", "n_cross"]
 HELD = ("grasp", "lift", "carry", "rotate", "place")
 
 
@@ -35,7 +35,8 @@ def med(rows, k):
 
 
 def qc_sheet(clip, s0, s1, path, n=6):
-    """Initial vs refined overlay and the refined side view, at the middle frame of up to n phases."""
+    """Per phase (middle frame, up to n phases): initial and refined overlay, initial and refined in 3D from behind
+    (red = hand through the object, green = touching), refined from the camera's left."""
     ph = s1.phases
     if len(ph) > n:
         ph = [ph[k] for k in np.linspace(0, len(ph) - 1, n).round().astype(int)]
@@ -43,8 +44,9 @@ def qc_sheet(clip, s0, s1, path, n=6):
     for p in ph:
         i = (p["start"] + p["end"]) // 2
         ims += [R.overlay(clip, s0, i, label=f"{i} {p['label']}: initial"), R.overlay(clip, s1, i, label=f"{i} {p['label']}: refined"),
-                R.view(clip, s1, i, "side", label=f"{i} refined, side view")]
-    cv2.imwrite(path, R.sheet(ims, ncols=3, tile_w=520), [cv2.IMWRITE_JPEG_QUALITY, 85])
+                R.view_orbit(clip, s0, i, 90, label=f"{i} initial, from behind"), R.view_orbit(clip, s1, i, 90, label=f"{i} refined, from behind"),
+                R.view_orbit(clip, s1, i, 180, label=f"{i} refined, from the left")]
+    cv2.imwrite(path, R.sheet(ims, ncols=5, tile_w=420), [cv2.IMWRITE_JPEG_QUALITY, 85])
 
 
 def main():
@@ -55,11 +57,10 @@ def main():
     for vid in vids:
         o = os.path.join(out_root, vid)
         clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid))
-        z = np.load(os.path.join(o, "final.npz"))
         phases = json.load(open(os.path.join(o, "phases.json")))
         s0 = clip.init_state.copy()
         s0.phases = phases
-        s1 = State(z["obj"], z["hand_off"], z["hand_rot"], phases)
+        s1 = load_state(os.path.join(o, "final.npz"), phases)
         m0, m1 = clip.metrics(s0), clip.metrics(s1)
         held = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in HELD]
         rest = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in ("approach", "release", "rest")]
@@ -95,11 +96,12 @@ def main():
               f"{summ['all']['hand_kp_px'][0]:.1f} -> {summ['all']['hand_kp_px'][1]:.1f} px, flagged frames "
               f"{summ['flagged_frames'][0]} -> {summ['flagged_frames'][1]}, verifier reverted {summ['reverted']}/{len(verdicts)}", flush=True)
     rows = ["| clip | object IoU (in hand) | object IoU (all) | hand keypoint px | hand depth bias cm | penetration cm | "
-            "rest height cm | rest height spread cm | flagged frames | verifier reverted |", "|" + "---|" * 10]
+            "hand triangles through the object (held) | rest height cm | rest height spread cm | flagged frames | verifier reverted |",
+            "|" + "---|" * 11]
     f = lambda p, d=2: f"{p[0]:.{d}f} → {p[1]:.{d}f}" if None not in p else "—"
     for t in table:
         rows.append(f"| {t['video_id']} | {f(t['held']['iou'])} | {f(t['all']['iou'])} | {f(t['all']['hand_kp_px'], 1)} | "
-                    f"{f(t['all']['hand_depth_bias_cm'])} | {f(t['all']['penetration_cm'])} | {f(t['rest_abs_height_cm'])} | {f(t['rest_height_spread_cm'])} | "
+                    f"{f(t['all']['hand_depth_bias_cm'])} | {f(t['all']['penetration_cm'])} | {f(t['held']['n_cross'], 0)} | {f(t['rest_abs_height_cm'])} | {f(t['rest_height_spread_cm'])} | "
                     f"{t['flagged_frames'][0]} → {t['flagged_frames'][1]} | {t['reverted']}/{len(t['verifier'])} |")
     open(os.path.join(out_root, "summary.md"), "w").write("\n".join(rows) + "\n")
     print("\n".join(rows))

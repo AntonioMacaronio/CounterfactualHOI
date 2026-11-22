@@ -60,7 +60,12 @@ def load_fprecon(args):
     mesh = trimesh.load(tracked_mesh(rd), force="mesh", process=False)
     hv, hf, hvalid, _ = corrected_hands(vd, rd)
     rigid = os.path.join(rd, "hand_rigid.npz")         # refinement agent's per-frame rigid hand motion (scripts/refine)
-    if os.path.exists(rigid):
+    final = os.path.join(rd, "hand_verts.npy")         # ... or its final hand mesh (finger flexion + rigid motion)
+    if os.path.exists(final):
+        hf_ = np.load(final)
+        m = min(len(hv), len(hf_))
+        hv[:m] = hf_[:m]
+    elif os.path.exists(rigid):
         z = np.load(rigid)
         for i in range(min(len(hv), len(z["hand_off"]))):
             c = hv[i].mean(0)

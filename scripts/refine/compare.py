@@ -21,7 +21,7 @@ from anthropic import AnthropicBedrock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 from agent import chunks, verify_run  # noqa: E402
-from clip import Clip, State  # noqa: E402
+from clip import Clip, load_state  # noqa: E402
 
 STORAGE = os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI")
 CHOIR_ROOT = os.environ.get("CHOIR_ROOT", os.path.join(STORAGE, "build", "CHOIR"))
@@ -30,9 +30,8 @@ CHOIR_ROOT = os.environ.get("CHOIR_ROOT", os.path.join(STORAGE, "build", "CHOIR"
 def load(clip, root, vid):
     if root == "initial":
         return clip.init_state.copy()
-    z = np.load(os.path.join(STORAGE, "runs", root, vid, "final.npz"))
     pf = os.path.join(STORAGE, "runs", root, vid, "phases.json")
-    return State(z["obj"], z["hand_off"], z["hand_rot"], json.load(open(pf)) if os.path.exists(pf) else [])
+    return load_state(os.path.join(STORAGE, "runs", root, vid, "final.npz"), json.load(open(pf)) if os.path.exists(pf) else [])
 
 
 def main():
