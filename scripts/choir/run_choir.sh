@@ -2,6 +2,7 @@
 # Run Open-CHOIR end to end on one clip ($CHOIR_ROOT/data/VID.mp4, seeded by first_mask.sh).
 #
 #   bash scripts/choir/run_choir.sh VID [GPU=0]
+#   CHOIR_STAGE1_ONLY=1 bash scripts/choir/run_choir.sh VID [GPU]   # steps 1-3 only (all that fprecon needs)
 #
 # Steps (each in its env, skipped when its outputs exist, logs in runs/logs/choir/VID/):
 #   1 stage1 masks     Yolov8/run_with_manual_object_mask.py      (choir)
@@ -54,6 +55,9 @@ flock -u 9
 
 step 3_hand "[ -d $O/stage1/hand/mano_params ] && [ -n \"\$(ls -A $O/stage1/hand/mano_params 2>/dev/null)\" ]" dynhamr \
   "$C/stage1_preprocess/Dyn_HaMR_new/dyn-hamr" env PYOPENGL_PLATFORM=egl TORCH_FORCE_NO_WEIGHTS_ONLY_LOAD=1 python run_mano_sequence.py --video_id "$VID" --video_dir "$C/output" --gpus "$GPU"
+
+# Stage 1 (steps 1-3) is all scripts/fprecon/run_fprecon.sh needs; step 4 is CHOIR's own HOI result (the baseline).
+if [ -n "${CHOIR_STAGE1_ONLY:-}" ]; then echo "[choir] $VID: stage 1 done (CHOIR_STAGE1_ONLY: skipping step 4)"; exit 0; fi
 
 # Dyn-HaMR exports both hands when it sees two ("dual"); stage 3 then needs the interacting side (HAND_SIDE overrides).
 SIDE="${HAND_SIDE:-$("$CONDA_ENVS_PATH/choir/bin/python" "$(dirname "${BASH_SOURCE[0]}")/pick_hand_side.py" "$O" 2>> "$LOGD/hand_side.log")}"
