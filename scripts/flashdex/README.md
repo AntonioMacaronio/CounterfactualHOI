@@ -114,6 +114,25 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
   well, a teacher-student distillation (DAgger: roll out the student, label with the teacher's actions) into the
   §1.4 observation space is likely the better design: RL then only fine-tunes, for example with the GenEnv goals.
 
+- **§1.4 policy learning curve** (p14_adadex_r7, 66% GenEnv). Learning starts after the assist decays:
+
+  | | 60M | 80M | 90M | 100M |
+  |---|---|---|---|---|
+  | TrackEnv position-only progress | 33% | 44% | 60% | 63% |
+  | TrackEnv FDR success | 1/10 | 3/10 | 4/10 | 3/10 |
+  | GenEnv final-goal success (object within 5 cm / 20° of its new goal at the end) | 0% | 21% | 26% | 26% |
+
+- **GenEnv share A/B at 30M** (g25 vs g66):
+
+  | | g25 | g66 |
+  |---|---|---|
+  | TrackEnv position-only progress | 39% | 26% |
+  | TrackEnv FDR success | 2/10 | 0/10 |
+  | TrackEnv object error | 17.0 cm | 20.4 cm |
+  | GenEnv position-only progress | 28% | 26% |
+
+  AdaDex progress is the same in both (19%). Judge again at 60-100M.
+
 ## §1.4 policy (`policy/`)
 
 A first, state-based version of the policy in `antzhang-notes/project.md` §1.4. It runs on FDR's env and FlashSAC
