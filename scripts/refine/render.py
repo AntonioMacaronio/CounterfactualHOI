@@ -172,7 +172,7 @@ AZ_NAMES = {0: "from the camera's right", 45: "right-behind", 90: "from behind",
             180: "from the camera's left", 225: "left-front", 270: "from the camera's side", 315: "right-front"}
 
 
-def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), label=None):
+def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), label=None, center=None, dist=None):
     """Object + hand + table from azimuth `az` (degrees about gravity: 0 = from the real camera's right, 90 = from
     behind the object looking back at the camera, 180 = from the left, 270 = from the camera's side) and elevation
     `el` (0 = level, 90 = straight down); zoom "action" frames hand and object, "contact" the region where they meet."""
@@ -181,7 +181,9 @@ def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), 
     T = state.obj[i]
     c_obj = clip.obj_center(state, i)
     sd = clip.sdf_at((hv - T[:3, 3]) @ T[:3, :3])
-    if zoom == "contact" and clip.hand_valid[i]:
+    if center is not None:                             # fixed camera (filmstrips): same view for every frame
+        c, dist = np.asarray(center, float), dist or max(0.40, 2.6 * float(clip.extent.max()))
+    elif zoom == "contact" and clip.hand_valid[i]:
         near = hv[sd < max(0.01, np.sort(sd)[min(20, len(sd) - 1)])]
         c, dist = near.mean(0), 0.16
     else:
@@ -227,6 +229,76 @@ def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), 
     return img
 
 
+def _orbit_cam(clip, c, dist, az, el, W, H):
+    up, right, fwd = clip.up, clip.right, clip.fwd
+    a, e = np.radians(az), np.radians(el)
+    eye = np.cos(e) * (np.cos(a) * right + np.sin(a) * fwd) + np.sin(e) * up
+    z = -eye
+    y = -up - (-up @ z) * z
+    if np.linalg.norm(y) < 1e-6:
+        y = -fwd - (-fwd @ z) * z
+    y /= np.linalg.norm(y)
+    Rv = np.stack([np.cross(y, z), y, z])
+    t = -Rv @ (c + dist * eye)
+    Kv = np.array([[0.9 * W, 0, W / 2], [0, 0.9 * W, H / 2], [0, 0, 1.0]])
+    return Rv, t, Kv
+
+
+TRACE_COLORS = [(40, 40, 40), (200, 60, 200), (40, 40, 230), (40, 160, 40), (230, 120, 30), (30, 180, 230)]  # BGR
+
+
+def motion_center(clip, state, frames):
+    pts = [0.5 * (clip.obj_center(state, i) + clip.hand_verts(state, i).mean(0)) for i in frames]
+    return np.mean(pts, 0)
+
+
+def trace(clip, state, start, end, az=0.0, el=25.0, size=(720, 560), label=None):
+    """One fixed 3D view of [start, end]: the scene at the middle frame and the paths of the wrist (dark) and the five
+    fingertips (thumb magenta, index red, middle green, ring orange, pinky cyan) over the range, one dot per frame;
+    real motion draws smooth curves, jitter draws zig-zags."""
+    from clip import TIPS, FINGERS
+    fr = list(range(start, end + 1))
+    mid = fr[len(fr) // 2]
+    hvs = {i: clip.hand_verts(state, i) for i in fr}
+    pts = np.concatenate([hvs[i][[TIPS[f] for f in FINGERS]] for i in fr])
+    c = motion_center(clip, state, fr)
+    dist = max(0.40, 2.6 * float(clip.extent.max()), 2.2 * float(np.ptp(pts, 0).max()))
+    img = view_orbit(clip, state, mid, az, el, size=size, center=c, dist=dist, label="")
+    img = (0.55 * img + 0.45 * 255).astype(np.uint8)              # fade the scene so the paths stand out
+    W, H = size
+    Rv, t, Kv = _orbit_cam(clip, c, dist, az, el, W, H)
+    proj = lambda P: (lambda q: q[:, :2] / q[:, 2:3])((Kv @ (Rv @ np.asarray(P).T + t[:, None])).T)
+    idx = [None] + [TIPS[f] for f in FINGERS]
+    for k, vi in enumerate(idx):
+        P = np.array([(clip.J16 @ hvs[i].astype(np.float64))[0] if vi is None else hvs[i][vi] for i in fr])
+        q = np.int32(proj(P))
+        ok = [clip.hand_valid[i] for i in fr]
+        for a in range(len(q) - 1):
+            if ok[a] and ok[a + 1]:
+                cv2.line(img, tuple(q[a]), tuple(q[a + 1]), TRACE_COLORS[k], 2)
+        for a in range(len(q)):
+            if ok[a]:
+                cv2.circle(img, tuple(q[a]), 2, TRACE_COLORS[k], -1)
+    txt = label if label is not None else f"paths of wrist + fingertips, frames {start}-{end}, {AZ_NAMES.get(int(round(az)) % 360, f'az {az:.0f}')}"
+    cv2.putText(img, txt, (8, 24), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (30, 30, 30), 2)
+    return img
+
+
+def filmstrip(clip, state, start, count=8, az=0.0, el=25.0, zoom="action", tile=(360, 300)):
+    """`count` consecutive frames from one fixed viewpoint (and, with zoom="contact", close to where hand and object
+    meet), so frame-to-frame jitter is visible."""
+    fr = [i for i in range(start, min(clip.N, start + count))]
+    c = motion_center(clip, state, fr)
+    dist = None
+    if zoom == "contact":
+        hv = clip.hand_verts(state, fr[len(fr) // 2])
+        T = state.obj[fr[len(fr) // 2]]
+        sd = clip.sdf_at((hv - T[:3, 3]) @ T[:3, :3])
+        c, dist = hv[sd < max(0.01, np.sort(sd)[min(20, len(sd) - 1)])].mean(0), 0.18
+    return sheet([view_orbit(clip, state, i, az, el, size=tile, center=c, dist=dist, label=f"frame {i}") for i in fr],
+                 ncols=min(4, len(fr)), tile_w=tile[0])
+
+
 def sheet(imgs, ncols=3, tile_w=640):
     tiles = []
     for im in imgs:
@@ -251,7 +323,8 @@ def crop(clip, state, i, box, mode="outline"):
 
 MIN_SPAN = {"contact_cm": 2.0, "penetration_cm": 1.0, "obj_height_cm": 2.0, "hand_height_cm": 2.0,
             "speed_cm_per_frame": 2.0, "ang_speed_deg_per_frame": 5.0, "hand_kp_px": 20.0, "depth_res_cm": 1.0,
-            "n_cross": 50.0}
+            "n_cross": 50.0, "hand_accel_mm": 10.0, "hand_rel_accel_mm": 10.0, "finger_accel_deg": 10.0,
+            "obj_accel_cm": 1.0, "obj_ang_accel_deg": 5.0}
 
 
 def plot(clip, rows_by_name, keys, start=0, end=None, phases=()):

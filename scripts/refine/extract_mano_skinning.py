@@ -3,7 +3,8 @@
   python -I scripts/refine/extract_mano_skinning.py      (any env with numpy + scipy; run by scripts/fprecon/setup.sh)
 
 Reads MANO_{RIGHT,LEFT}.pkl from Dyn-HaMR's data dir in the CHOIR build (MANO_DIR to override) and writes
-$PROJECT_STORAGE_ROOT/models/mano/skinning_{right,left}.npz (weights 778x16, parents 16, J 16x778, v_template 778x3).
+$PROJECT_STORAGE_ROOT/models/mano/skinning_{right,left}.npz (weights 778x16, parents 16, J 16x778, v_template 778x3)
+and mano_{right,left}.npz (the full model: + shapedirs, posedirs, faces, hands_components, hands_mean).
 The pkls hold chumpy arrays; a stand-in module unpickles them without installing chumpy.
 """
 
@@ -48,7 +49,13 @@ def main():
         parents[0] = -1
         np.savez(os.path.join(out, f"skinning_{side}.npz"), weights=arr(d["weights"]).astype(np.float32), parents=parents,
                  J=arr(d["J_regressor"]).astype(np.float32), v_template=arr(d["v_template"]).astype(np.float32))
-        print(f"wrote {out}/skinning_{side}.npz")
+        # the full model for scripts/refine/mano.py (MANO forward kinematics, flat-hand-mean convention)
+        np.savez(os.path.join(out, f"mano_{side}.npz"), weights=arr(d["weights"]).astype(np.float32), parents=parents,
+                 J_regressor=arr(d["J_regressor"]).astype(np.float32), v_template=arr(d["v_template"]).astype(np.float32),
+                 shapedirs=arr(d["shapedirs"]).astype(np.float32), posedirs=arr(d["posedirs"]).astype(np.float32),
+                 faces=arr(d["f"]).astype(np.int32), hands_components=arr(d["hands_components"]).astype(np.float32),
+                 hands_mean=arr(d["hands_mean"]).astype(np.float32))
+        print(f"wrote {out}/skinning_{side}.npz, mano_{side}.npz")
 
 
 if __name__ == "__main__":

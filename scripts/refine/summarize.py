@@ -25,7 +25,8 @@ from clip import Clip, flag, load_state, phase_of  # noqa: E402
 
 STORAGE = os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI")
 CHOIR_ROOT = os.environ.get("CHOIR_ROOT", os.path.join(STORAGE, "build", "CHOIR"))
-KEYS = ["iou", "coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "penetration_cm", "contact_cm", "n_cross"]
+KEYS = ["iou", "coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "penetration_cm", "contact_cm", "n_cross",
+        "hand_accel_mm", "hand_rel_accel_mm", "finger_accel_deg", "obj_accel_cm", "obj_ang_accel_deg"]
 HELD = ("grasp", "lift", "carry", "rotate", "place")
 
 
@@ -64,7 +65,7 @@ def main():
         m0, m1 = clip.metrics(s0), clip.metrics(s1)
         held = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in HELD]
         rest = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in ("approach", "release", "rest")]
-        summ = {"video_id": vid, "frames": clip.N, "phases": phases}
+        summ = {"video_id": vid, "frames": clip.N, "phases": phases, "hand_jitter_ref_mm": clip.jitter_ref}
         for name, rows0, rows1 in (("all", m0, m1),
                                    ("held", [m0[i] for i in held], [m1[i] for i in held])):
             summ[name] = {k: [med(rows0, k), med(rows1, k)] for k in KEYS}
@@ -76,6 +77,14 @@ def main():
         spread = lambda rows: (lambda h: float(max(h) - min(h)) if len(h) > 1 else 0.0)(
             [float(np.median([rows[i]["obj_height_cm"] for i in range(p["start"], p["end"] + 1)])) for p in rp])
         summ["rest_height_spread_cm"] = [spread(m0), spread(m1)]
+        lifted = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in ("lift", "carry", "rotate")]
+        summ["grip_lifted"] = [float(np.mean([m0[i]["opposed"] for i in lifted])) if lifted else None,
+                               float(np.mean([m1[i]["opposed"] for i in lifted])) if lifted else None]
+        cf = os.path.join(o, "critic_final.json")
+        if os.path.exists(cf):
+            rv = json.load(open(cf))
+            summ["reviewer"] = {"overall": rv["overall"], "problems": rv["problems"], "votes": rv.get("votes", [rv["overall"]]),
+                                **{f"n_{sev}": sum(p["severity"] == sev for p in rv["problems"]) for sev in ("high", "medium", "low")}}
         summ["flagged_frames"] = [sum(bool(flag(r, phase_of(s1, r["frame"]))) for r in m0),
                                   sum(bool(flag(r, phase_of(s1, r["frame"]))) for r in m1)]
         verdicts, n_edits, minutes = [], None, None
@@ -96,13 +105,16 @@ def main():
               f"{summ['all']['hand_kp_px'][0]:.1f} -> {summ['all']['hand_kp_px'][1]:.1f} px, flagged frames "
               f"{summ['flagged_frames'][0]} -> {summ['flagged_frames'][1]}, verifier reverted {summ['reverted']}/{len(verdicts)}", flush=True)
     rows = ["| clip | object IoU (in hand) | object IoU (all) | hand keypoint px | hand depth bias cm | penetration cm | "
-            "hand triangles through the object (held) | rest height cm | rest height spread cm | flagged frames | verifier reverted |",
-            "|" + "---|" * 11]
+            "hand triangles through the object (held) | hand jitter mm/f² (held) | finger jitter °/f² (held) | object rotation jitter °/f² | "
+            "grip while lifted | rest height cm | rest height spread cm | flagged frames | verifier reverted | reviewer |", "|" + "---|" * 16]
     f = lambda p, d=2: f"{p[0]:.{d}f} → {p[1]:.{d}f}" if None not in p else "—"
     for t in table:
         rows.append(f"| {t['video_id']} | {f(t['held']['iou'])} | {f(t['all']['iou'])} | {f(t['all']['hand_kp_px'], 1)} | "
-                    f"{f(t['all']['hand_depth_bias_cm'])} | {f(t['all']['penetration_cm'])} | {f(t['held']['n_cross'], 0)} | {f(t['rest_abs_height_cm'])} | {f(t['rest_height_spread_cm'])} | "
-                    f"{t['flagged_frames'][0]} → {t['flagged_frames'][1]} | {t['reverted']}/{len(t['verifier'])} |")
+                    f"{f(t['all']['hand_depth_bias_cm'])} | {f(t['all']['penetration_cm'])} | {f(t['held']['n_cross'], 0)} | {f(t['held']['hand_accel_mm'], 1)} | "
+                    f"{f(t['held']['finger_accel_deg'], 1)} | {f(t['all']['obj_ang_accel_deg'], 1)} | "
+                    f"{f(t['grip_lifted']) if None not in t['grip_lifted'] else '—'} | {f(t['rest_abs_height_cm'])} | {f(t['rest_height_spread_cm'])} | "
+                    f"{t['flagged_frames'][0]} → {t['flagged_frames'][1]} | {t['reverted']}/{len(t['verifier'])} | "
+                    + (f"{t['reviewer']['overall']} ({t['reviewer']['n_high']} high, {t['reviewer']['n_medium']} medium)" if t.get("reviewer") else "—") + " |")
     open(os.path.join(out_root, "summary.md"), "w").write("\n".join(rows) + "\n")
     print("\n".join(rows))
 

@@ -4,10 +4,9 @@ Inputs come from the FoundationPose + Depth Pro 2 run ($PROJECT_STORAGE_ROOT/run
 ($CHOIR_ROOT/output/VID): RGB frames, SAM3 masks, hand-scaled metric depth, the textured SAM3D mesh, Dyn-HaMR hands
 (moved onto the depth map), GeoCalib gravity and the table plane fitted in the frame-0 depth.
 
-State (what the agent edits): per-frame object pose (object -> OpenCV camera, metric), a per-frame rigid motion of the
-hand (rotation about its centroid + translation), a per-frame flexion of each finger on top of Dyn-HaMR's articulation
-(curl > 0, open < 0; MANO's skinning weights), and phase labels. Every edit makes a new version; nothing is overwritten
-(Versions).
+State (what the agent edits): per-frame object pose (object -> OpenCV camera, metric), the hand as MANO parameters
+only (per frame: global orientation, translation, 15 finger-joint rotations; one shape per clip; scripts/refine/mano.py),
+and phase labels. Every edit makes a new version; nothing is overwritten (Versions).
 
 Metrics are computed on GPU at 1/4 resolution: object silhouette coverage / spill against the SAM3 mask (as in
 scripts/fprecon/verify_track.py), depth residual and bias against the depth map, the hand's silhouette fit, hand-object
@@ -15,7 +14,8 @@ contact distance and penetration (from a signed-distance grid of the object), ha
 surface (FCL triangle-triangle tests: catches fingers through a thin wall, which a coarse SDF misses), heights above the table surface measured
 locally around the object (the global plane fit can be ~2 cm off far from the camera), the hand's distance to its 2D keypoints
 (ViTPose, from CHOIR stage 1; MANO joints from Dyn-HaMR's mesh via MANO's joint regressor), height above the table
-and motion.
+and motion: speeds and accelerations (second differences: jitter) of the object, of the hand mesh (in the camera and
+relative to the object) and of the finger angles.
 """
 
 import json
@@ -46,30 +46,38 @@ LOW = 4                                     # metrics resolution divisor
 FINGERS = ["thumb", "index", "middle", "ring", "pinky"]
 CHAINS = {"thumb": (13, 14, 15), "index": (1, 2, 3), "middle": (4, 5, 6), "ring": (10, 11, 12), "pinky": (7, 8, 9)}
 TIPS = {"thumb": 745, "index": 317, "middle": 444, "ring": 556, "pinky": 673}
-FLEX_SPLIT = (0.4, 0.35, 0.25)              # a finger's flexion shared over its three joints (base to tip)
+sys.path.insert(0, HERE)
+import mano  # noqa: E402
 
 
 @dataclass
 class State:
     obj: np.ndarray                         # (N, 4, 4) object -> camera
-    hand_off: np.ndarray                    # (N, 3) camera-frame translation added to the hand
-    hand_rot: np.ndarray                    # (N, 3) rotation vector applied to the hand about its centroid
+    go: np.ndarray                          # (N, 3) MANO global orientation (axis-angle, camera frame)
+    tr: np.ndarray                          # (N, 3) MANO translation (camera frame, metres)
+    hp: np.ndarray                          # (N, 45) MANO finger-joint rotations (axis-angle, flat-hand-mean)
     phases: list = field(default_factory=list)   # [{"start", "end", "label"}]
-    finger: np.ndarray = None               # (N, 5) flexion in degrees per finger (FINGERS order), 0 = Dyn-HaMR's
-
-    def __post_init__(self):
-        if self.finger is None:
-            self.finger = np.zeros((len(self.obj), len(FINGERS)))
+    verts: np.ndarray = None                # (N, 778, 3) fixed hand vertices: read-only results from before MANO states
+    betas: np.ndarray = None                # (10,) MANO shape, one per clip (None = the hand tracker's, Clip.betas)
 
     def copy(self):
-        return State(self.obj.copy(), self.hand_off.copy(), self.hand_rot.copy(), [dict(p) for p in self.phases],
-                     self.finger.copy())
+        return State(self.obj.copy(), self.go.copy(), self.tr.copy(), self.hp.copy(), [dict(p) for p in self.phases],
+                     None if self.verts is None else self.verts, None if self.betas is None else self.betas.copy())
 
 
 def load_state(path, phases=None):
-    """A State from a versions/vNNN.npz or final.npz (finger flexion optional: older runs have none)."""
+    """A State from a versions/vNNN.npz or final.npz. Runs from before the MANO state (rounds 1-5: a rigid motion and
+    vertex-level finger flexion) load read-only, with their exported hand vertices (export/hand_verts.npy)."""
     z = np.load(path)
-    return State(z["obj"], z["hand_off"], z["hand_rot"], phases or [], z["finger"] if "finger" in z else None)
+    if "hand_pose" in z.files:
+        return State(z["obj"], z["global_orient"], z["transl"], z["hand_pose"], phases or [],
+                     betas=z["betas"] if "betas" in z.files else None)
+    N = len(z["obj"])
+    hv = os.path.join(os.path.dirname(path), "export", "hand_verts.npy")
+    if not os.path.exists(hv):
+        hv = os.path.join(os.path.dirname(os.path.dirname(path)), "export", "hand_verts.npy")
+    return State(z["obj"], np.zeros((N, 3)), np.zeros((N, 3)), np.zeros((N, 45)), phases or [],
+                 np.load(hv) if os.path.exists(hv) else None)
 
 
 class Versions:
@@ -109,13 +117,14 @@ class Clip:
         self.side, self.depth_scale = hs["side"], hs["scale"]
         self.depth = np.load(os.path.join(run, "depth_dp2.npy"), mmap_mode="r")
         poses = np.load(os.path.join(run, "object_poses.npy"))
-        hv, self.hand_faces, self.hand_valid, _ = corrected_hands(vd, run)
-        self.N = min(len(poses), len(hv), self.depth.shape[0])
-        poses, hv, self.hand_valid = poses[:self.N], hv[:self.N], self.hand_valid[:self.N]
-        ok = np.nonzero(self.hand_valid)[0]
-        for i in np.nonzero(~self.hand_valid)[0]:
-            hv[i] = hv[ok[np.argmin(np.abs(ok - i))]]
-        self.hand_base = hv.astype(np.float32)
+        _, self.hand_faces, _, _ = corrected_hands(vd, run)          # Dyn-HaMR's (closed-wrist) MANO faces
+        P = mano.tracker_params_camera(vd, run, self.side)            # the hand tracker's MANO parameters, our frame
+        self.N = min(len(poses), len(P["hand_pose"]), self.depth.shape[0])
+        poses = poses[:self.N]
+        self.hand_valid = P["valid"][:self.N]
+        self.betas = P["betas"]
+        self.J0 = mano.root_joint(self.betas, self.side)
+        self._hv_cache = {}
         self.fps = cv2.VideoCapture(os.path.join(vd, "inputs", "video.mp4")).get(cv2.CAP_PROP_FPS) or 30.0
 
         self.mesh = trimesh.load(tracked_mesh(run), force="mesh", process=False)
@@ -161,11 +170,8 @@ class Clip:
             lab[:, k + 1] = self.skin_W[:, list(CHAINS[f])].sum(1)
         self.vert_finger = lab.argmax(1) - 1                   # -1 = palm
         self.face_finger = np.array([np.bincount(self.vert_finger[f] + 1, minlength=6).argmax() - 1 for f in self.hand_faces])
-        self.palm_sign = self._palm_sign()
-        self.finger_rows = [np.nonzero(self.skin_W[:, list(CHAINS[f])].sum(1) > 1e-4)[0] for f in FINGERS]
-        moving = [self.skin_W[:, list(CHAINS[f])].sum(1) > 0.05 for f in FINGERS]      # faces a finger's flexion moves
-        self.finger_faces = [np.asarray(self.hand_faces, np.int32)[mv[self.hand_faces].any(1)] for mv in moving]
         self.distal = [np.nonzero(self.skin_W[:, CHAINS[f][2]] > 0.5)[0] for f in FINGERS]   # last segment (pad + tip)
+        self.palm_verts = np.nonzero(self.vert_finger == -1)[0]
 
         self.glctx = dr.RasterizeCudaContext()
         self._rgb, self._ltab, self._xyz = {}, {}, None
@@ -184,7 +190,17 @@ class Clip:
         ob.endModel()
         self.col_obj = fcl.CollisionObject(ob, fcl.Transform())
         self.hand_faces_i = np.asarray(self.hand_faces, np.int32)
-        self.init_state = State(poses.copy(), np.zeros((self.N, 3)), np.zeros((self.N, 3)), [])
+        self.init_state = State(poses.copy(), P["global_orient"][:self.N].copy(), P["transl"][:self.N].copy(),
+                                P["hand_pose"][:self.N].copy(), [])
+        # per finger joint, its typical bending direction in this clip (the mean of the tracker's rotation vectors,
+        # which flexion dominates): curl_finger turns joints about it
+        hp = P["hand_pose"][:self.N][self.hand_valid].reshape(-1, 15, 3)
+        mean = hp.mean(0)
+        self.flex_axis = mean / np.maximum(np.linalg.norm(mean, axis=1, keepdims=True), 1e-6)
+        # how smooth the hand tracker's own motion is (median hand-mesh acceleration): the reference for jitter
+        acc = self.motion(self.init_state, range(self.N))
+        ref = [a["hand_accel_mm"] for a in acc.values() if a.get("hand_accel_mm") is not None]
+        self.jitter_ref = float(np.median(ref)) if ref else 2.0
 
     # ---------- inputs ----------
     def rgb(self, i):
@@ -230,9 +246,9 @@ class Clip:
         self.table_n = t["normal"] if t else self.up
         self.table_p = t["point"] if t else np.zeros(3)
 
-    def _sdf_grid(self, n=56):
+    def _sdf_grid(self, n=128):
         """Signed distance to the object surface on a grid in the object frame (negative inside), cached."""
-        path = os.path.join(self.run, "refine_sdf.npz")
+        path = os.path.join(self.run, f"refine_sdf{n}.npz")
         if os.path.exists(path):
             z = np.load(path)
             self.sdf, self.sdf_lo, self.sdf_hi = z["sdf"], z["lo"], z["hi"]
@@ -241,7 +257,13 @@ class Clip:
         pad = 0.25 * np.ptp(v, 0).max()
         lo, hi = v.min(0) - pad, v.max(0) + pad
         g = np.stack(np.meshgrid(*[np.linspace(lo[k], hi[k], n) for k in range(3)], indexing="ij"), -1).reshape(-1, 3)
-        closest, dist, tri = trimesh.proximity.closest_point(self.mesh, g)
+        import open3d as o3d                                 # closest points (open3d's BVH: seconds, not minutes)
+        scene = o3d.t.geometry.RaycastingScene()
+        scene.add_triangles(o3d.core.Tensor(np.asarray(self.mesh.vertices, np.float32)),
+                            o3d.core.Tensor(np.asarray(self.mesh.faces, np.uint32)))
+        q = scene.compute_closest_points(o3d.core.Tensor(g.astype(np.float32)))
+        closest, tri = q["points"].numpy().astype(np.float64), q["primitive_ids"].numpy().astype(np.int64)
+        dist = np.linalg.norm(g - closest, axis=1)
         sign = np.sign(np.einsum("ij,ij->i", g - closest, self.mesh.face_normals[tri]))
         sign[sign == 0] = 1
         self.sdf = (sign * dist).reshape(n, n, n).astype(np.float32)
@@ -265,73 +287,42 @@ class Clip:
         val[out] = 1.0
         return val
 
-    # ---------- hand model ----------
-    def _palm_sign(self):
-        """Sign that makes cross(index MCP - wrist, pinky MCP - wrist) point to the palm side: the side the fingers
-        bend towards, summed over the clip's frames (people rarely hyperextend their fingers)."""
-        s = 0.0
-        for i in np.nonzero(self.hand_valid)[0][::5]:
-            v = self.hand_base[i].astype(np.float64)
-            J = self.J16 @ v
-            n = np.cross(J[1] - J[0], J[7] - J[0])
-            n /= np.linalg.norm(n) + 1e-12
-            for f in ("index", "middle", "ring", "pinky"):
-                j1, j2, j3 = CHAINS[f]
-                pts = [J[0], J[j1], J[j2], J[j3], v[TIPS[f]]]
-                for a, b, c in zip(pts, pts[1:], pts[2:]):
-                    u, w = b - a, c - b
-                    s += (w - u * (w @ u) / (u @ u + 1e-12)) @ n
-        return 1.0 if s >= 0 else -1.0
-
-    def palm_normal(self, J):
-        n = self.palm_sign * np.cross(J[1] - J[0], J[7] - J[0])
-        return n / (np.linalg.norm(n) + 1e-12)
-
-    def finger_delta(self, v, J, n, k, deg):
-        """Displacement of the hand's vertices when finger k flexes by `deg` degrees (curl > 0): each of its three
-        joints turns (FLEX_SPLIT of the angle) about the axis across the finger, perpendicular to the palm normal n,
-        and the mesh follows by MANO's skinning weights. Fingers are independent (disjoint joint chains), so the
-        deltas of several fingers add up."""
-        f = FINGERS[k]
-        j1, j2, j3 = CHAINS[f]
-        rows = self.finger_rows[k]                           # vertices with any weight on this finger's joints
-        vr = v[rows].astype(np.float64)
-        Ra, ta = np.eye(3), np.zeros(3)
-        out = np.zeros_like(vr)
-        for j, nxt, share in ((j1, J[j2], FLEX_SPLIT[0]), (j2, J[j3], FLEX_SPLIT[1]), (j3, v[TIPS[f]], FLEX_SPLIT[2])):
-            p, q = Ra @ J[j] + ta, Ra @ nxt + ta
-            a = np.cross(q - p, n)
-            a /= np.linalg.norm(a) + 1e-12
-            Rk = Rotation.from_rotvec(np.radians(share * deg) * a).as_matrix()
-            Ra, ta = Rk @ Ra, Rk @ (ta - p) + p
-            out += self.skin_W[rows, j][:, None] * (vr @ Ra.T + ta - vr)
-        d = np.zeros((len(v), 3), np.float32)
-        d[rows] = out
-        return d
-
-    def articulate(self, v, flex):
-        """Hand vertices v (778, 3) with each finger flexed by flex[k] degrees on top of their pose."""
-        if not np.any(flex):
-            return v
-        J = self.J16 @ v.astype(np.float64)
-        n = self.palm_normal(J)
-        out = v.astype(np.float32).copy()
-        for k in range(len(FINGERS)):
-            if flex[k]:
-                out += self.finger_delta(v, J, n, k, flex[k])
-        return out
-
-    def hand_verts_of(self, i, flex, rot, off):
-        """Dyn-HaMR's hand with finger flexion `flex`, rotated by `rot` about its (unflexed) centroid, then shifted."""
-        base = self.hand_base[i]
-        v = self.articulate(base, flex) if flex is not None else base
-        if np.any(rot):
-            c = base.mean(0)
-            v = (v - c) @ Rotation.from_rotvec(rot).as_matrix().T.astype(np.float32) + c
-        return v + np.asarray(off, np.float32)
+    # ---------- hand model (MANO parameters) ----------
+    def hand_verts_batch(self, state, frames):
+        """Hand vertices (F, 778, 3) for `frames` (one batched MANO forward)."""
+        frames = list(frames)
+        if state.verts is not None:
+            return state.verts[frames].astype(np.float64)
+        return mano.mano_forward(state.go[frames], state.tr[frames], state.hp[frames], self.betas_of(state), self.side)
 
     def hand_verts(self, state, i):
-        return self.hand_verts_of(i, state.finger[i], state.hand_rot[i], state.hand_off[i])
+        if state.verts is not None:
+            return state.verts[i].astype(np.float64)
+        key = (i, state.go[i].tobytes(), state.tr[i].tobytes(), state.hp[i].tobytes(),
+               None if state.betas is None else state.betas.tobytes())
+        v = self._hv_cache.get(key)
+        if v is None:
+            if len(self._hv_cache) > 20000:
+                self._hv_cache.clear()
+            v = self._hv_cache[key] = self.hand_verts_batch(state, [i])[0]
+        return v
+
+    def betas_of(self, state):
+        return self.betas if state.betas is None else state.betas
+
+    def J0_of(self, state):
+        return self.J0 if state.betas is None else mano.root_joint(state.betas, self.side)
+
+    def hand_rigid(self, state, i, R=None, d=None, center=None):
+        """New (go, tr) of frame i after rotating its hand by R about `center` (default: its vertex centroid) and
+        translating it by d (camera frame): MANO rotates about its root joint J0, so the translation absorbs the rest."""
+        R = np.eye(3) if R is None else R
+        d = np.zeros(3) if d is None else d
+        c = self.hand_verts(state, i).mean(0) if center is None else center
+        go = Rotation.from_matrix(R @ Rotation.from_rotvec(state.go[i]).as_matrix()).as_rotvec()
+        J0 = self.J0_of(state)
+        tr = R @ (J0 + state.tr[i] - c) + c + d - J0
+        return go, tr
 
     def crossing(self, verts, T, faces=None, cap=4000):
         """Indices (into `faces`, default all hand faces) of hand triangles that cross the object's surface for object
@@ -443,20 +434,76 @@ class Clip:
         m.visual.vertex_colors = np.tile([90, 140, 235, 255], (len(verts), 1)) if colors is None else colors
         return make_mesh_tensors(m)
 
-    def render_hand_low(self, state, frames):
+    def render_hand_low(self, state, frames, hv=None):
         out = np.zeros((len(frames), self.hl, self.wl), np.float32)
         eye = torch.eye(4, device="cuda")[None]
         for k, i in enumerate(frames):
+            v = hv[i] if hv is not None and i in hv else self.hand_verts(state, i)
             _, d, _ = nvdiffrast_render(K=self.Kl, H=self.hl, W=self.wl, glctx=self.glctx,
-                                        mesh_tensors=self.hand_tensors(self.hand_verts(state, i)), ob_in_cams=eye)
+                                        mesh_tensors=self.hand_tensors(v), ob_in_cams=eye)
             out[k] = d[0].cpu().numpy()
+        return out
+
+    def grasp(self, hv, T, sd=None):
+        """Is the object gripped? Touching (< 5 mm): the thumb's and each finger's last segment, and the palm. A grip
+        is opposed when the thumb or the palm and at least one other finger touch on sides of the object facing
+        roughly opposite ways (outward surface normals at the contacts, from the SDF gradient, more than ~110 deg apart);
+        one fingertip resting on the object is not a grip."""
+        po = (hv - T[:3, 3]) @ T[:3, :3]
+        sd = self.sdf_at(po) if sd is None else sd
+        parts = {f: self.distal[k] for k, f in enumerate(FINGERS)}
+        parts["palm"] = self.palm_verts
+        touch, normal = {}, {}
+        eps = 0.002
+        for name, idx in parts.items():
+            j = idx[int(np.argmin(sd[idx]))]
+            touch[name] = bool(sd[j] < 0.005)
+            if touch[name]:
+                g = np.array([(self.sdf_at(po[[j]] + eps * e) - self.sdf_at(po[[j]] - eps * e))[0] / (2 * eps) for e in np.eye(3)])
+                normal[name] = g / (np.linalg.norm(g) + 1e-9)
+        opposed = any(touch[a] and touch[b] and normal[a] @ normal[b] < -0.35
+                      for a in ("thumb", "palm") for b in ("index", "middle", "ring", "pinky"))
+        return {"n_touching": int(sum(touch[f] for f in FINGERS)), "thumb_touching": touch["thumb"],
+                "palm_touching": touch["palm"], "opposed": bool(opposed), "thumb_gap_cm": min(5.0, float(100 * sd[self.distal[0]].min()))}
+
+    # ---------- motion ----------
+    def motion(self, state, frames, hv=None):
+        """Per-frame speed and acceleration (second difference) of the object (center, rotation), the hand mesh (mean
+        over its vertices, in the camera and relative to the object) and the finger angles; None where a neighbour
+        is missing or the hand is not tracked."""
+        if hv is None:
+            need = sorted({j for i in frames for j in (i - 1, i, i + 1) if 0 <= j < self.N})
+            hv = dict(zip(need, self.hand_verts_batch(state, need)))
+        get = lambda j: hv.setdefault(j, self.hand_verts(state, j).astype(np.float64))
+        out = {}
+        for i in frames:
+            r = {}
+            j = i - 1 if i > 0 else i + 1
+            if 0 <= j < self.N:
+                r["ang_speed_deg_per_frame"] = float(np.degrees(Rotation.from_matrix(state.obj[i, :3, :3] @ state.obj[j, :3, :3].T).magnitude()))
+                r["speed_cm_per_frame"] = float(100 * np.linalg.norm(self.obj_center(state, i) - self.obj_center(state, j)))
+            if 0 < i < self.N - 1:
+                c = [self.obj_center(state, k) for k in (i - 1, i, i + 1)]
+                r["obj_accel_cm"] = float(100 * np.linalg.norm(c[2] - 2 * c[1] + c[0]))
+                w1 = Rotation.from_matrix(state.obj[i, :3, :3] @ state.obj[i - 1, :3, :3].T).as_rotvec()
+                w2 = Rotation.from_matrix(state.obj[i + 1, :3, :3] @ state.obj[i, :3, :3].T).as_rotvec()
+                r["obj_ang_accel_deg"] = float(np.degrees(np.linalg.norm(w2 - w1)))
+                if self.hand_valid[i - 1:i + 2].all():
+                    v = [get(k) for k in (i - 1, i, i + 1)]
+                    r["hand_accel_mm"] = float(1000 * np.linalg.norm(v[2] - 2 * v[1] + v[0], axis=1).mean())
+                    rel = [(v[n] - state.obj[k, :3, 3]) @ state.obj[k, :3, :3] for n, k in enumerate((i - 1, i, i + 1))]
+                    r["hand_rel_accel_mm"] = float(1000 * np.linalg.norm(rel[2] - 2 * rel[1] + rel[0], axis=1).mean())
+                    r["finger_accel_deg"] = float(np.degrees(np.abs(state.hp[i + 1] - 2 * state.hp[i] + state.hp[i - 1])).mean())
+            out[i] = r
         return out
 
     # ---------- metrics ----------
     def metrics(self, state, frames=None):
         frames = list(range(self.N)) if frames is None else list(frames)
+        need = sorted({j for i in frames for j in (i - 1, i, i + 1) if 0 <= j < self.N})
+        hvc = dict(zip(need, self.hand_verts_batch(state, need)))     # one batched MANO forward
         do = self.render_obj_low(state, frames)
-        dh = self.render_hand_low(state, frames)
+        dh = self.render_hand_low(state, frames, hvc)
         kern = np.ones((3, 3), np.uint8)
         rows = []
         for k, i in enumerate(frames):
@@ -479,7 +526,7 @@ class Clip:
             r["hand_depth_bias_cm"] = float(100 * np.median(dh[k][hb] - d[hb])) if hb.sum() > 8 else None
             r["hand_kp_px"] = self.hand_kp_err(state, i)
             T = state.obj[i]
-            hv = self.hand_verts(state, i)
+            hv = hvc.setdefault(i, self.hand_verts(state, i).astype(np.float64))
             sd = self.sdf_at((hv - T[:3, 3]) @ T[:3, :3])
             r["contact_cm"] = float(100 * max(sd.min(), 0))
             r["penetration_cm"] = float(100 * max(-sd.min(), 0))
@@ -489,17 +536,15 @@ class Clip:
             ff = np.bincount(self.face_finger[cf] + 1, minlength=6)[1:] if len(cf) else np.zeros(5, int)
             r["cross_fingers"] = [f for f, c in zip(FINGERS, ff) if c >= 3]
             r["tip_gap_cm"] = [round(float(100 * sd[d].min()), 2) for d in self.distal]   # each finger's last segment
+            r.update(self.grasp(hv, T, sd))
             r["obj_height_cm"] = float(100 * self.height_above_table(state, [i])[0])
             r["hand_height_cm"] = float(100 * ((hv @ self.table_n).min() - self.local_table_c(state, i)))
             r["hand_valid"] = bool(self.hand_valid[i])
+            r["_jitter_ref"] = self.jitter_ref
             rows.append(r)
-        idx = {r["frame"]: r for r in rows}
-        for i in frames:                                  # motion, from the neighbouring poses
-            j = i - 1 if i > 0 else i + 1
-            if 0 <= j < self.N:
-                dR = Rotation.from_matrix(state.obj[i, :3, :3] @ state.obj[j, :3, :3].T).magnitude()
-                idx[i]["ang_speed_deg_per_frame"] = float(np.degrees(dR))
-                idx[i]["speed_cm_per_frame"] = float(100 * np.linalg.norm(self.obj_center(state, i) - self.obj_center(state, j)))
+        mo = self.motion(state, frames, hvc)              # motion and jitter, from the neighbouring frames
+        for r in rows:
+            r.update(mo[r["frame"]])
         return rows
 
 
@@ -534,8 +579,16 @@ def flag(r, phase):
         out.append("hand below table")
     if phase in ("grasp", "carry", "rotate", "lift", "place") and r["contact_cm"] > 2.0:
         out.append("hand not touching object")
+    if phase in ("lift", "carry", "rotate") and r.get("opposed") is False:
+        out.append("no opposing grip (thumb or palm vs fingers)")
+    if r.get("hand_depth_bias_cm") is not None and abs(r["hand_depth_bias_cm"]) > 1.5:
+        out.append("hand off the depth map")
     if r.get("ang_speed_deg_per_frame", 0) > 12:
         out.append("rotation jump")
+    if r.get("hand_accel_mm") is not None and r["hand_accel_mm"] > max(4.0, 2.5 * r.get("_jitter_ref", 2.0)):
+        out.append("hand jitter")
+    if r.get("finger_accel_deg") is not None and r["finger_accel_deg"] > 8.0:
+        out.append("finger jitter")
     return out
 
 
@@ -543,7 +596,7 @@ def summarize(clip, state, rows, window=None):
     """Compact text summary for the agent: per-window medians and flagged frame runs."""
     window = window or max(10, clip.N // 12)
     keys = ["coverage", "spill", "depth_res_cm", "depth_bias_cm", "hand_kp_px", "hand_depth_bias_cm", "contact_cm",
-            "penetration_cm", "n_cross", "obj_height_cm", "ang_speed_deg_per_frame"]
+            "penetration_cm", "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "finger_accel_deg"]
     lines = ["frames    phase      " + " ".join(f"{k[:11]:>11}" for k in keys)]
     for s in range(rows[0]["frame"], rows[-1]["frame"] + 1, window):
         win = [r for r in rows if s <= r["frame"] < s + window]

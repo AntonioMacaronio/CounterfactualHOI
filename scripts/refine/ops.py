@@ -7,10 +7,9 @@ forward = away from the camera, up) or camera axes, along the viewing ray. A ran
 
 Search-backed edits: polish_object runs FoundationPose's refiner from the current pose on the hand-scaled depth and
 keeps a frame's result only if it fits the SAM3 mask + depth better and stays within a trust region (so it sharpens a
-pose without jumping to another solution); polish_hand fits the hand's rigid motion to its 2D keypoints, its SAM3 mask
-and the depth by gradient-free coordinate search (penalising penetration into the object); fit_fingers searches each
-finger's flexion against its keypoints, the object's surface (no triangles through it) and, while held, contact;
-propose_object_poses returns FoundationPose's top registration hypotheses at a frame for the agent to choose from
+pose without jumping to another solution); fit_mano is a gradient-based fit of the hand's MANO parameters (the only
+hand representation: no vertex edits) to its 2D keypoints, SAM3 mask and the depth, with priors, no penetration and a
+grip in held phases; propose_object_poses returns FoundationPose's top registration hypotheses at a frame for the agent to choose from
 (apply_candidate).
 """
 
@@ -22,6 +21,7 @@ import torch
 from scipy.spatial.transform import Rotation
 
 from clip import FINGERS, LOW, TIPS, Clip, State, se3_interp  # noqa: F401
+import mano  # noqa: E402
 from Utils import nvdiffrast_render  # noqa: E402
 
 _EST = {}
@@ -42,6 +42,40 @@ def weights(N, start, end, falloff=0):
 
 def _touched(w):
     return [int(i) for i in np.nonzero(w > 0)[0]]
+
+
+def whittaker(x, window=12.0, w=None):
+    """Smooth x (T, d) along time: min sum w_t |x_t - x0_t|^2 + lam sum |second difference|^2, lam from the
+    smoothing period `window` (frames; motion slower than that passes). Removes jitter, keeps the motion."""
+    x = np.asarray(x, float)
+    T = len(x)
+    if T < 4 or window <= 1:
+        return x.copy()
+    lam = (window / (2 * np.pi)) ** 4
+    D = np.diff(np.eye(T), 2, axis=0)
+    W = np.diag(np.ones(T) if w is None else np.asarray(w, float))
+    return np.linalg.solve(W + lam * D.T @ D, W @ x.reshape(T, -1)).reshape(x.shape)
+
+
+def runs_of(frames):
+    """Split sorted frame indices into runs of consecutive frames."""
+    out = []
+    for i in frames:
+        if out and i == out[-1][-1] + 1:
+            out[-1].append(i)
+        else:
+            out.append([i])
+    return out
+
+
+def _pin(n, start, end, N, run):
+    """Weights for whittaker(): strong at a run's ends that border untouched frames, so the smoothed range joins them."""
+    w = np.ones(len(run))
+    if run[0] > 0 and run[0] == start:
+        w[0] = 1e4
+    if run[-1] < N - 1 and run[-1] == end:
+        w[-1] = 1e4
+    return w
 
 
 def world_vec(clip, dx, dy, dz, frame):
@@ -120,15 +154,15 @@ def smooth_object(clip, state, start, end, window=5):
 
 
 def move_hand(clip, state, start, end, dx_cm, dy_cm, dz_cm, frame="world", rot_axis=None, rot_deg=0.0, falloff=0):
+    """Rigidly move the hand (MANO global orientation + translation): rotate about its centroid, then translate."""
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     d = world_vec(clip, dx_cm, dy_cm, dz_cm, frame) / 100
     for i in _touched(w):
-        s.hand_off[i] += w[i] * d
+        R = None
         if rot_axis and rot_deg:
-            a = clip.axis(state, i, rot_axis)
-            R = Rotation.from_rotvec(np.radians(rot_deg) * w[i] * a) * Rotation.from_rotvec(state.hand_rot[i])
-            s.hand_rot[i] = R.as_rotvec()
+            R = Rotation.from_rotvec(np.radians(rot_deg) * w[i] * clip.axis(state, i, rot_axis)).as_matrix()
+        s.go[i], s.tr[i] = clip.hand_rigid(state, i, R, w[i] * d)
     return s, _touched(w), (f"move hand ({dx_cm:+.1f},{dy_cm:+.1f},{dz_cm:+.1f}) cm [{frame}]"
                             + (f", rotate {rot_deg:+.1f} deg about {rot_axis}" if rot_axis and rot_deg else "") + f" on {start}-{end}")
 
@@ -140,7 +174,7 @@ def attach_hand_to_object(clip, state, start, end, ref):
     c_rel = T[:3, :3].T @ (clip.hand_verts(state, ref).mean(0) - T[:3, 3])
     for i in range(start, end + 1):
         target = state.obj[i, :3, :3] @ c_rel + state.obj[i, :3, 3]
-        s.hand_off[i] += target - clip.hand_verts(state, i).mean(0)
+        s.tr[i] = state.tr[i] + target - clip.hand_verts(state, i).mean(0)
     return s, list(range(start, end + 1)), f"attach hand to object on {start}-{end} (relative position of frame {ref})"
 
 
@@ -227,105 +261,12 @@ def apply_candidate(clip, state, i, cand_pose, start, end, falloff=0):
     return s, _touched(w), f"apply registration candidate at frame {i} to {start}-{end} (rotation {np.degrees(np.linalg.norm(rv)):.1f} deg, shift {100 * np.linalg.norm(t_d):.1f} cm)"
 
 
-# ---------- hand fit ----------
+# ---------- hand (MANO parameters) ----------
 HELD = ("grasp", "lift", "carry", "rotate", "place")
+CHAIN_JOINTS = {"thumb": (13, 14, 15), "index": (1, 2, 3), "middle": (4, 5, 6), "ring": (10, 11, 12), "pinky": (7, 8, 9)}
+CURL_SHARE = (0.4, 0.35, 0.25)
 
 
-def _hand_costs(clip, i, v0, c, mt, rots, offs, T_obj, held=False):
-    """Fit cost of several rigid hand motions at frame i (one batched render): robust 2D keypoint error, rendered
-    hand outside its mask, depth error, penetration into the object, and, while the object is held, the hand's gap
-    to the object's surface (keypoints of fingers hidden behind the object would otherwise pull the hand off it)."""
-    Rs = Rotation.from_rotvec(np.asarray(rots)).as_matrix()
-    Ts = np.tile(np.eye(4), (len(Rs), 1, 1))
-    Ts[:, :3, :3] = Rs
-    Ts[:, :3, 3] = c - Rs @ c + np.asarray(offs)
-    _, dh, _ = nvdiffrast_render(K=clip.Kl, H=clip.hl, W=clip.wl, glctx=clip.glctx, mesh_tensors=mt,
-                                 ob_in_cams=torch.as_tensor(Ts, device="cuda", dtype=torch.float))
-    dh = dh.cpu().numpy()
-    hm, om, d = clip.hm[i] & ~clip.om[i], clip.om[i], clip.dl[i]
-    ok = np.isfinite(clip.kp2d[i, :, 0])
-    J0 = clip.kp_reg @ v0
-    out = []
-    for m in range(len(Rs)):
-        sh = dh[m] > 0
-        n = sh.sum()
-        if n < 10:
-            out.append(10.0)
-            continue
-        spill = (sh & ~hm & ~om).sum() / n                    # rendered hand outside its mask (object mask = occluder)
-        both = sh & hm & (d > 0)
-        dres = np.median(np.abs(dh[m][both] - d[both])) if both.sum() > 8 else 0.05
-        v = (v0 - c) @ Rs[m].T + c + offs[m]
-        sd = clip.sdf_at((v - T_obj[:3, 3]) @ T_obj[:3, :3])
-        pen = max(-sd.min(), 0)
-        gap = max(sd.min() - 0.003, 0) if held else 0.0
-        kp_term = 0.0
-        if ok.sum() >= 8:                                     # robust (Huber-like) keypoint reprojection, 30 px units
-            J = (J0 - c) @ Rs[m].T + c + offs[m]
-            p = (clip.K @ J.T).T
-            e = np.linalg.norm(p[ok, :2] / p[ok, 2:3] - clip.kp2d[i, ok], axis=1) / 30.0
-            kp_term = float(np.mean(np.where(e < 1, 0.5 * e ** 2, e - 0.5)))
-        out.append(kp_term + 0.5 * spill + 4.0 * dres + 20.0 * pen + 15.0 * gap)
-    return np.array(out)
-
-
-def polish_hand(clip, state, start, end, max_trans_cm=6.0, max_rot_deg=25.0, smooth=5):
-    """Rigid hand fit per frame to its 2D keypoints (robust), its SAM3 mask, the depth, no penetration into the
-    object and, in held phases (set_phases), contact with it: greedy coordinate descent with step halving, the 12
-    neighbouring moves rendered in one batch; then a temporal median of the fitted motion."""
-    s = state.copy()
-    fr = [i for i in range(start, end + 1)
-          if clip.hand_valid[i] and (clip.hm[i].sum() > 30 or np.isfinite(clip.kp2d[i, :, 0]).sum() >= 8)]
-    for i in fr:
-        v0 = clip.articulate(clip.hand_base[i], state.finger[i]).astype(np.float64)   # current finger flexion
-        c = clip.hand_base[i].astype(np.float64).mean(0)                               # rigid centre, as hand_verts
-        mt = clip.hand_tensors(v0.astype(np.float32))
-        r0, t0 = state.hand_rot[i].copy(), state.hand_off[i].copy()
-        cur_r, cur_t = r0.copy(), t0.copy()
-        held = any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in state.phases)
-        best = _hand_costs(clip, i, v0, c, mt, [cur_r], [cur_t], s.obj[i], held)[0]
-        for step_t, step_r in ((0.02, 8.0), (0.01, 4.0), (0.005, 2.0), (0.0025, 1.0)):
-            for _ in range(12):
-                rots, offs = [], []
-                for k in range(6):
-                    for sign in (1, -1):
-                        r, t = cur_r.copy(), cur_t.copy()
-                        if k < 3:
-                            t[k] += sign * step_t
-                            if 100 * np.linalg.norm(t - t0) > max_trans_cm:
-                                continue
-                        else:
-                            r = (Rotation.from_rotvec(np.radians(sign * step_r) * np.eye(3)[k - 3]) * Rotation.from_rotvec(r)).as_rotvec()
-                            if np.degrees((Rotation.from_rotvec(r) * Rotation.from_rotvec(r0).inv()).magnitude()) > max_rot_deg:
-                                continue
-                        rots.append(r)
-                        offs.append(t)
-                if not rots:
-                    break
-                cs = _hand_costs(clip, i, v0, c, mt, rots, offs, s.obj[i], held)
-                j = int(np.argmin(cs))
-                if cs[j] >= best - 1e-4:
-                    break
-                best, cur_r, cur_t = cs[j], rots[j], offs[j]
-        s.hand_rot[i], s.hand_off[i] = cur_r, cur_t
-    if smooth > 1 and len(fr) > smooth:                       # remove frame-to-frame jitter of the fitted motion
-        half = smooth // 2
-        off, rot = s.hand_off.copy(), s.hand_rot.copy()
-        for i in fr:
-            lo, hi = max(start, i - half), min(end, i + half)
-            s.hand_off[i] = np.median(off[lo:hi + 1], 0)
-            s.hand_rot[i] = Rotation.from_rotvec(rot[lo:hi + 1]).mean().as_rotvec()
-    kept = 0                                                  # the rigid fit cannot see thin walls (coarse SDF): keep
-    for i in fr:                                              # the old pose where it pushes the hand through the surface
-        if len(clip.crossing(clip.hand_verts(s, i), s.obj[i])) > len(clip.crossing(clip.hand_verts(state, i), state.obj[i])) + 5:
-            s.hand_off[i], s.hand_rot[i] = state.hand_off[i].copy(), state.hand_rot[i].copy()
-            kept += 1
-    return s, fr, (f"polish hand on {start}-{end}: fitted {len(fr)} frames to keypoints + mask + depth (trust region "
-                   f"{max_trans_cm} cm, {max_rot_deg} deg)" + (f"; kept the previous pose on {kept} frames where the fit "
-                   "pushed the hand through the object" if kept else ""))
-
-
-# ---------- fingers ----------
 def _finger_names(fingers):
     if not fingers or fingers == "all" or fingers == ["all"]:
         return list(FINGERS)
@@ -336,96 +277,164 @@ def _finger_names(fingers):
 
 
 def curl_finger(clip, state, start, end, fingers, delta_deg, falloff=0):
-    """Add `delta_deg` of flexion (curl > 0, open < 0) to the named fingers on [start, end]."""
+    """Turn the named fingers' MANO joints (base to tip: 40 / 35 / 25 % of delta_deg) about each joint's typical
+    bending direction in this clip (curl > 0, open < 0)."""
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     names = _finger_names(fingers)
     for i in _touched(w):
+        hp = s.hp[i].reshape(15, 3)
         for f in names:
-            s.finger[i, FINGERS.index(f)] += w[i] * delta_deg
-    return s, _touched(w), f"curl {', '.join(names)} by {delta_deg:+.0f} deg on {start}-{end} (falloff {falloff})"
+            for j, share in zip(CHAIN_JOINTS[f], CURL_SHARE):
+                k = j - 1
+                R = Rotation.from_rotvec(np.radians(w[i] * share * delta_deg) * clip.flex_axis[k]) * Rotation.from_rotvec(hp[k])
+                hp[k] = R.as_rotvec()
+        s.hp[i] = hp.reshape(45)
+    return s, _touched(w), f"curl {', '.join(names)} by {delta_deg:+.0f} deg (MANO joints) on {start}-{end} (falloff {falloff})"
 
 
-def _finger_cost_fn(clip, s, i, k, flex):
-    """Cost of finger k's flexion at frame i (other fingers at `flex`): robust 2D keypoint error, triangles through
-    the object's surface (FCL), penetration (SDF), and in held phases the gap of its last segment to the surface."""
-    T, base = s.obj[i], clip.hand_base[i]
-    Jb = clip.J16 @ base.astype(np.float64)
-    n = clip.palm_normal(Jb)
-    Rr = Rotation.from_rotvec(s.hand_rot[i]).as_matrix()
-    c, off = base.mean(0), s.hand_off[i]
-    others = base + sum(clip.finger_delta(base, Jb, n, j, flex[j]) for j in range(len(FINGERS)) if j != k and flex[j])
-    held = any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in s.phases)
-    f = FINGERS[k]
-    ok = np.isfinite(clip.kp2d[i, :, 0])
-    rows, kpr = clip.finger_rows[k], [r for r in clip.kp_finger[f] if ok[r]]
-    to_obj = lambda v: (v - T[:3, 3]) @ T[:3, :3]
+def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_weight=2.0, depth_weight=0.5,
+             smooth_weight=1.0, contact_weight=1.0, lr=1.0, shape=False):
+    """Gradient-based fit of the MANO parameters of every frame in [start, end] at once (torch, Adam): the 2D
+    keypoints (robust, 15 px units), the depth map on the hand's mask (vertices the depth map sees), staying on the
+    hand/object masks, MANO's hand-pose prior (energy outside the top 15 PCA components) and a weak pull to the hand
+    tracker's pose, smoothness over time (finger joints and hand joints' positions), no penetration into the object
+    (its SDF) or below the table, and in held phases (set_phases; contact=False turns it off) a grip: the thumb or palm
+    and the nearest finger on the object's surface. mode: "all", "fingers" (joint rotations only) or "rigid".
+    shape=True also fits the clip's one MANO shape (betas, with a prior towards the current one; kept in the state)
+    (the automatic fit does this once: a hand of the wrong size cannot match both the keypoints and the depth)."""
+    import torch
+    import torch.nn.functional as F
+    fr = list(range(start, end + 1))
+    n = len(fr)
+    dev = "cuda"
+    T = lambda a: torch.as_tensor(np.asarray(a, np.float32), device=dev)
+    go0, tr0, hp0 = T(state.go[fr]), T(state.tr[fr]), T(state.hp[fr])
+    hp_trk, betas0 = T(clip.init_state.hp[fr]), T(clip.betas_of(state))
+    dbeta = torch.zeros_like(betas0, requires_grad=shape)
+    dgo = torch.zeros_like(go0, requires_grad=mode in ("all", "rigid"))
+    dtr = torch.zeros_like(tr0, requires_grad=mode in ("all", "rigid"))
+    dhp = torch.zeros_like(hp0, requires_grad=mode in ("all", "fingers"))
+    groups = [{"params": [p], "lr": lr * a} for p, a in ((dgo, 0.02), (dtr, 0.004), (dhp, 0.03), (dbeta, 0.02)) if p.requires_grad]
+    if not groups:
+        raise ValueError("mode must be all, fingers or rigid")
+    valid = T([float(clip.hand_valid[i]) for i in fr])
+    kp = clip.kp2d[fr]
+    kp_m = T(np.isfinite(kp[..., 0]).astype(np.float32)) * valid[:, None]
+    kp_t = T(np.nan_to_num(kp))
+    K = T(clip.K)
+    hl, wl = clip.hl, clip.wl
+    dl = T(clip.dl[fr])[:, None]
+    hm = T((clip.hm[fr] & ~clip.om[fr]).astype(np.float32))[:, None]
+    dtm = T(np.stack([cv2.distanceTransform((~(clip.hm[i] | clip.om[i])).astype(np.uint8), cv2.DIST_L2, 3) for i in fr]))[:, None]
+    has_mask = T([float((clip.hm[i] | clip.om[i]).sum() > 30) for i in fr]) * valid
+    sdf, lo, hi = T(clip.sdf)[None, None], T(clip.sdf_lo), T(clip.sdf_hi)
+    Ro, to = T(state.obj[fr, :3, :3]), T(state.obj[fr, :3, 3])
+    held = T([float(contact is not False and any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in state.phases))
+              for i in fr]) * valid
+    reg = T(clip.kp_reg)
+    m = mano.model(clip.side)
+    comps, hmean = T(m["hands_components"]), T(m["hands_mean"])
+    th_idx = torch.as_tensor(clip.distal[0], device=dev)
+    fi_idx = [torch.as_tensor(d, device=dev) for d in clip.distal[1:]]
+    eye3 = 0.003 * torch.eye(3, device=dev)
+    tn, tc = T(clip.table_n), T([clip.local_table_c(state, i) for i in fr])
+    faces = torch.as_tensor(m["faces"].astype(np.int64), device=dev)
 
-    def cost(deg):
-        v = (others + clip.finger_delta(base, Jb, n, k, deg) - c) @ Rr.T + c + off
-        pen = max(-clip.sdf_at(to_obj(v[rows])).min(), 0.0)
-        ncross = len(clip.crossing(v, T, clip.finger_faces[k], cap=300))
-        gap = min(max(clip.sdf_at(to_obj(v[clip.distal[k]])).min() - 0.003, 0.0), 0.03) if held else 0.0
-        kp = 0.0
-        if kpr:
-            P = (clip.K @ (clip.kp_reg[kpr] @ v).T).T
-            e = np.linalg.norm(P[:, :2] / P[:, 2:3] - clip.kp2d[i, kpr], axis=1) / 30.0
-            kp = float(np.mean(np.where(e < 1, 0.5 * e ** 2, e - 0.5)))
-        return kp + 0.1 * ncross + 40.0 * pen + 30.0 * gap + 0.002 * abs(deg)
-    return cost
+    def sample(img, uv):                                   # img (n,1,h,w), uv (n,V,2) low-res pixels -> (n,V)
+        g = torch.stack([uv[..., 0] / (wl - 1) * 2 - 1, uv[..., 1] / (hl - 1) * 2 - 1], -1)[:, None]
+        return F.grid_sample(img, g, align_corners=True, padding_mode="border")[:, 0, 0]
 
+    def sdf_at(p):                                         # object-frame points (n,V,3) -> signed distance (n,V)
+        u = (p - lo) / (hi - lo) * 2 - 1
+        g = torch.stack([u[..., 2], u[..., 1], u[..., 0]], -1).reshape(1, 1, 1, -1, 3)
+        return F.grid_sample(sdf, g, align_corners=True, padding_mode="border").reshape(p.shape[:2])
 
-def fit_fingers(clip, state, start, end, fingers=None, max_curl=45.0, max_open=35.0, smooth=5):
-    """Per frame and finger, a 1-D search over the finger's flexion (on top of Dyn-HaMR's articulation) minimising
-    _finger_cost_fn: coarse grid then refinement. Then a temporal median, kept per frame and finger only where it
-    is not worse for that frame (the hand moves against the object, so a neighbour's angle can cross its surface).
-    Frames where the hand is more than 3 cm from the object are left alone."""
-    names = _finger_names(fingers)
+    def losses():
+        go, tr, hp, betas = go0 + dgo, tr0 + dtr, hp0 + dhp, betas0 + dbeta
+        v, J = mano.mano_forward_torch(go, tr, hp, betas, clip.side)
+        j21 = torch.einsum("jv,nvc->njc", reg, v)
+        p = j21 @ K.T
+        e = torch.linalg.norm(p[..., :2] / p[..., 2:3] - kp_t, dim=-1) / 15.0
+        L = {"kp": (torch.where(e < 1, 0.5 * e ** 2, e - 0.5) * kp_m).sum() / kp_m.sum().clamp_min(1)}
+        pv = v @ K.T
+        uvv, z = pv[..., :2] / pv[..., 2:3] / LOW, v[..., 2]
+        dmap, inm = sample(dl, uvv), sample(hm, uvv)
+        with torch.no_grad():                              # vertices facing the camera, on the hand's mask, each
+            fn = torch.cross(v[:, faces[:, 1]] - v[:, faces[:, 0]], v[:, faces[:, 2]] - v[:, faces[:, 0]], dim=-1)
+            vn = torch.zeros_like(v).index_add_(1, faces.reshape(-1), fn.repeat_interleave(3, 1))
+            # weighted by the image area it covers (MANO's vertices are dense on the fingers, sparse on the palm)
+            proj = torch.relu(-(vn * v).sum(-1) / torch.linalg.norm(v, dim=-1)) / z ** 2
+            seen = proj * (((z - dmap).abs() < 0.15) & (inm > 0.5) & (dmap > 0.05)).float() * valid[:, None]
+            w_seen = seen.sum(1)
+            seen = seen / w_seen.clamp_min(1e-12)[:, None]
+            n_seen = (seen > 0).sum(1)
+        r = 100 * (z - dmap)                               # cm; robust per vertex + the hand's mean offset per frame
+        ok = (n_seen > 20).float()
+        L["depth"] = ((torch.where(r.abs() < 1, 0.5 * r ** 2, r.abs() - 0.5) * seen).sum(1) * ok).sum() / ok.sum().clamp_min(1)
+        bias = (r * seen).sum(1)
+        L["depth"] = L["depth"] + 0.5 * (bias ** 2 * ok).sum() / ok.sum().clamp_min(1)
+        L["mask"] = (sample(dtm, uvv).clamp(max=20) * has_mask[:, None]).mean()
+        sd = sdf_at(torch.einsum("nvi,nij->nvj", v - to[:, None], Ro))
+        # no penetration, with a 1.5 mm margin, at the vertices and the triangle centres (thin walls, handles)
+        sdc = sdf_at(torch.einsum("nvi,nij->nvj", v[:, faces].mean(2) - to[:, None], Ro))
+        L["pen"] = 10 * (torch.relu(0.0015 - sd).sum(1) + torch.relu(0.0015 - sdc).sum(1)).mean()
+        # grip: the thumb's last segment and the two closest fingers' on the surface, and the thumb's contact facing
+        # the closest finger's (outward normals > ~110 deg apart: an opposed grip, not a hand resting on one side)
+        po = torch.einsum("nvi,nij->nvj", v - to[:, None], Ro)
+        gt, it = sd[:, th_idx].min(1)
+        gf = torch.stack([sd[:, f].min(1).values for f in fi_idx], 1)
+        g2, k2 = torch.topk(gf, 2, dim=1, largest=False)
+        gap = (torch.relu(gt - 0.0035).clamp(max=0.05) + torch.relu(g2[:, 0] - 0.0035).clamp(max=0.05)
+               + 0.5 * torch.relu(g2[:, 1] - 0.0035).clamp(max=0.05))
+        with torch.no_grad():                              # the closest finger's closest vertex, per frame
+            jf = torch.stack([f[sd[:, f].argmin(1)] for f in fi_idx], 1).gather(1, k2[:, :1])[:, 0]
+        ar = torch.arange(n, device=dev)
+        pt, pf = po[ar, th_idx[it]], po[ar, jf]
+        nrm = lambda p_: F.normalize(torch.stack([sdf_at((p_ + e)[:, None]) - sdf_at((p_ - e)[:, None]) for e in eye3], -1)[:, 0], dim=-1)
+        opp = torch.relu((nrm(pt) * nrm(pf)).sum(-1) + 0.34)
+        L["grip"] = 100 * (gap * held).sum() / held.sum().clamp_min(1) + (opp * held).sum() / held.sum().clamp_min(1)
+        L["table"] = 10 * torch.relu(tc[:, None] - v @ tn).sum(1).mean()
+        c = (hp - hmean) @ comps.T
+        L["prior"] = 10 * (c[:, 15:] ** 2).sum(1).mean() + ((hp - hp_trk) ** 2).sum(1).mean() + 0.1 * (dbeta ** 2).sum()
+        L["smooth"] = (30 * ((hp[2:] - 2 * hp[1:-1] + hp[:-2]) ** 2).sum(1).mean()
+                       + 1e5 * ((J[2:] - 2 * J[1:-1] + J[:-2]) ** 2).sum(-1).mean()) if n >= 3 else torch.zeros((), device=dev)
+        total = (kp_weight * L["kp"] + depth_weight * L["depth"] + 0.1 * L["mask"] + 5 * L["pen"] + contact_weight * L["grip"]
+                 + L["table"] + L["prior"] + smooth_weight * L["smooth"])
+        return total, L
+
+    with torch.no_grad():
+        _, L0 = losses()
+    opt = torch.optim.Adam(groups)
+    sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=0.02 * lr * 0.004)
+    for _ in range(iters):
+        opt.zero_grad()
+        total, _ = losses()
+        total.backward()
+        opt.step()
+        sched.step()
+    with torch.no_grad():
+        _, L1 = losses()
     s = state.copy()
-    fitted = []
-    for i in range(start, end + 1):
-        if not clip.hand_valid[i]:
-            continue
-        T = s.obj[i]
-        if clip.sdf_at((clip.hand_verts(s, i) - T[:3, 3]) @ T[:3, :3]).min() > 0.03:
-            continue
-        flex = s.finger[i].copy()
-        for f in names:
-            k = FINGERS.index(f)
-            cost = _finger_cost_fn(clip, s, i, k, flex)
-            grid = np.arange(-max_open, max_curl + 1e-6, 7.5)
-            cs = [cost(g) for g in grid]
-            best, bc = float(grid[int(np.argmin(cs))]), min(cs)
-            for step in (3.75, 1.875, 0.94):
-                for g in (best - step, best + step):
-                    if -max_open <= g <= max_curl:
-                        cg = cost(g)
-                        if cg < bc:
-                            best, bc = g, cg
-            flex[k] = best
-        s.finger[i] = flex
-        fitted.append(i)
-    if smooth > 1 and len(fitted) > smooth:
-        half, raw = smooth // 2, s.finger.copy()
-        for i in fitted:
-            lo, hi = max(start, i - half), min(end, i + half)
-            sm = np.median(raw[lo:hi + 1], 0)
-            for f in names:
-                k = FINGERS.index(f)
-                if abs(sm[k] - raw[i, k]) < 0.5:
-                    continue
-                cost = _finger_cost_fn(clip, s, i, k, s.finger[i])
-                if cost(sm[k]) <= cost(raw[i, k]) + 0.02:
-                    s.finger[i, k] = sm[k]
-    ch = np.abs(s.finger[fitted] - state.finger[fitted]) if fitted else np.zeros((1, 5))
-    return s, fitted, (f"fit fingers ({', '.join(names)}) on {start}-{end}: {len(fitted)} frames near the object; "
-                       f"median |change| per finger " + ", ".join(f"{f} {np.median(ch[:, FINGERS.index(f)]):.0f}" for f in names) + " deg")
+    note = ""
+    if shape:
+        b = (betas0 + dbeta).detach().cpu().numpy().astype(np.float64)
+        flat = lambda bb: mano.mano_forward(np.zeros((1, 3)), np.zeros((1, 3)), np.zeros((1, 45)), bb, clip.side)[0]
+        size = np.ptp(flat(b), 0).max() / np.ptp(flat(clip.betas_of(state)), 0).max()
+        s.tr = s.tr + clip.J0_of(state) - mano.root_joint(b, clip.side)   # other frames keep their root joint
+        s.betas = b
+        note = f"; hand shape fitted (size x{size:.3f})"
+    s.go[fr] = (go0 + dgo).detach().cpu().numpy()
+    s.tr[fr] = (tr0 + dtr).detach().cpu().numpy()
+    s.hp[fr] = (hp0 + dhp).detach().cpu().numpy()
+    show = ", ".join(f"{k} {float(L0[k]):.2f}->{float(L1[k]):.2f}" for k in ("kp", "depth", "pen", "grip", "smooth"))
+    return s, fr, f"fit MANO ({mode}{', no contact' if contact is False else ''}) on {start}-{end}: {n} frames, {iters} steps; losses {show}{note}"
 
 
-def separate_hand(clip, state, start, end, max_cm=1.5, step_cm=0.2, tol=3, max_kp_px=8.0):
-    """Per frame, translate the hand out of the object along the surface normal where its palm crosses the surface
-    (fingers: fit_fingers), in small steps, until at most `tol` palm triangles cross; a step that raises the
-    keypoint error by more than max_kp_px is not taken."""
+def separate_hand(clip, state, start, end, max_cm=1.5, step_cm=0.2, tol=3, max_kp_px=8.0, smooth=8):
+    """Per frame, translate the hand out of the object along the surface normal where its palm crosses the surface,
+    in small steps, until at most `tol` palm triangles cross; a step that raises the keypoint error by more than
+    max_kp_px is not taken. The pushes are then made one smooth profile over time. (MANO translation only.)"""
     s = state.copy()
     moved = []
     eps = 0.002
@@ -446,19 +455,121 @@ def separate_hand(clip, state, start, end, max_cm=1.5, step_cm=0.2, tol=3, max_k
         best = None
         for k in range(1, int(round(max_cm / step_cm)) + 1):
             trial = s.copy()
-            trial.hand_off[i] = s.hand_off[i] + nrm * k * step_cm / 100
+            trial.tr[i] = s.tr[i] + nrm * k * step_cm / 100
             kp = clip.hand_kp_err(trial, i)
             if kp0 is not None and kp is not None and kp > kp0 + max_kp_px:
                 break
-            best = trial.hand_off[i]
+            best = trial.tr[i]
             if len(clip.crossing(clip.hand_verts(trial, i), T, palm)) <= tol:
                 break
         if best is not None:
-            s.hand_off[i] = best
+            s.tr[i] = best
             moved.append(i)
-    sh = [100 * np.linalg.norm(s.hand_off[i] - state.hand_off[i]) for i in moved]
+    if moved and smooth > 1:
+        fr = list(range(start, end + 1))
+        d = np.array([s.tr[i] - state.tr[i] for i in fr])
+        m_ = np.linalg.norm(d, axis=1)
+        env = np.zeros_like(d)
+        for n_ in range(len(fr)):
+            lo, hi = max(0, n_ - 4), min(len(fr), n_ + 5)
+            u = d[lo:hi].sum(0)
+            if m_[lo:hi].max() > 0 and np.linalg.norm(u) > 0:
+                env[n_] = m_[lo:hi].max() * u / np.linalg.norm(u)
+        env = whittaker(env, smooth, _pin(len(fr), start, end, clip.N, fr))
+        for n_, i in enumerate(fr):
+            s.tr[i] = state.tr[i] + env[n_]
+        moved = [i for n_, i in enumerate(fr) if np.linalg.norm(env[n_]) > 1e-4]
+    sh = [100 * np.linalg.norm(s.tr[i] - state.tr[i]) for i in moved]
     return s, moved, (f"separate hand from the object on {start}-{end}: moved {len(moved)} frames out along the surface "
-                      f"normal where the palm crossed it (median {np.median(sh) if sh else 0:.1f} cm, max {max(sh) if sh else 0:.1f} cm)")
+                      f"normal where the palm crossed it, smoothly (median {np.median(sh) if sh else 0:.1f} cm, "
+                      f"max {max(sh) if sh else 0:.1f} cm)")
+
+
+def smooth_hand(clip, state, start, end, window=12.0, fingers=True, rigid=True, max_extra_cross=5):
+    """Remove jitter from the hand on [start, end]: smooth its MANO parameters over time (whittaker: motion slower
+    than `window` frames passes; orientations relative to the range's first frame), joined to the frames outside the
+    range. Where that pushes the hand through the object (more than max_extra_cross extra crossing triangles), only
+    part of the smoothing is applied there (a fraction that is itself smooth in time)."""
+    s = state.copy()
+    fr = [i for i in range(start, end + 1) if clip.hand_valid[i]]
+    for run in runs_of(fr):
+        if len(run) < 4:
+            continue
+        w = _pin(len(run), start, end, clip.N, run)
+        if rigid:
+            R0 = Rotation.from_rotvec(state.go[run[0]])
+            rel = (R0.inv() * Rotation.from_rotvec(state.go[run])).as_rotvec()
+            s.go[run] = (R0 * Rotation.from_rotvec(whittaker(rel, window, w))).as_rotvec()
+            s.tr[run] = whittaker(state.tr[run], window, w)
+        if fingers:
+            s.hp[run] = whittaker(state.hp[run], window, w)
+    n0 = {i: len(clip.crossing(clip.hand_verts(state, i), state.obj[i])) for i in fr}
+    alpha = np.ones(clip.N)
+    bad = 0
+    for i in fr:
+        if len(clip.crossing(clip.hand_verts(s, i), s.obj[i])) <= n0[i] + max_extra_cross:
+            continue
+        bad += 1
+        for a in (0.75, 0.5, 0.25, 0.0):
+            t = _blend(state, s, i, a)
+            if a == 0.0 or len(clip.crossing(clip.hand_verts(t, i), t.obj[i])) <= n0[i] + max_extra_cross:
+                alpha[i] = a
+                break
+    if bad:
+        for run in runs_of(fr):
+            a = np.array([alpha[max(run[0], i - 3):min(run[-1], i + 3) + 1].min() for i in run])
+            alpha[run] = np.clip(whittaker(a, 6.0), 0, 1)
+        out = s.copy()
+        for i in fr:
+            out = _blend(state, out, i, alpha[i], into=out)
+        s = out
+    mo0, mo1 = clip.motion(state, fr), clip.motion(s, fr)
+    j0 = [mo0[i]["hand_accel_mm"] for i in fr if mo0[i].get("hand_accel_mm") is not None]
+    j1 = [mo1[i]["hand_accel_mm"] for i in fr if mo1[i].get("hand_accel_mm") is not None]
+    what = " + ".join(x for x, on in (("rigid motion", rigid), ("finger joints", fingers)) if on)
+    return s, fr, (f"smooth hand ({what}) on {start}-{end} over {window:.0f} frames: hand jitter median "
+                   f"{np.median(j0) if j0 else 0:.1f} -> {np.median(j1) if j1 else 0:.1f} mm/frame^2"
+                   + (f"; smoothing reduced on {bad} frames where it pushed the hand through the object" if bad else ""))
+
+
+def _blend(a, b, i, w, into=None):
+    """State `into` (default a copy of b) with frame i's hand = a + w (b - a) (orientation by slerp)."""
+    t = b.copy() if into is None else into
+    Ra, Rb = Rotation.from_rotvec(a.go[i]), Rotation.from_rotvec(b.go[i])
+    t.go[i] = (Ra * Rotation.from_rotvec(w * (Ra.inv() * Rb).as_rotvec())).as_rotvec()
+    t.tr[i] = a.tr[i] + w * (b.tr[i] - a.tr[i])
+    t.hp[i] = a.hp[i] + w * (b.hp[i] - a.hp[i])
+    return t
+
+
+def hand_depth_bias(clip, state, i):
+    """Median depth of the rendered hand minus the depth map over the hand's mask pixels (m; < 0 = hand too close)."""
+    r = clip.metrics(state, [i])[0]
+    return None if r.get("hand_depth_bias_cm") is None else r["hand_depth_bias_cm"] / 100
+
+
+def move_hand_to_depth(clip, state, start, end, smooth=10):
+    """Move the hand along the camera ray through it by its measured depth error (rendered hand vs the depth map on
+    its mask), per frame, smoothed over time: one jump, so a hand that is on the wrong side of the object (e.g. in
+    front of it while the fingers really wrap its far side) gets there without passing through it step by step.
+    Follow with fit_mano to settle the grip."""
+    s = state.copy()
+    fr = [i for i in range(start, end + 1) if clip.hand_valid[i]]
+    rows = {r["frame"]: r for r in clip.metrics(state, fr)}
+    d = np.zeros((len(fr), 3))
+    for n_, i in enumerate(fr):
+        b = rows[i].get("hand_depth_bias_cm")
+        if b is None:
+            continue
+        c = clip.hand_verts(state, i).mean(0)
+        d[n_] = -b / 100 * c / np.linalg.norm(c)
+    for run in runs_of(list(range(len(fr)))):
+        d[run] = whittaker(d[run], smooth)
+    for n_, i in enumerate(fr):
+        s.tr[i] = state.tr[i] + d[n_]
+    mv = 100 * np.linalg.norm(d, axis=1)
+    return s, fr, (f"move hand to its depth on {start}-{end}: along the camera ray by the hand's depth error "
+                   f"(median {np.median(mv) if len(mv) else 0:.1f} cm, max {mv.max() if len(mv) else 0:.1f} cm), smoothed")
 
 
 # ---------- object silhouette fit ----------
@@ -481,12 +592,12 @@ def _obj_costs(clip, i, poses):
     return np.array(out)
 
 
-def fit_object_silhouette(clip, state, start, end, max_rot_deg=8.0, max_trans_cm=2.0, smooth=3):
+def fit_object_silhouette(clip, state, start, end, max_rot_deg=8.0, max_trans_cm=2.0, smooth=8):
     """Per-frame 6-DoF fit of the object to its SAM3 mask (outside the hand) and the depth: greedy coordinate
     descent with step halving (rotations about the object's own axes through its center, translations along camera
     x/y and the viewing ray), the 12 neighbouring poses rendered in one batch, within a trust region around the
     current pose (it sharpens a pose; it will not fix a wrong orientation); frames without a usable mask are skipped.
-    Then a temporal smoothing of the change over `smooth` frames."""
+    Then the change is smoothed over time (whittaker, `smooth` frames)."""
     s = state.copy()
     fr = [i for i in range(start, end + 1) if clip.om[i].sum() > 40]
     for i in fr:
@@ -529,17 +640,16 @@ def fit_object_silhouette(clip, state, start, end, max_rot_deg=8.0, max_trans_cm
                     break
                 best, (cur_rv, cur_t) = cs[j], cands[j]
         s.obj[i] = pose(cur_rv, cur_t)
-    if smooth > 1 and len(fr) > smooth:                     # smooth the applied change, not the poses themselves
-        half = smooth // 2
-        dR = [Rotation.from_matrix(s.obj[i, :3, :3] @ state.obj[i, :3, :3].T) for i in range(clip.N)]
-        dc = [clip.obj_center(s, i) - clip.obj_center(state, i) for i in range(clip.N)]
-        out = s.copy()
-        for i in fr:
-            lo, hi = max(start, i - half), min(end, i + half)
-            Rm = Rotation.concatenate(dR[lo:hi + 1]).mean()
-            cm = np.mean(dc[lo:hi + 1], 0)
-            c = clip.obj_center(state, i)
-            out.obj[i, :3, :3] = Rm.as_matrix() @ state.obj[i, :3, :3]
-            out.obj[i, :3, 3] = c + cm - out.obj[i, :3, :3] @ clip.center_obj
+    if smooth > 1 and len(fr) >= 4:                         # smooth the applied change over time (whittaker), not
+        out = s.copy()                                      # the poses themselves
+        for run in runs_of(fr):
+            if len(run) < 4:
+                continue
+            w = _pin(len(run), start, end, clip.N, run)
+            dr = whittaker(np.array([Rotation.from_matrix(s.obj[i, :3, :3] @ state.obj[i, :3, :3].T).as_rotvec() for i in run]), smooth, w)
+            dc = whittaker(np.array([clip.obj_center(s, i) - clip.obj_center(state, i) for i in run]), smooth, w)
+            for n_, i in enumerate(run):
+                out.obj[i, :3, :3] = Rotation.from_rotvec(dr[n_]).as_matrix() @ state.obj[i, :3, :3]
+                out.obj[i, :3, 3] = clip.obj_center(state, i) + dc[n_] - out.obj[i, :3, :3] @ clip.center_obj
         s = out
     return s, fr, f"fit object to its mask + depth on {start}-{end}: {len(fr)} frames (trust region {max_rot_deg} deg, {max_trans_cm} cm)"
