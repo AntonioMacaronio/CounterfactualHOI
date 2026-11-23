@@ -95,6 +95,8 @@ def caption(out_dir, vid):
         cap = (f"{sm['frames']} frames · hand keypoint error {ba('all', 'hand_kp_px', 1)} px · object mask IoU "
                f"{ba('all', 'iou')} · hand triangles through the object while held {ba('held', 'n_cross', 0)} · "
                f"hand jitter while held {ba('held', 'hand_accel_mm', 1)} mm/frame² (hand tracker {sm.get('hand_jitter_ref_mm', 0):.1f})"
+               + (f" · frames where a fingertip jumps (over {sm['jump_threshold_mm']:.0f} mm/frame²) "
+                  f"{sm['jump_frames'][0]} → {sm['jump_frames'][1]}" if sm.get("jump_frames") else "")
                + (f" · lifted frames with a real grip {sm['grip_lifted'][0]:.0%} → {sm['grip_lifted'][1]:.0%}"
                   if sm.get("grip_lifted") and None not in sm["grip_lifted"] else "")
                + f" · verifier kept {len(sm['verifier']) - sm['reverted']}/{len(sm['verifier'])} chunks · "

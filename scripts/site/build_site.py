@@ -13,9 +13,9 @@ a link to all of that method's viewers:
   4. agentic refinement of 3 (Claude edits MANO + object poses, a blind verifier checks) -> recon/agent/
   5. the refined motions retargeted to the Sharpa hand in simulation (FlashDexRetarget) -> recon/retarget/
 then the generated-video gallery (videos/) and the first retargeting test (img/). Sources: ../outputs/{recon_viser,
-choir_viser,fprecon_viser,refine_viser_r7,flashdex_viser,minimax_h3} (scripts/daid/build_recon_html.py,
+choir_viser,fprecon_viser,refine_viser_r8,flashdex_viser,minimax_h3} (scripts/daid/build_recon_html.py,
 scripts/choir/build_choir_html.py [--method fprecon|refine], scripts/flashdex/build_flashdex_html.py), the refinement
-comparisons in $PROJECT_STORAGE_ROOT/runs/compare/*_final7 (scripts/refine/compare.py --tag final7) and
+comparisons in $PROJECT_STORAGE_ROOT/runs/compare/*_final8 (scripts/refine/compare.py --tag final8) and
 ../videos/grid2x2.mp4. The
 viser viewers are self-contained HTML files, so the site is
 plain static files (plus .nojekyll so GitHub Pages serves them untouched). Re-run after new results.
@@ -25,6 +25,7 @@ import argparse
 import html
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -128,7 +129,7 @@ def results_table(rows):
 
 def refine_table(rdir):
     """Per-clip medians before -> after the agentic refinement, from build_choir_html.py --method refine's summaries."""
-    rows, agg = [], {k: [] for k in ("kp", "iou", "pen", "cross", "jit", "grip")}
+    rows, agg = [], {k: [] for k in ("kp", "iou", "pen", "cross", "jit", "grip", "jump")}
     for st in ("pp", "prp"):
         for i in range(1, 6):
             f = os.path.join(rdir, "summary", f"{st}_anthony_real_{i}.json")
@@ -142,11 +143,13 @@ def refine_table(rdir):
             agg["cross"].append(sm["held"].get("n_cross", [None, None]))
             agg["jit"].append(sm["held"].get("hand_accel_mm", [None, None]))
             agg["grip"].append(sm.get("grip_lifted", [None, None]))
+            agg["jump"].append(sm.get("jump_frames", [None, None]))
             rv = sm.get("reviewer")
             rv_txt = f"{rv['overall']} ({rv['n_high']} high, {rv['n_medium']} medium)" if rv else "—"
             rows.append(f"<tr><td>{sm['video_id']}</td><td>{ba('all', 'hand_kp_px', 1)}</td><td>{ba('all', 'iou')}</td>"
                         f"<td>{ba('held', 'n_cross', 0) if 'n_cross' in sm['held'] else '—'}</td>"
                         f"<td>{ba('held', 'hand_accel_mm', 1) if 'hand_accel_mm' in sm['held'] else '—'}</td>"
+                        f"<td>{(lambda j: f'{j[0]} → <b>{j[1]}</b>' if j else '—')(sm.get('jump_frames'))}</td>"
                         f"<td>{(lambda g: f'{g[0]:.0%} → <b>{g[1]:.0%}</b>' if g and None not in g else '—')(sm.get('grip_lifted'))}</td>"
                         f"<td>{sm['flagged_frames'][0]} → <b>{sm['flagged_frames'][1]}</b></td>"
                         f"<td>{len(sm['verifier']) - sm['reverted']} / {len(sm['verifier'])}</td><td>{rv_txt}</td>"
@@ -155,6 +158,7 @@ def refine_table(rdir):
         return "", None
     table = ("<table><tr><th>clip</th><th>hand keypoint error (px)</th><th>object mask IoU</th>"
              "<th>hand triangles through the object while held</th><th>hand jitter while held (mm/frame²)</th>"
+             "<th>frames where a fingertip jumps</th>"
              "<th>lifted frames with a real grip</th><th>flagged frames</th><th>verifier kept (chunks)</th>"
              "<th>reviewer on the result</th>"
              "<th>agent time</th></tr>" + "".join(rows) + "</table>")
@@ -166,13 +170,13 @@ def refine_table(rdir):
 
 def ablation_rows():
     """Blind A/B comparisons (scripts/refine/compare.py) as (label a, label b, wins a, wins b, ties)."""
-    names = {"initial": "initial (no refinement)", "refine_r7_auto": "automatic fit only (no agent)",
-             "refine_r5": "previous round (vertex-level hand edits)",
-             "refine_r6": "first MANO-only round (no penetration margin)", "refine_r7": "automatic fit + agent (final)"}
+    names = {"initial": "initial (no refinement)", "refine_r8_auto": "automatic fit only (no agent)",
+             "refine_r7": "previous round (before the seam and fingertip-smoothness fixes)",
+             "refine_r8": "automatic fit + agent (final)"}
     out = []
     root = os.path.join(STORAGE, "runs", "compare")
     for d in sorted(os.listdir(root)) if os.path.isdir(root) else []:
-        if not d.endswith("_final7"):                  # the final runs (judge with 3D views, paths + motion plot); others: earlier rounds
+        if not d.endswith("_final8"):                  # the final runs (judge with 3D views, paths + motion plot); others: earlier rounds
             continue
         js = [json.load(open(os.path.join(root, d, f))) for f in sorted(os.listdir(os.path.join(root, d))) if f.endswith(".json")]
         if not js:
@@ -247,7 +251,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(WORKDIR, "CounterfactualHOI-site"))
     ap.add_argument("--featured", default="prp_anthony_real_4", help="real clip shown for CHOIR and ours")
-    ap.add_argument("--refine", default="refine_viser_r7", help="outputs/ dir of the agent-refined viewers")
+    ap.add_argument("--refine", default="refine_viser_r8", help="outputs/ dir of the agent-refined viewers")
     ap.add_argument("--retarget", default="flashdex_viser", help="outputs/ dir of the retargeted motions")
     args = ap.parse_args()
     out, feat = args.out, args.featured
@@ -255,6 +259,7 @@ def main():
 
     tabs = (("daid", "recon_viser"), ("choir", "choir_viser"), ("ours", "fprecon_viser"), ("agent", args.refine),
             ("retarget", args.retarget))
+    retarget_round = []                                # the refinement round tab 5 was trained on, if not tab 4's
     have = {sub for sub, src in tabs if os.path.exists(os.path.join(OUTPUTS, src, "index.html"))}
     NAV[:] = [(h, n) for h, n in NAV if h == "index.html" or h.split("/")[1] in have]   # no links to missing tabs
     for sub, src in tabs:
@@ -264,6 +269,13 @@ def main():
         if sub in ("agent", "retarget"):               # their side-by-side tabs point at the other method's viewers
             ix = os.path.join(out, "recon", sub, "index.html")
             page = open(ix).read()
+            # retargeting trained on an earlier refinement round than tab 4 shows: keep that round's viewers with it
+            for other in sorted(set(re.findall(r"\.\./(refine_viser_\w+)/", page)) - {args.refine}):
+                os.makedirs(os.path.join(out, "recon", sub, "ref"), exist_ok=True)
+                for f in sorted(set(re.findall(rf"\.\./{other}/([\w.]+\.html)", page))):
+                    shutil.copyfile(os.path.join(OUTPUTS, other, f), os.path.join(out, "recon", sub, "ref", f))
+                page = page.replace(f"../{other}/", "ref/")
+                retarget_round.append(other.split("_")[-1])
             page = page.replace("../fprecon_viser/", "../ours/").replace(f"../{args.refine}/", "../agent/")
             open(ix, "w").write(page)
         add_nav(os.path.join(out, "recon", sub, "index.html"), 2)
@@ -315,6 +327,11 @@ def main():
             verdicts.setdefault(rv["overall"], []).append(f[:-5].replace("_anthony_real", ""))
     status = "; ".join(f"<b>{k}</b>: {', '.join(verdicts[k])}" for k in ("good", "acceptable", "bad") if k in verdicts)
     prev = next(((wa, wb, t) for a, b, wa, wb, t, n in abl if a.startswith("previous")), None)
+    jumps = [0, 0]                                     # frames where a fingertip jumps, summed over the clips
+    sdir = os.path.join(out, "recon", "agent", "summary")
+    for f in sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []:
+        j = json.load(open(os.path.join(sdir, f))).get("jump_frames") or [0, 0]
+        jumps = [jumps[0] + j[0], jumps[1] + j[1]]
     agent_section = "" if not rtable else f"""
 <h2>4 · Agentic refinement of our reconstructions</h2>
 <p>An agent refines the reconstruction by looking at it against the video and editing its parameters with tools. The
@@ -323,11 +340,13 @@ rotations, plus one hand shape per clip): no tool edits mesh vertices, so the ha
 that a retargeter can read. Per clip:</p>
 <ol>
 <li><b>Automatic fit (no LLM).</b> The object's 6-DoF pose is fitted frame by frame to its SAM3 mask outside the
-hand and the depth (a search within a trust region, smoothed over time). Then <b>fit_mano</b>, a gradient-based fit
+hand and the depth (a search within a trust region, smoothed over time), and its poses are lightly smoothed (5
+frames) to remove the pose tracker's frame-to-frame noise. Then <b>fit_mano</b>, a gradient-based fit
 of all the hand's MANO parameters over the whole clip at once (Adam on the GPU, ~15 s per clip): the detected 2D hand
 keypoints, the hand's SAM3 mask, the depth map (weighted by the image area each part of the hand covers), MANO's
-hand-pose prior and a pull to the hand tracker's pose, smoothness over time (joint angles and joint positions), no
-penetration into the object (its signed distance field, at the hand's vertices and triangle centres with a 1.5 mm
+hand-pose prior and a pull to the hand tracker's pose, smoothness over time (joint angles, and the positions of
+the joints, the fingertips and the wrist: without the fingertips the fit follows the keypoints' frame-to-frame noise
+there), no penetration into the object (its signed distance field, at the hand's vertices and triangle centres with a 1.5 mm
 margin, so fingers cannot slip through a thin wall or handle) or the table, and the clip's hand shape.</li>
 <li><b>Agent.</b> Claude (Opus 5.5) sees overlays of the rendered hand and object on the frames (with the SAM3 mask,
 the detected keypoints and the object's axes), the 3D scene from any side (hand red where it passes through the
@@ -338,14 +357,17 @@ fit_mano over the held phases with a grip term (the thumb and the closest finger
 thumb's contact facing the fingers'), with more smoothing where the hand still jitters, moves or rotates the hand,
 turns fingers' MANO joints, pushes the palm out of the object, holds the object static or smooths it at rest, and
 fixes flips, jumps and lag with object edits or FoundationPose's re-registration hypotheses. Every edit is a new
-version with before / after images and numbers; it reverts what does not help.</li>
+version with before / after images and numbers, including the acceleration of the fastest fingertip around the edited
+frames and a warning when the edit made the hand or the object jump; it reverts what does not help. A fit over a
+frame range keeps the frames just outside it fixed and joins them smoothly.</li>
 <li><b>Reviewer.</b> When the agent wants to finish, an independent reviewer (fresh context) judges the result in
 absolute terms, every phase next to the video and from four sides, and the agent must fix what it finds or say why it
 cannot. The final result is reviewed three more times; the majority verdict and all three votes are in each clip's
 caption.</li>
 <li><b>Verifier.</b> A separate blind A/B judge compares the agent's result with the automatic fit on each changed
 range (overlays, 3D views from three sides, fingertip paths, a plot of the motion) and keeps the automatic fit wherever
-the agent's version looks worse.</li>
+the agent's version looks worse. Kept and rejected ranges are joined over 10 frames, and the result is checked for
+frames where the hand jumps more than either version does.</li>
 </ol>
 {viewer(f"recon/agent/{feat}.html", out, "agent " + feat, agent_cap)}
 <p>Medians over each clip's frames, initial reconstruction → final.</p>
@@ -353,18 +375,25 @@ the agent's version looks worse.</li>
 {("<p>Blind A/B judgements over every frame of the 10 clips, in chunks at phase boundaries (≤ 60 frames), by the "
   "same judge as the verifier, which sees overlays, 3D views from three sides and a motion plot. "
   "<i>Automatic fit vs final</i> is not an independent test: the verifier already used that judge to keep the "
-  "automatic fit wherever the agent's edit lost. The previous round edited the hand's mesh (a rigid motion plus "
-  "per-finger flexion by skinning, searched frame by frame).</p>" + abl_table) if abl_table else ""}
+  "automatic fit wherever the agent's edit lost. The previous round had the same tools, but a bug in joining the "
+  "verifier's kept and rejected ranges made the hand jump at their boundaries (for two or three frames, up to "
+  "12 cm/frame² at a fingertip), its range fits could leave a jump at the range's ends, and its fits had no "
+  "smoothness on the fingertips.</p>" + abl_table) if abl_table else ""}
 <p class="verdict">Summary: median hand keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px; hand triangles
 through the object while held {rmed["cross"][0]:.0f} → {rmed["cross"][1]:.0f}; hand jitter while held
-{rmed["jit"][0]:.1f} → {rmed["jit"][1]:.1f} mm/frame² (the hand tracker's own motion is the first number); lifted
+{rmed["jit"][0]:.1f} → {rmed["jit"][1]:.1f} mm/frame² (the hand tracker's own motion is the first number); frames
+where a fingertip jumps, summed over the 10 clips, {jumps[0]} → {jumps[1]} (a median hides these: a jump lasts two or
+three frames); lifted
 frames with the thumb or palm against the fingers {rmed["grip"][0]:.0%} → {rmed["grip"][1]:.0%} (a hook grip through a
 mug's handle is not counted, see the reviewer); object mask IoU {rmed["iou"][0]:.2f} → {rmed["iou"][1]:.2f}.
-{f"Against the previous round (vertex-level hand edits), the judge preferred this round on {prev[1]} chunks and the previous one on {prev[0]} ({prev[2]} ties). " if prev else ""}
+{f"Against the previous round, the judge preferred this round on {prev[1]} chunks and the previous one on {prev[0]} ({prev[2]} ties). " if prev else ""}
 <b>Reviewer on each final result (majority of three reviews):</b> {status or "pending"}.</p>
 <p class="more"><a href="recon/agent/index.html">→ Before / after, side by side for each clip (and all 10 refined viewers, with captions, QC frames and the agent's reports)</a></p>
 """
     rsum = retarget_summary(os.path.join(out, "recon", "retarget"))
+    retarget_note = (f" The policy was trained on the previous refinement round ({', '.join(sorted(set(retarget_round)))}), "
+                     "which is what its page shows on the left; section 4 above is a newer round, and retargeting it is "
+                     "the next step." if retarget_round else "")
     retarget_section = "" if not os.path.exists(os.path.join(out, "recon", "retarget", "index.html")) else f"""
 <h2>5 · Retargeted motions (Sharpa Wave hand, physically simulated)</h2>
 <p>The agent-refined reconstructions (section 4: MANO hand + object poses) are turned into physically plausible robot
@@ -375,7 +404,7 @@ object follow the reconstructed one. The object, table and gravity are simulated
 object. Where an object's reconstructed underside (SAM3D cannot see it) made it tip over at rest in simulation
 (the metal case, the soap bottle), its collision mesh is flattened under the object at its reconstructed rest
 pose; the visual mesh and the trajectories are unchanged. The viewers show the policy's rollout of each clip next
-to the refined reconstruction it tracks.
+to the refined reconstruction it tracks.{retarget_note}
 {rsum}</p>
 <p class="more"><a href="recon/retarget/index.html">→ Refined reconstruction (left) vs retargeted motion (right), pp and prp tabs</a></p>
 """

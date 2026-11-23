@@ -20,7 +20,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
-from clip import FINGERS, LOW, TIPS, Clip, State, se3_interp  # noqa: F401
+from clip import FINGERS, LOW, TIP_IDS, TIPS, Clip, State, se3_interp  # noqa: F401
 import mano  # noqa: E402
 from Utils import nvdiffrast_render  # noqa: E402
 
@@ -175,7 +175,9 @@ def attach_hand_to_object(clip, state, start, end, ref):
     for i in range(start, end + 1):
         target = state.obj[i, :3, :3] @ c_rel + state.obj[i, :3, 3]
         s.tr[i] = state.tr[i] + target - clip.hand_verts(state, i).mean(0)
-    return s, list(range(start, end + 1)), f"attach hand to object on {start}-{end} (relative position of frame {ref})"
+    s, extra = _fade_edges(clip, state, s, start, end)   # no jump at the range's ends
+    return s, sorted(set(range(start, end + 1)) | set(extra)), (
+        f"attach hand to object on {start}-{end} (relative position of frame {ref}), fading out over {FADE} frames beyond the range")
 
 
 # ---------- FoundationPose-backed ----------
@@ -263,6 +265,7 @@ def apply_candidate(clip, state, i, cand_pose, start, end, falloff=0):
 
 # ---------- hand (MANO parameters) ----------
 HELD = ("grasp", "lift", "carry", "rotate", "place")
+TIP_SMOOTH = 2.0            # weight of the fingertips + wrist in fit_mano's smoothness, relative to the joints'
 CHAIN_JOINTS = {"thumb": (13, 14, 15), "index": (1, 2, 3), "middle": (4, 5, 6), "ring": (10, 11, 12), "pinky": (7, 8, 9)}
 CURL_SHARE = (0.4, 0.35, 0.25)
 
@@ -294,13 +297,16 @@ def curl_finger(clip, state, start, end, fingers, delta_deg, falloff=0):
 
 
 def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_weight=2.0, depth_weight=0.5,
-             smooth_weight=1.0, contact_weight=1.0, lr=1.0, shape=False):
+             smooth_weight=1.0, contact_weight=1.0, lr=1.0, shape=False, tip_smooth=TIP_SMOOTH):
     """Gradient-based fit of the MANO parameters of every frame in [start, end] at once (torch, Adam): the 2D
     keypoints (robust, 15 px units), the depth map on the hand's mask (vertices the depth map sees), staying on the
     hand/object masks, MANO's hand-pose prior (energy outside the top 15 PCA components) and a weak pull to the hand
-    tracker's pose, smoothness over time (finger joints and hand joints' positions), no penetration into the object
+    tracker's pose, smoothness over time (joint angles, and the positions of the joints, the fingertips and the
+    wrist: without the fingertips the fit follows the keypoints' frame-to-frame noise there), no penetration into the object
     (its SDF) or below the table, and in held phases (set_phases; contact=False turns it off) a grip: the thumb or palm
     and the nearest finger on the object's surface. mode: "all", "fingers" (joint rotations only) or "rigid".
+    The two frames on each side of the range stay fixed and the fit joins them smoothly (the smoothness term spans the
+    range's ends, and a jump there costs as much as anywhere, however long the range): no seam at the ends.
     shape=True also fits the clip's one MANO shape (betas, with a prior towards the current one; kept in the state)
     (the automatic fit does this once: a hand of the wrong size cannot match both the keypoints and the depth)."""
     import torch
@@ -311,6 +317,20 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
     T = lambda a: torch.as_tensor(np.asarray(a, np.float32), device=dev)
     go0, tr0, hp0 = T(state.go[fr]), T(state.tr[fr]), T(state.hp[fr])
     hp_trk, betas0 = T(clip.init_state.hp[fr]), T(clip.betas_of(state))
+    pre = [i for i in (start - 2, start - 1) if i >= 0]              # the frames just outside the range: fixed
+    post = [i for i in (end + 1, end + 2) if i < clip.N]
+    tip_ids = torch.as_tensor(TIP_IDS, device=dev)
+    pts = lambda v_, J_: torch.cat([v_[:, tip_ids], J_[:, :1]], 1)   # the 5 fingertips and the wrist
+
+    def fixed(ids):
+        if not ids:
+            return torch.zeros((0, 45), device=dev), torch.zeros((0, 16, 3), device=dev), torch.zeros((0, 6, 3), device=dev)
+        v_, J_ = mano.mano_forward_torch(T(state.go[ids]), T(state.tr[ids]), T(state.hp[ids]), betas0, clip.side)
+        return T(state.hp[ids]), J_, pts(v_, J_)
+    with torch.no_grad():
+        (hp_pre, J_pre, p_pre), (hp_post, J_post, p_post) = fixed(pre), fixed(post)
+    # second-difference stencils (frames k, k+1, k+2 of pre + range + post) that reach outside the range
+    edge = [k for k in range(len(pre) + n + len(post) - 2) if k < len(pre) or k + 2 >= len(pre) + n]
     dbeta = torch.zeros_like(betas0, requires_grad=shape)
     dgo = torch.zeros_like(go0, requires_grad=mode in ("all", "rigid"))
     dtr = torch.zeros_like(tr0, requires_grad=mode in ("all", "rigid"))
@@ -350,7 +370,7 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
         g = torch.stack([u[..., 2], u[..., 1], u[..., 0]], -1).reshape(1, 1, 1, -1, 3)
         return F.grid_sample(sdf, g, align_corners=True, padding_mode="border").reshape(p.shape[:2])
 
-    def losses():
+    def losses(tip_w=1.0):
         go, tr, hp, betas = go0 + dgo, tr0 + dtr, hp0 + dhp, betas0 + dbeta
         v, J = mano.mano_forward_torch(go, tr, hp, betas, clip.side)
         j21 = torch.einsum("jv,nvc->njc", reg, v)
@@ -397,19 +417,28 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
         L["table"] = 10 * torch.relu(tc[:, None] - v @ tn).sum(1).mean()
         c = (hp - hmean) @ comps.T
         L["prior"] = 10 * (c[:, 15:] ** 2).sum(1).mean() + ((hp - hp_trk) ** 2).sum(1).mean() + 0.1 * (dbeta ** 2).sum()
-        L["smooth"] = (30 * ((hp[2:] - 2 * hp[1:-1] + hp[:-2]) ** 2).sum(1).mean()
-                       + 1e5 * ((J[2:] - 2 * J[1:-1] + J[:-2]) ** 2).sum(-1).mean()) if n >= 3 else torch.zeros((), device=dev)
+        hpf, Jf = torch.cat([hp_pre, hp, hp_post]), torch.cat([J_pre, J, J_post])
+        d2h, d2J = hpf[2:] - 2 * hpf[1:-1] + hpf[:-2], Jf[2:] - 2 * Jf[1:-1] + Jf[:-2]
+        zero = torch.zeros((), device=dev)
+        pf = torch.cat([p_pre, pts(v, J), p_post])
+        d2p = pf[2:] - 2 * pf[1:-1] + pf[:-2]
+        L["smooth"] = (30 * (d2h ** 2).sum(1).mean() + 1e5 * (d2J ** 2).sum(-1).mean()
+                       + tip_w * tip_smooth * 1e5 * (d2p ** 2).sum(-1).mean()) if len(hpf) >= 3 else zero
+        # the range's ends: summed, not averaged over the range, so a 1 cm jump there costs ~20 whatever its length
+        L["join"] = (30 * (d2h[edge] ** 2).sum(1).sum() + 1e5 * (d2J[edge] ** 2).sum(-1).mean(-1).sum()) if edge else zero
         total = (kp_weight * L["kp"] + depth_weight * L["depth"] + 0.1 * L["mask"] + 5 * L["pen"] + contact_weight * L["grip"]
-                 + L["table"] + L["prior"] + smooth_weight * L["smooth"])
+                 + L["table"] + L["prior"] + smooth_weight * L["smooth"] + max(1.0, smooth_weight) * L["join"])
         return total, L
 
     with torch.no_grad():
         _, L0 = losses()
     opt = torch.optim.Adam(groups)
     sched = torch.optim.lr_scheduler.CosineAnnealingLR(opt, iters, eta_min=0.02 * lr * 0.004)
-    for _ in range(iters):
+    for it in range(iters):
         opt.zero_grad()
-        total, _ = losses()
+        # the fingertip smoothness comes in once the fit has found its pose (from 40% to 70% of the steps): from the
+        # start it couples the frames so stiffly that Adam does not get there in the steps it has
+        total, _ = losses(min(1.0, max(0.0, (it / iters - 0.4) / 0.3)))
         total.backward()
         opt.step()
         sched.step()
@@ -427,7 +456,7 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
     s.go[fr] = (go0 + dgo).detach().cpu().numpy()
     s.tr[fr] = (tr0 + dtr).detach().cpu().numpy()
     s.hp[fr] = (hp0 + dhp).detach().cpu().numpy()
-    show = ", ".join(f"{k} {float(L0[k]):.2f}->{float(L1[k]):.2f}" for k in ("kp", "depth", "pen", "grip", "smooth"))
+    show = ", ".join(f"{k} {float(L0[k]):.2f}->{float(L1[k]):.2f}" for k in ("kp", "depth", "pen", "grip", "smooth") + (("join",) if edge else ()))
     return s, fr, f"fit MANO ({mode}{', no contact' if contact is False else ''}) on {start}-{end}: {n} frames, {iters} steps; losses {show}{note}"
 
 
@@ -542,6 +571,58 @@ def _blend(a, b, i, w, into=None):
     return t
 
 
+FADE = 6
+
+
+def _fade_edges(clip, before, after, start, end, falloff=FADE):
+    """Continue a hand edit made on [start, end] beyond its ends: the change at the first / last frame (rotation
+    about the root joint, translation, joint rotations) is applied to the `falloff` frames outside, fading out
+    (cosine), so the edit leaves no jump at the range's ends. Returns (state, the extra frames touched)."""
+    s, extra = after.copy(), []
+    for edge, step in ((start, -1), (end, 1)):
+        dR = (Rotation.from_rotvec(after.go[edge]) * Rotation.from_rotvec(before.go[edge]).inv()).as_rotvec()
+        dt, dh = after.tr[edge] - before.tr[edge], after.hp[edge] - before.hp[edge]
+        for k in range(1, falloff + 1):
+            i = edge + step * k
+            if not 0 <= i < clip.N:
+                break
+            w = 0.5 * (1 + np.cos(np.pi * k / (falloff + 1)))
+            s.go[i] = (Rotation.from_rotvec(w * dR) * Rotation.from_rotvec(before.go[i])).as_rotvec()
+            s.tr[i] = before.tr[i] + w * dt
+            s.hp[i] = before.hp[i] + w * dh
+            extra.append(i)
+    return s, sorted(extra)
+
+
+def seam_frames(clip, state, refs, factor=1.5, floor=3.0):
+    """Frames where `state`'s hand jumps more than every reference state does around that frame (its fastest
+    fingertip's acceleration > factor x theirs + floor mm/frame^2), with both accelerations per frame."""
+    near = lambda a: np.maximum.reduce([a, np.r_[a[1:], 0.0], np.r_[0.0, a[:-1]]])
+    ref = np.maximum.reduce([near(np.nan_to_num(clip.tip_accel(r))) for r in refs])
+    a = np.nan_to_num(clip.tip_accel(state))
+    return [i for i in range(clip.N) if a[i] > factor * ref[i] + floor], a, ref
+
+
+def smooth_seams(clip, state, refs, pad=6, window=8.0):
+    """Smooth the hand at the seams left where versions were joined (seam_frames). Returns (state, notes)."""
+    notes = []
+    for _ in range(2):
+        bad, a, ref = seam_frames(clip, state, refs)
+        if not bad:
+            break
+        groups = [[bad[0], bad[0]]]
+        for i in bad[1:]:
+            if i - groups[-1][1] <= 4:
+                groups[-1][1] = i
+            else:
+                groups.append([i, i])
+        for lo, hi in groups:
+            state, _, note = smooth_hand(clip, state, max(0, lo - pad), min(clip.N - 1, hi + pad), window)
+            notes.append(f"seam at frames {lo}-{hi} (fingertip acceleration {a[lo:hi + 1].max():.0f} mm/frame^2, the "
+                         f"versions joined there have {ref[lo:hi + 1].max():.0f}): {note}")
+    return state, notes
+
+
 def hand_depth_bias(clip, state, i):
     """Median depth of the rendered hand minus the depth map over the hand's mask pixels (m; < 0 = hand too close)."""
     r = clip.metrics(state, [i])[0]
@@ -567,9 +648,14 @@ def move_hand_to_depth(clip, state, start, end, smooth=10):
         d[run] = whittaker(d[run], smooth)
     for n_, i in enumerate(fr):
         s.tr[i] = state.tr[i] + d[n_]
+    extra = []
+    if fr:                                               # no jump at the range's ends: the end frames' move fades out
+        s, extra = _fade_edges(clip, state, s, fr[0], fr[-1])
     mv = 100 * np.linalg.norm(d, axis=1)
-    return s, fr, (f"move hand to its depth on {start}-{end}: along the camera ray by the hand's depth error "
-                   f"(median {np.median(mv) if len(mv) else 0:.1f} cm, max {mv.max() if len(mv) else 0:.1f} cm), smoothed")
+    return s, sorted(set(fr) | set(extra)), (
+        f"move hand to its depth on {start}-{end}: along the camera ray by the hand's depth error "
+        f"(median {np.median(mv) if len(mv) else 0:.1f} cm, max {mv.max() if len(mv) else 0:.1f} cm), smoothed, "
+        f"fading out over {FADE} frames beyond the range")
 
 
 # ---------- object silhouette fit ----------

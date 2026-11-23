@@ -36,7 +36,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ops  # noqa: E402
 import render as R  # noqa: E402
-from clip import FINGERS, Clip, State, Versions, flag, phase_of, se3_interp, summarize  # noqa: E402
+from clip import FINGERS, Clip, State, Versions, flag, jump_threshold, phase_of, se3_interp, summarize  # noqa: E402
 
 OBJECTS = {1: "small metal device (a RealSense-style depth camera)", 2: "blue tape roll", 3: "black spatula",
            4: "gray mug", 5: "dish soap bottle"}
@@ -47,10 +47,10 @@ AXES = ["object_long", "object_mid", "object_short", "world_up", "world_right", 
         "camera_x", "camera_y", "camera_z", "ray"]
 SIGNALS = ["coverage", "spill", "iou", "depth_res_cm", "depth_bias_cm", "hand_kp_px", "hand_coverage", "hand_spill",
            "hand_depth_bias_cm", "contact_cm", "penetration_cm", "n_cross", "obj_height_cm", "hand_height_cm",
-           "ang_speed_deg_per_frame", "speed_cm_per_frame", "hand_accel_mm", "hand_rel_accel_mm", "finger_accel_deg",
+           "ang_speed_deg_per_frame", "speed_cm_per_frame", "hand_accel_mm", "hand_rel_accel_mm", "tip_accel_mm", "finger_accel_deg",
            "obj_accel_cm", "obj_ang_accel_deg", "thumb_gap_cm", "n_touching", "opposed"]
 REPORT_KEYS = ["coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "contact_cm", "penetration_cm",
-               "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "finger_accel_deg", "obj_ang_accel_deg",
+               "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "tip_accel_mm", "finger_accel_deg", "obj_ang_accel_deg",
                "thumb_gap_cm", "n_touching", "opposed"]
 
 SYSTEM = """You refine a 4D reconstruction of a hand manipulating a rigid object, filmed by a static camera. The
@@ -90,6 +90,12 @@ How to read the images:
   it; the overview gives the hand tracker's own smoothness as the reference (refined motion should not be much
   jitterier). view_motion shows a range's wrist and fingertip paths in one fixed 3D view (smooth curves = good,
   zig-zags = jitter) and a filmstrip of consecutive frames from one viewpoint.
+- Jumps: tip_accel_mm is the acceleration of the fastest fingertip. hand_accel_mm is a mean over the whole hand and a
+  median over frames hides single frames, so a hand or a finger that jumps between two frames (the end of an edit's
+  range, a fit that changed its solution from one frame to the next) only shows in tip_accel_mm: a spike of 10+
+  mm/frame^2 on one to three frames, flagged "finger jump". In the viewer and on a robot such a jump is the most
+  visible error of all. Every edit reports the fastest fingertip's acceleration around the frames it touched and
+  WARNS when the edit added a jump (to the hand or the object): fix a jump right away, before any other work.
 - The segmentation masks and keypoints are evidence, not truth: masks sometimes miss parts of the object or the
   object entirely, keypoints of occluded fingers are guesses. When a mask is clearly wrong, trust what you see in the
   frame. Metrics (coverage/spill/depth vs the masks and the depth map, keypoint error, contact, height) are computed
@@ -109,18 +115,23 @@ Edits (each makes a new version and shows you before/after numbers and images of
   and in the held phases you labeled (so label phases first) a grip: the thumb or palm and a finger on the object's
   surface. mode "fingers" fits only the joint rotations, "rigid" only the global pose; contact false turns the grip
   term off. Because it is smooth over time and fits the whole range jointly, it is the main hand tool: use it per
-  phase (grasp to place for the grip). separate_hand pushes the hand out along the surface normal where the palm
+  phase (grasp to place for the grip). It keeps the frames just outside its range fixed and joins them smoothly, and
+  its smoothness covers the fingertips and the wrist, so it leaves no seam; a pose that must change at the range's
+  end changes over the first / last few frames inside the range (include a few more frames if those matter). separate_hand pushes the hand out along the surface normal where the palm
   passes through the object; move_hand_to_depth jumps the hand along the camera ray by its measured depth error (to
   the side of the object the depth map puts it on, which a local fit cannot reach without passing through the
   object; then fit_mano); curl_finger (turns the named fingers' MANO joints) and move_hand / attach_hand_to_object
-  for what the fit cannot see; smooth_hand smooths the MANO parameters over a range (it re-checks that the hand
-  stays out of the object). Keypoints of fingers hidden behind the object are guesses, so in held phases contact and
+  for what the fit cannot see (move_hand_to_depth and attach_hand_to_object fade their change out over 6 frames
+  beyond the range; move_hand and curl_finger need a falloff of 4+ frames unless the range's ends are already
+  jumps you are removing); smooth_hand smooths the MANO parameters over a range (it re-checks that the hand stays
+  out of the object). Keypoints of fingers hidden behind the object are guesses, so in held phases contact and
   no crossing matter more than them.
 - Range edits apply fully on [start, end] and fade out over `falloff` frames on each side.
 
 How to work:
 Unless the overview says otherwise, you start from v1, the automatic fit: fit_object_silhouette frame by frame
-(smoothed over time), then fit_mano over the whole clip without the grip term (it knows no phases yet).
+(smoothed over time), smooth_object over the whole clip (window 5: the pose tracker's frame-to-frame noise), then
+fit_mano over the whole clip without the grip term (it knows no phases yet).
 It is usually more precise per frame than the initial reconstruction (v0), and a
 verifier will compare your result against v1, chunk by chunk, keeping v1 wherever yours looks worse. The automatic
 fit knows nothing about the motion: it fits the object frame by frame, so it can make it jitter or drift while it
@@ -150,17 +161,25 @@ mask, or keeps a wrong orientation it started from. Fixing that is your job:
    depth_res_cm past ~1 cm; the export puts the simulated table at the object's resting height, so a constant
    offset is harmless. What must be fixed is a rest height that differs between rest phases or drifts within one.
 6. Smoothness: per-frame fits (separate_hand, fit_object_silhouette, polish_object) and hand edits can add jitter
-   (fit_mano has its own smoothness term; raise smooth_weight if it is still jittery). After such edits plot
-   hand_accel_mm / finger_accel_deg and look at view_motion over the edited range; where the hand or fingers jitter,
-   fit_mano with a higher smooth_weight or smooth_hand (window ~8-15 frames); where the object does, smooth_object.
+   (fit_mano has its own smoothness term; raise smooth_weight if it is still jittery), and any range edit with a
+   sharp end can add a jump. After such edits plot tip_accel_mm / hand_accel_mm and look at view_motion over the
+   edited range and a few frames beyond; where the hand or fingers jitter or jump, fit_mano with a higher
+   smooth_weight or smooth_hand (window ~8-15 frames) across those frames; where the object does, smooth_object or
+   interpolate_object.
    Do not smooth through real fast motion (a quick grasp or release): compare with the hand tracker's reference.
 7. Before finishing, check the current version phase by phase, with outline overlays, view3d from several sides
    and a plot of the motion: while the object is held the hand must touch it (contact_cm ~0, green, no gap) without
-   passing through it (n_cross ~0, no red); hand, fingers and object move smoothly (view_motion, jitter plots); at rest the object sits still on the table; the object's outline
+   passing through it (n_cross ~0, no red); hand, fingers and object move smoothly with no "finger jump" flag left
+   (view_motion, plot tip_accel_mm over the whole clip); at rest the object sits still on the table; the object's outline
    follows the real one through the whole motion, with no jumps. Fix what fails, then finish. Finish when the
    remaining errors are small compared to the uncertainty of the evidence; do not chase tiny metric changes, and do
    not edit frames that already look right.
 Batch your inspections: several frames per inspect call, several independent tool calls per turn."""
+
+
+def frames_text(frames):
+    """[3, 4, 5, 9] -> '3-5, 9'."""
+    return ", ".join(f"{r[0]}-{r[-1]}" if len(r) > 1 else str(r[0]) for r in ops.runs_of(sorted(frames)))
 
 
 def tool(name, desc, props, required=None, strict=False):
@@ -211,7 +230,7 @@ TOOLS = [
     tool("move_hand", "Rigidly move the hand (cm; optional rotation about an axis through its centroid, rot_axis 'none' to skip).",
          {**RANGE, "dx_cm": NUM, "dy_cm": NUM, "dz_cm": NUM, "frame": {"type": "string", "enum": ["world", "camera"]},
           "rot_axis": {"type": "string", "enum": ["none"] + AXES}, "rot_deg": NUM, **FALLOFF}),
-    tool("fit_mano", "Gradient-based fit of the MANO parameters of every frame in [start, end] jointly: 2D keypoints, hand mask, depth, hand-pose prior, smoothness over time, no penetration into the object or table, and in held phases a grip (thumb or palm + a finger on the object). mode: all, fingers (joint rotations only) or rigid (global pose only).",
+    tool("fit_mano", "Gradient-based fit of the MANO parameters of every frame in [start, end] jointly: 2D keypoints, hand mask, depth, hand-pose prior, smoothness over time, no penetration into the object or table, and in held phases a grip (thumb or palm + a finger on the object). The frames just outside the range stay fixed and the fit joins them without a jump. mode: all, fingers (joint rotations only) or rigid (global pose only).",
          {**RANGE, "mode": {"type": "string", "enum": ["all", "fingers", "rigid"]},
           "contact": {"type": "boolean", "description": "grip term in held phases (default true)"},
           "smooth_weight": {"type": "number", "description": "smoothness over time (default 1; 3-10 for a jittery range)"},
@@ -219,7 +238,7 @@ TOOLS = [
          required=["start", "end", "mode"]),
     tool("separate_hand", "Per frame, push the hand out of the object along the surface normal where the palm passes through it (at most max_cm; keeps the keypoint fit).",
          {**RANGE, "max_cm": NUM}),
-    tool("move_hand_to_depth", "Move the hand along the camera ray by its measured depth error (hand vs depth map), per frame, smoothed: one jump to the side of the object the depth puts it on; follow with fit_mano.",
+    tool("move_hand_to_depth", "Move the hand along the camera ray by its measured depth error (hand vs depth map), per frame, smoothed: one jump to the side of the object the depth puts it on, fading out over 6 frames beyond the range; follow with fit_mano.",
          dict(RANGE)),
     tool("smooth_hand", "Remove jitter from the hand on [start, end]: smooth its MANO parameters (global pose and/or joint rotations) over time (motion slower than `window` frames is kept), then re-check that it stays out of the object.",
          {**RANGE, "window": {"type": "number", "description": "smoothing period in frames (8-15 typical)"},
@@ -233,7 +252,7 @@ TOOLS = [
           "azimuths": {"type": "array", "items": NUM, "description": "degrees: 0 camera's right, 90 behind, 180 left, 270 camera side (1-4)"},
           "elevation": {"type": "number", "description": "degrees above level (0-90, default view 25)"},
           "zoom": {"type": "string", "enum": ["action", "contact"]}}),
-    tool("attach_hand_to_object", "Keep the hand's position fixed relative to the object over [start, end], as at frame ref.", {**RANGE, "ref": INT}),
+    tool("attach_hand_to_object", "Keep the hand's position fixed relative to the object over [start, end], as at frame ref (the change fades out over 6 frames beyond the range).", {**RANGE, "ref": INT}),
     tool("history", "List versions with their edits and key metrics.", {}),
     tool("revert", "Make version v the working version again (as a new version).", {"version": INT}),
     tool("finish", "Done: the current version is your result.", {"summary": {"type": "string"}}),
@@ -254,12 +273,13 @@ class Session:
         self.client, self.critic_rounds, self.critique = None, 0, None
 
     def auto_fit(self):
-        """v1 = the fits run over the whole clip (object silhouette, then MANO without the grip term): the agent
-        starts from it."""
+        """v1 = the fits run over the whole clip (object silhouette, a light smoothing of the object's poses, then
+        MANO without the grip term): the agent starts from it."""
         c = self.clip
         st, _, n1 = ops.fit_object_silhouette(c, self.v.state, 0, c.N - 1)
+        st, _, n1b = ops.smooth_object(c, st, 0, c.N - 1, 5)       # the tracker's frame-to-frame pose noise
         st, _, n2 = ops.fit_mano(c, st, 0, c.N - 1, contact=False, shape=True)
-        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n2}")
+        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n1b}; {n2}")
         self.save(k, st)
         self.base = k
         return k
@@ -300,12 +320,41 @@ class Session:
         fb = sum(len(flag(r, phase_of(self.v.states[before], r['frame']))) for r in mb if r["frame"] in sel)
         fa = sum(len(flag(r, phase_of(st, r['frame']))) for r in ma if r["frame"] in sel)
         lines.append(f"  flags on touched frames: {fb} -> {fa}")
+        lines += self.jump_report(mb, ma, touched)
         show = [touched[int(j)] for j in np.linspace(0, len(touched) - 1, min(3, len(touched)))]
         tiles = []
         for i in dict.fromkeys(show):
             tiles += [R.overlay(self.clip, self.v.states[before], i, label=f"{i} before (v{before})"),
                       R.overlay(self.clip, st, i, label=f"{i} after (v{k})")]
         return [{"type": "text", "text": "\n".join(lines)}, self.img(R.sheet(tiles, ncols=2), f"v{k}")]
+
+    def jump_report(self, mb, ma, touched):
+        """Did the edit make the hand or the object jump? The fastest fingertip's and the object's acceleration on the
+        touched frames and two beyond each end (a sharp range end shows there), before vs after."""
+        lo, hi = max(0, touched[0] - 2), min(self.clip.N - 1, touched[-1] + 2)
+        val = lambda rows, i, k: rows[i].get(k) if rows[i].get(k) is not None else np.nan
+        fr = list(range(lo, hi + 1))
+        tb, ta = (np.array([val(rows, i, "tip_accel_mm") for i in fr]) for rows in (mb, ma))
+        out = []
+        if np.isfinite(ta).any() and np.isfinite(tb).any():
+            thr = jump_threshold(self.clip.tip_ref)
+            out.append(f"  fastest fingertip's acceleration, max over frames {lo}-{hi}: {np.nanmax(tb):.1f} -> {np.nanmax(ta):.1f} "
+                       f"mm/frame^2 (at frame {fr[int(np.nanargmax(ta))]}; a jump is over {thr:.0f})")
+            new = [i for i, b_, a_ in zip(fr, tb, ta) if np.isfinite(a_) and a_ > thr and a_ > 1.5 * np.nan_to_num(b_) + 2]
+            if new:
+                out.append(f"  WARNING: this edit made the hand JUMP at frames {frames_text(new)} (fingertip acceleration up to "
+                           f"{max(a_ for i, a_ in zip(fr, ta) if i in new):.0f} mm/frame^2). Fix it before anything else: revert and redo "
+                           "the edit with a falloff or a range that ends where the hand already agrees, or smooth_hand / "
+                           "fit_mano across those frames.")
+        ob = [i for i in fr if not np.isnan(val(ma, i, "obj_accel_cm")) and not np.isnan(val(mb, i, "obj_accel_cm")) and (
+            (val(ma, i, "obj_accel_cm") > 0.6 and val(ma, i, "obj_accel_cm") > 1.5 * val(mb, i, "obj_accel_cm") + 0.2) or
+            (val(ma, i, "obj_ang_accel_deg") > 4 and val(ma, i, "obj_ang_accel_deg") > 1.5 * val(mb, i, "obj_ang_accel_deg") + 1))]
+        if ob:
+            out.append(f"  WARNING: this edit made the OBJECT jump at frames {frames_text(ob)} (acceleration up to "
+                       f"{max(val(ma, i, 'obj_accel_cm') for i in ob):.1f} cm/frame^2, {max(val(ma, i, 'obj_ang_accel_deg') for i in ob):.0f} "
+                       "deg/frame^2). Fix it before anything else: redo the edit with a falloff, or interpolate_object / "
+                       "smooth_object across those frames.")
+        return out
 
     def run_tool(self, name, a):
         spec = next((t for t in TOOLS if t["name"] == name), None)
@@ -406,8 +455,11 @@ class Session:
             f0 = int(min(max(peak - 4, 0), c.N - 8))
             txt = (f"v{self.v.cur}, frames {s_}-{e_}: hand jitter median {np.median(list(ha.values())) if ha else 0:.1f}, max "
                    f"{max(ha.values()) if ha else 0:.1f} mm/frame^2 at frame {peak} (hand tracker's reference {c.jitter_ref:.1f}); "
-                   f"finger jitter median {np.median(list(fa.values())) if fa else 0:.1f}, max {max(fa.values()) if fa else 0:.1f} deg/frame^2. "
-                   f"Images: paths over the range; filmstrip of frames {f0}-{f0 + 7}.")
+                   f"finger jitter median {np.median(list(fa.values())) if fa else 0:.1f}, max {max(fa.values()) if fa else 0:.1f} deg/frame^2; "
+                   + (lambda ta: f"fastest fingertip's acceleration max {max(ta.values()):.1f} mm/frame^2 at frame {max(ta, key=ta.get)} "
+                      f"(a jump is over {jump_threshold(c.tip_ref):.0f}). " if ta else "")(
+                       {i: m["tip_accel_mm"] for i, m in mo.items() if m.get("tip_accel_mm") is not None})
+                   + f"Images: paths over the range; filmstrip of frames {f0}-{f0 + 7}.")
             return [{"type": "text", "text": txt}, self.img(R.trace(c, st, s_, e_, az, el), "trace"),
                     self.img(R.filmstrip(c, st, f0, 8, az, el, a["zoom"]), "filmstrip")]
         if name == "curl_finger":
@@ -482,6 +534,9 @@ def overview(sess):
              f"finger jitter (median finger_accel_deg) v{k} {j0:.1f} deg/frame^2.")(
                 np.nanmedian([r.get("finger_accel_deg") if r.get("finger_accel_deg") is not None else np.nan for r in rows]),
                 np.nanmedian([r.get("hand_accel_mm") if r.get("hand_accel_mm") is not None else np.nan for r in rows])) +
+            (lambda jf: f"\nFinger jumps (fastest fingertip's acceleration over {jump_threshold(c.tip_ref):.0f} mm/frame^2; hand tracker's "
+             f"median {c.tip_ref:.1f}): " + (f"frames {frames_text(jf)}" if jf else "none") + f" in v{k}.")(
+                [r["frame"] for r in rows if r.get("tip_accel_mm") is not None and r["tip_accel_mm"] > jump_threshold(c.tip_ref)]) +
             f"\nImages (v{k}): (1) 12 frames, outline overlays; (2) 6 frames, side views; (3) per-frame signals"
             + (" (v0 for comparison)" if k else "") + f"; (4) frames {near} where the hand is at the object, in 3D from four "
             f"sides (red = through / inside the object, green = touching); (5) wrist + fingertip paths over frames "
@@ -490,7 +545,7 @@ def overview(sess):
             sess.img(R.sheet([R.overlay(c, st, i) for i in fr], ncols=4), "overview"),
             sess.img(R.sheet([R.view(c, st, i, "side") for i in side], ncols=3), "overview_side"),
             sess.img(R.plot(c, {f"v{k}": rows, **({"initial (v0)": sess.metrics_of(0)} if k else {})},
-                            ["coverage", "hand_kp_px", "contact_cm", "n_cross", "obj_height_cm", "hand_accel_mm", "finger_accel_deg"]),
+                            ["coverage", "hand_kp_px", "contact_cm", "n_cross", "obj_height_cm", "hand_accel_mm", "tip_accel_mm"]),
                      "overview_plot"),
             sess.img(R.sheet([R.view_orbit(c, st, i, z) for i in near for z in (0, 90, 180, 270)], ncols=4, tile_w=440),
                      "overview_3d"),
@@ -661,7 +716,7 @@ def critic_text(rev):
                                                   for p in rev["problems"]) if rev["problems"] else f"overall {rev['overall']}; no problems"
 
 
-VERIFY_SIGNALS = ["obj_height_cm", "ang_speed_deg_per_frame", "contact_cm", "n_cross", "hand_accel_mm", "finger_accel_deg"]
+VERIFY_SIGNALS = ["obj_height_cm", "ang_speed_deg_per_frame", "contact_cm", "n_cross", "hand_accel_mm", "tip_accel_mm"]
 
 
 def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None):
@@ -704,7 +759,8 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
         prompt += (f" The plot shows A's and B's motion over frames {max(0, a - 8)}-{min(clip.N - 1, b + 8)}: the object's lowest "
                    "point above the table, its rotation speed per frame, the hand's distance to the object "
                    "(0 = touching), the hand's triangles through the object, and the frame-to-frame acceleration of the hand "
-                   "and the finger angles (jitter). A real object does not jitter or drift while it rests on the table and moves "
+                   "(mean over its surface) and of its fastest fingertip (jitter; a spike on one to three frames is the hand "
+                   "or a finger jumping). A real object does not jitter or drift while it rests on the table and moves "
                    "smoothly while held, and real hands and fingers move smoothly; spikes there are reconstruction errors.")
     r = client.messages.create(model=args.model, max_tokens=8000, output_config={"effort": "high", "format": {"type": "json_schema", "schema": VERIFY_SCHEMA}},
                                messages=[{"role": "user", "content": [R.encode(im) for im in ims] + [{"type": "text", "text": prompt}]}])
@@ -715,14 +771,62 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
     return run, v
 
 
-def merge(clip, s0, s1, runs_to_revert, blend=3):
-    s = s1.copy()
-    for a, b in runs_to_revert:
-        w = ops.weights(clip.N, a, b, blend)
+def revert_weights(N, runs, blend=6):
+    """Per-frame weight of the base version: 1 on the rejected ranges, falling smoothly to 0 over `blend` frames into
+    the kept frames. The 0/1 profile is widened by blend/2 and low-passed with a Hann window, so it has no kink:
+    the largest of two overlapping fades has one in the middle of a short kept range (the hand jumps there), and a
+    range's own fade must not overwrite its neighbour's frames (the hand jumps to the other version and back)."""
+    h = max(1, blend // 2)
+    r = np.zeros(N + 4 * h)                                # padded by 2h on both sides
+    for a, b in runs:
+        r[a + h:b + 3 * h + 1] = 1                         # [a, b] widened by h
+    k = np.hanning(2 * h + 3)[1:-1]
+    return np.clip(np.convolve(r, k / k.sum(), mode="same")[2 * h:2 * h + N], 0, 1)
+
+
+def merge(clip, s0, s1, runs_to_revert, kept=(), blend=6):
+    """The refined result (s1) with the verifier's rejected ranges set back to the base (s0), by one smooth weight
+    per frame (revert_weights). Then a check on the result: wherever its hand jumps more than both versions do (a
+    seam), it is smoothed; and where a jump is left next to a kept range (`kept`: the verifier's kept ranges), that
+    range is rejected as well and the merge redone: the two versions are too far apart there for the hand to move to
+    the other one and back within the range (pp_5: 7 cm at the fingertips, 11 frames kept between rejected ranges).
+    Returns (state, notes)."""
+    revert, kept, notes = sorted(runs_to_revert), sorted(kept), []
+    if not revert:
+        return s1.copy(), notes
+    while True:
+        w = revert_weights(clip.N, revert, blend)
+        s = s1.copy()
         for i in np.nonzero(w > 0)[0]:
             s.obj[i] = se3_interp(s1.obj[i], s0.obj[i], w[i])
             s = ops._blend(s1, s0, i, w[i], into=s)
-    return s
+        s, seams = ops.smooth_seams(clip, s, [s0, s1])
+        bad, a, _ = ops.seam_frames(clip, s, [s0, s1])
+        jumps = [i for i in bad if a[i] > jump_threshold(clip.tip_ref)]
+        near = [r for r in kept if any(r[0] - blend <= i <= r[1] + blend for i in jumps)]
+        if not near:
+            return s, notes + seams
+        r = min(near, key=lambda r: r[1] - r[0])
+        notes.append(f"kept range {r[0]}-{r[1]} rejected as well: joining it to its rejected neighbours left the hand jumping "
+                     f"(fingertip acceleration {max(a[i] for i in jumps):.0f} mm/frame^2 at frames {frames_text(jumps)})")
+        kept.remove(r)
+        revert = sorted(revert + [r])
+
+
+def report_table(cols):
+    """Markdown table of the per-frame metrics' medians; cols = [(name, rows), ...]."""
+    med = lambda rows, k: np.nanmedian([r[k] if r.get(k) is not None else np.nan for r in rows])
+    return (f"| metric (median over frames) | {' | '.join(n for n, _ in cols)} |\n|---|{'---|' * len(cols)}\n"
+            + "\n".join(f"| {k} | " + " | ".join(f"{med(m, k):.2f}" for _, m in cols) + " |" for k in REPORT_KEYS))
+
+
+def merge_text(clip, final, seams):
+    """The report's paragraph on the merge: seams smoothed and finger jumps left in the result."""
+    thr = jump_threshold(clip.tip_ref)
+    jumps = [r["frame"] for r in clip.metrics(final) if r.get("tip_accel_mm") is not None and r["tip_accel_mm"] > thr]
+    return ("Merge of the kept and the reverted ranges: " + ("; ".join(seams) if seams else "no seams to smooth")
+            + f". Finger jumps left (fastest fingertip over {thr:.0f} mm/frame^2): "
+            + (f"frames {frames_text(jumps)}" if jumps else "none") + ".")
 
 
 def export(clip, state, out):
@@ -813,8 +917,10 @@ def main():
         for run, v in verdicts:
             log(f"verify {run}: winner {v['winner']} (refined = {v['refined_label']}), confidence {v['confidence']:.2f}, keep {v['keep_refined']}: {v['reason'][:200]}")
     revert = [run for run, v in verdicts if not v["keep_refined"]]
-    final = merge(clip, s0, s1, revert)
+    final, seams = merge(clip, s0, s1, revert, [run for run, v in verdicts if v["keep_refined"]])
     final.phases = s1.phases
+    merged = merge_text(clip, final, seams)
+    log(merged)
     export(clip, final, args.out)
     final_rev = None
     if not args.no_critic:                            # what is still wrong with the result, for the report
@@ -822,9 +928,7 @@ def main():
         log(f"reviewer on the final result: {critic_text(final_rev)[:600]}")
     cols = [("initial", sess.metrics_of(0))] + ([(f"start (v{sess.base})", sess.metrics_of(sess.base))] if sess.base else [])
     cols.append(("final", clip.metrics(final)))
-    med = lambda rows, k: np.nanmedian([r[k] if r.get(k) is not None else np.nan for r in rows])
-    table = (f"| metric (median over frames) | {' | '.join(n for n, _ in cols)} |\n|---|{'---|' * len(cols)}\n"
-             + "\n".join(f"| {k} | " + " | ".join(f"{med(m, k):.2f}" for _, m in cols) + " |" for k in REPORT_KEYS))
+    table = report_table(cols)
     report = (f"# Refinement of {clip.vid}\n\nModel {args.model}, effort {args.effort}; {sess.v.cur + 1} versions; "
               f"{(time.time() - t0) / 60:.1f} min.\n\nAgent summary: {sess.done or '(none)'}\n\n"
               f"Phases: {', '.join(p['label'] + ' ' + str(p['start']) + '-' + str(p['end']) for p in s1.phases)}\n\n"
@@ -832,6 +936,7 @@ def main():
               f"\n\nVerifier (v{sess.base} vs refined, blind A/B):\n" +
               "\n".join(f"- frames {run[0]}-{run[1]}: {'kept' if v['keep_refined'] else 'REVERTED'} (winner {v['winner']}, refined = {v['refined_label']}, "
                         f"confidence {v['confidence']:.2f}): {v['reason']}" for run, v in verdicts)
+              + "\n\n" + merged
               + (f"\n\nIndependent reviewer, before the agent could finish: {critic_text(sess.critique)}" if sess.critique else "")
               + (f"\n\nIndependent reviewer on the final result (what is still wrong): {critic_text(final_rev)}" if final_rev else "")
               + f"\n\n{table}\n")

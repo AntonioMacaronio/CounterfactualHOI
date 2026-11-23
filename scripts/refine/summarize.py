@@ -21,12 +21,12 @@ import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import render as R  # noqa: E402
-from clip import Clip, flag, load_state, phase_of  # noqa: E402
+from clip import Clip, flag, jump_threshold, load_state, phase_of  # noqa: E402
 
 STORAGE = os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI")
 CHOIR_ROOT = os.environ.get("CHOIR_ROOT", os.path.join(STORAGE, "build", "CHOIR"))
 KEYS = ["iou", "coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "penetration_cm", "contact_cm", "n_cross",
-        "hand_accel_mm", "hand_rel_accel_mm", "finger_accel_deg", "obj_accel_cm", "obj_ang_accel_deg"]
+        "hand_accel_mm", "hand_rel_accel_mm", "tip_accel_mm", "finger_accel_deg", "obj_accel_cm", "obj_ang_accel_deg"]
 HELD = ("grasp", "lift", "carry", "rotate", "place")
 
 
@@ -87,6 +87,12 @@ def main():
                                 **{f"n_{sev}": sum(p["severity"] == sev for p in rv["problems"]) for sev in ("high", "medium", "low")}}
         summ["flagged_frames"] = [sum(bool(flag(r, phase_of(s1, r["frame"]))) for r in m0),
                                   sum(bool(flag(r, phase_of(s1, r["frame"]))) for r in m1)]
+        # jumps: medians hide them (a seam is 2-3 frames), so count the frames and keep the worst
+        thr = jump_threshold(clip.tip_ref)
+        tips = [[r["tip_accel_mm"] for r in m if r.get("tip_accel_mm") is not None] for m in (m0, m1)]
+        summ["jump_threshold_mm"] = thr
+        summ["jump_frames"] = [int(sum(a > thr for a in t)) for t in tips]
+        summ["tip_accel_max_mm"] = [float(max(t)) if t else None for t in tips]
         verdicts, n_edits, minutes = [], None, None
         for line in open(os.path.join(o, "transcript.jsonl")):
             r = json.loads(line)
@@ -106,7 +112,8 @@ def main():
               f"{summ['flagged_frames'][0]} -> {summ['flagged_frames'][1]}, verifier reverted {summ['reverted']}/{len(verdicts)}", flush=True)
     rows = ["| clip | object IoU (in hand) | object IoU (all) | hand keypoint px | hand depth bias cm | penetration cm | "
             "hand triangles through the object (held) | hand jitter mm/f² (held) | finger jitter °/f² (held) | object rotation jitter °/f² | "
-            "grip while lifted | rest height cm | rest height spread cm | flagged frames | verifier reverted | reviewer |", "|" + "---|" * 16]
+            "grip while lifted | rest height cm | rest height spread cm | flagged frames | verifier reverted | reviewer | "
+            "finger-jump frames | worst fingertip accel mm/f² |", "|" + "---|" * 18]
     f = lambda p, d=2: f"{p[0]:.{d}f} → {p[1]:.{d}f}" if None not in p else "—"
     for t in table:
         rows.append(f"| {t['video_id']} | {f(t['held']['iou'])} | {f(t['all']['iou'])} | {f(t['all']['hand_kp_px'], 1)} | "
@@ -114,7 +121,8 @@ def main():
                     f"{f(t['held']['finger_accel_deg'], 1)} | {f(t['all']['obj_ang_accel_deg'], 1)} | "
                     f"{f(t['grip_lifted']) if None not in t['grip_lifted'] else '—'} | {f(t['rest_abs_height_cm'])} | {f(t['rest_height_spread_cm'])} | "
                     f"{t['flagged_frames'][0]} → {t['flagged_frames'][1]} | {t['reverted']}/{len(t['verifier'])} | "
-                    + (f"{t['reviewer']['overall']} ({t['reviewer']['n_high']} high, {t['reviewer']['n_medium']} medium)" if t.get("reviewer") else "—") + " |")
+                    + (f"{t['reviewer']['overall']} ({t['reviewer']['n_high']} high, {t['reviewer']['n_medium']} medium)" if t.get("reviewer") else "—")
+                    + f" | {t['jump_frames'][0]} → {t['jump_frames'][1]} | {f(t['tip_accel_max_mm'], 0)} |")
     open(os.path.join(out_root, "summary.md"), "w").write("\n".join(rows) + "\n")
     print("\n".join(rows))
 

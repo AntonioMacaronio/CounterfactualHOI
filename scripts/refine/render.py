@@ -323,7 +323,7 @@ def crop(clip, state, i, box, mode="outline"):
 
 MIN_SPAN = {"contact_cm": 2.0, "penetration_cm": 1.0, "obj_height_cm": 2.0, "hand_height_cm": 2.0,
             "speed_cm_per_frame": 2.0, "ang_speed_deg_per_frame": 5.0, "hand_kp_px": 20.0, "depth_res_cm": 1.0,
-            "n_cross": 50.0, "hand_accel_mm": 10.0, "hand_rel_accel_mm": 10.0, "finger_accel_deg": 10.0,
+            "n_cross": 50.0, "hand_accel_mm": 10.0, "hand_rel_accel_mm": 10.0, "finger_accel_deg": 10.0, "tip_accel_mm": 15.0,
             "obj_accel_cm": 1.0, "obj_ang_accel_deg": 5.0}
 
 

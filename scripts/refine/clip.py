@@ -46,6 +46,7 @@ LOW = 4                                     # metrics resolution divisor
 FINGERS = ["thumb", "index", "middle", "ring", "pinky"]
 CHAINS = {"thumb": (13, 14, 15), "index": (1, 2, 3), "middle": (4, 5, 6), "ring": (10, 11, 12), "pinky": (7, 8, 9)}
 TIPS = {"thumb": 745, "index": 317, "middle": 444, "ring": 556, "pinky": 673}
+TIP_IDS = [TIPS[f] for f in FINGERS]
 sys.path.insert(0, HERE)
 import mano  # noqa: E402
 
@@ -201,6 +202,8 @@ class Clip:
         acc = self.motion(self.init_state, range(self.N))
         ref = [a["hand_accel_mm"] for a in acc.values() if a.get("hand_accel_mm") is not None]
         self.jitter_ref = float(np.median(ref)) if ref else 2.0
+        ref = [a["tip_accel_mm"] for a in acc.values() if a.get("tip_accel_mm") is not None]
+        self.tip_ref = float(np.median(ref)) if ref else 3.0
 
     # ---------- inputs ----------
     def rgb(self, i):
@@ -469,8 +472,9 @@ class Clip:
     # ---------- motion ----------
     def motion(self, state, frames, hv=None):
         """Per-frame speed and acceleration (second difference) of the object (center, rotation), the hand mesh (mean
-        over its vertices, in the camera and relative to the object) and the finger angles; None where a neighbour
-        is missing or the hand is not tracked."""
+        over its vertices, in the camera and relative to the object), its fastest fingertip (tip_accel_mm: the mean
+        over the mesh hides a finger that jumps) and the finger angles; None where a neighbour is missing or the hand
+        is not tracked."""
         if hv is None:
             need = sorted({j for i in frames for j in (i - 1, i, i + 1) if 0 <= j < self.N})
             hv = dict(zip(need, self.hand_verts_batch(state, need)))
@@ -490,12 +494,20 @@ class Clip:
                 r["obj_ang_accel_deg"] = float(np.degrees(np.linalg.norm(w2 - w1)))
                 if self.hand_valid[i - 1:i + 2].all():
                     v = [get(k) for k in (i - 1, i, i + 1)]
-                    r["hand_accel_mm"] = float(1000 * np.linalg.norm(v[2] - 2 * v[1] + v[0], axis=1).mean())
+                    a = np.linalg.norm(v[2] - 2 * v[1] + v[0], axis=1)
+                    r["hand_accel_mm"] = float(1000 * a.mean())
+                    r["tip_accel_mm"] = float(1000 * a[TIP_IDS].max())
                     rel = [(v[n] - state.obj[k, :3, 3]) @ state.obj[k, :3, :3] for n, k in enumerate((i - 1, i, i + 1))]
                     r["hand_rel_accel_mm"] = float(1000 * np.linalg.norm(rel[2] - 2 * rel[1] + rel[0], axis=1).mean())
                     r["finger_accel_deg"] = float(np.degrees(np.abs(state.hp[i + 1] - 2 * state.hp[i] + state.hp[i - 1])).mean())
             out[i] = r
         return out
+
+    def tip_accel(self, state, frames=None):
+        """Fastest fingertip's acceleration (mm/frame^2) per frame as an array (nan where undefined)."""
+        frames = list(range(self.N)) if frames is None else list(frames)
+        mo = self.motion(state, frames)
+        return np.array([mo[i].get("tip_accel_mm", np.nan) for i in frames], float)
 
     # ---------- metrics ----------
     def metrics(self, state, frames=None):
@@ -540,7 +552,7 @@ class Clip:
             r["obj_height_cm"] = float(100 * self.height_above_table(state, [i])[0])
             r["hand_height_cm"] = float(100 * ((hv @ self.table_n).min() - self.local_table_c(state, i)))
             r["hand_valid"] = bool(self.hand_valid[i])
-            r["_jitter_ref"] = self.jitter_ref
+            r["_jitter_ref"], r["_tip_ref"] = self.jitter_ref, self.tip_ref
             rows.append(r)
         mo = self.motion(state, frames, hvc)              # motion and jitter, from the neighbouring frames
         for r in rows:
@@ -589,14 +601,22 @@ def flag(r, phase):
         out.append("hand jitter")
     if r.get("finger_accel_deg") is not None and r["finger_accel_deg"] > 8.0:
         out.append("finger jitter")
+    if r.get("tip_accel_mm") is not None and r["tip_accel_mm"] > jump_threshold(r.get("_tip_ref", 3.0)):
+        out.append("finger jump")
     return out
+
+
+def jump_threshold(tip_ref):
+    """Fingertip acceleration (mm/frame^2) above which a frame counts as a jump: 3x the hand tracker's median, at
+    least 8 (a 1 cm step between two frames gives ~10; a quick real grasp stays below)."""
+    return max(8.0, 3.0 * tip_ref)
 
 
 def summarize(clip, state, rows, window=None):
     """Compact text summary for the agent: per-window medians and flagged frame runs."""
     window = window or max(10, clip.N // 12)
     keys = ["coverage", "spill", "depth_res_cm", "depth_bias_cm", "hand_kp_px", "hand_depth_bias_cm", "contact_cm",
-            "penetration_cm", "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "finger_accel_deg"]
+            "penetration_cm", "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "tip_accel_mm"]
     lines = ["frames    phase      " + " ".join(f"{k[:11]:>11}" for k in keys)]
     for s in range(rows[0]["frame"], rows[-1]["frame"] + 1, window):
         win = [r for r in rows if s <= r["frame"] < s + window]
@@ -617,7 +637,7 @@ def summarize(clip, state, rows, window=None):
         start = prev = fr[0]
         for f in fr[1:] + [None]:
             if f is None or f > prev + 2:
-                if prev - start >= 1 or reason in ("rotation jump",):
+                if prev - start >= 1 or reason in ("rotation jump", "finger jump"):
                     runs.append(f"{reason}: {start}-{prev}")
                 if f is not None:
                     start = f
