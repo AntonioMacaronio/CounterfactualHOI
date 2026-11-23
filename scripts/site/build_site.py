@@ -372,7 +372,10 @@ motions with <a href="https://holiday-robot.github.io/FlashDexRetarget/">FlashDe
 of the human hand to the Sharpa Wave hand (22 DoF, floating wrist) gives a reference per clip, then one
 reference-conditioned RL policy (FlashSAC, Isaac Lab) is trained over all 10 clips in simulation to make the simulated
 object follow the reconstructed one. The object, table and gravity are simulated; the hand has to really hold the
-object. The viewers show the policy's rollout of each clip next to the refined reconstruction it tracks.
+object. Where an object's reconstructed underside (SAM3D cannot see it) made it tip over at rest in simulation
+(the metal case, the soap bottle), its collision mesh is flattened under the object at its reconstructed rest
+pose; the visual mesh and the trajectories are unchanged. The viewers show the policy's rollout of each clip next
+to the refined reconstruction it tracks.
 {rsum}</p>
 <p class="more"><a href="recon/retarget/index.html">→ Refined reconstruction (left) vs retargeted motion (right), pp and prp tabs</a></p>
 """
