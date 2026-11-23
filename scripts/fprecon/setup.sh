@@ -27,7 +27,7 @@ fpose() {
   export CUDA_HOME="$E" PATH="$E/bin:$PATH" CONDA_PREFIX="$E"
   export CPATH="$E/targets/x86_64-linux/include${CPATH:+:$CPATH}"
   export LIBRARY_PATH="$E/targets/x86_64-linux/lib:$E/lib${LIBRARY_PATH:+:$LIBRARY_PATH}"
-  export TORCH_CUDA_ARCH_LIST="9.0" MAX_JOBS=32
+  export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-9.0}" MAX_JOBS="${MAX_JOBS:-32}"   # 9.0 = H100/H200
   $PIP install -q --upgrade pip setuptools wheel
   $PIP install -q torch==2.6.0+cu126 torchvision==0.21.0+cu126 --index-url https://download.pytorch.org/whl/cu126
   $PIP install -q -r "$FP/requirements.txt"

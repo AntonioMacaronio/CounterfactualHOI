@@ -10,8 +10,10 @@ CONDA="$HOME/miniconda3/bin/conda"                      # only "create -p": the 
 export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$SHARED_CACHE_ROOT/conda-pkgs}"
 FDR="$PROJECT_STORAGE_ROOT/build/FlashDexRetarget"
 E="$CONDA_ENVS_PATH/flashdex"
+FDR_PIN=e84da37bca8ccb9543d9a1e4a202515ced6aad0d      # the commit our runs used (2026-11-23)
 [ -d "$FDR/.git" ] || git clone -q https://github.com/Holiday-Robot/FlashDexRetarget.git "$FDR"
 cd "$FDR"
+git checkout -q "$FDR_PIN"
 git submodule update --init third_party/rsl_rl_flashsac
 [ -x "$E/bin/python" ] || "$CONDA" create -y -q -p "$E" python=3.11 pip
 PIP="$E/bin/python -m pip"

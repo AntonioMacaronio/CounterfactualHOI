@@ -8,7 +8,8 @@
 #   bash scripts/daid/setup.sh check              # import smoke test for each env
 #
 # Envs: conda-forge python + ffmpeg + CUDA 12.8 compiler, then pip at the exact versions of the
-# upstream working envs (reconstruction/env/*.yml), with the source builds compiled for sm_90 only.
+# upstream working envs (reconstruction/env/*.yml), with the source builds compiled for one GPU architecture:
+# TORCH_CUDA_ARCH_LIST, default 9.0 (H100/H200); set it first on other GPUs (e.g. 8.0 A100, 8.9 L40S/RTX 4090).
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 
@@ -17,7 +18,7 @@ W="$DAID_WEIGHTS"
 CONDA="$HOME/miniconda3/bin/conda"
 HF="$PROJECT_STORAGE_ROOT/venvs/hf-dl/bin/hf"
 PINS="python3 $PROJECT_ROOT/scripts/daid/yml_pins.py"
-export TORCH_CUDA_ARCH_LIST="9.0"     # H200
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-9.0}"     # 9.0 = H100/H200
 export MAX_JOBS="${MAX_JOBS:-32}"
 export FORCE_CUDA=1
 
@@ -166,9 +167,9 @@ bad = []
 for m in sys.argv[1:]:
     try: importlib.import_module(m)
     except Exception as e: bad.append(f"{m}: {type(e).__name__}: {e}"[:200])
-ok = torch.cuda.is_available() and torch.cuda.get_device_capability() == (9, 0)
-x = torch.ones(1, device="cuda") * 2 if ok else None
-print(f"torch {torch.__version__} cuda_ok={ok} ->", "OK" if not bad else "FAIL\n  " + "\n  ".join(bad))
+ok = torch.cuda.is_available() and float((torch.ones(1, device="cuda") * 2).item()) == 2.0
+cap = "sm_%d%d" % torch.cuda.get_device_capability() if torch.cuda.is_available() else "-"
+print(f"torch {torch.__version__} cuda_ok={ok} ({cap}) ->", "OK" if not bad else "FAIL\n  " + "\n  ".join(bad))
 EOF
     ) 2>&1 | tail -4 | sed "s/^/$name: /"
   done

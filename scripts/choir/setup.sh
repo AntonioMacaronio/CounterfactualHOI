@@ -17,7 +17,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../env.sh"
 C="$CHOIR_ROOT"
 CONDA="$HOME/miniconda3/bin/conda"
 HFBIN="$PROJECT_STORAGE_ROOT/venvs/hf-dl/bin"
-export TORCH_CUDA_ARCH_LIST="9.0" MAX_JOBS="${MAX_JOBS:-32}" FORCE_CUDA=1
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-9.0}" MAX_JOBS="${MAX_JOBS:-32}" FORCE_CUDA=1   # 9.0 = H100/H200
 CU126=(cuda-version=12.6 cuda-nvcc cuda-cudart-dev cuda-libraries-dev cuda-cccl)
 
 link() {  # link SRC DST unless DST is a real file
@@ -204,8 +204,9 @@ bad = []
 for m in sys.argv[1:]:
     try: importlib.import_module(m)
     except Exception as e: bad.append(f"{m}: {type(e).__name__}: {e}"[:200])
-ok = torch.cuda.is_available() and torch.cuda.get_device_capability() == (9, 0) and float((torch.ones(1, device="cuda") * 2).item()) == 2.0
-print(f"torch {torch.__version__} cuda_ok={ok} ->", "OK" if not bad else "FAIL\n  " + "\n  ".join(bad))
+ok = torch.cuda.is_available() and float((torch.ones(1, device="cuda") * 2).item()) == 2.0
+cap = "sm_%d%d" % torch.cuda.get_device_capability() if torch.cuda.is_available() else "-"
+print(f"torch {torch.__version__} cuda_ok={ok} ({cap}) ->", "OK" if not bad else "FAIL\n  " + "\n  ".join(bad))
 EOF
   done
 }
