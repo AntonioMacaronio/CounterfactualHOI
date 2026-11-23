@@ -3,8 +3,10 @@
 
 export PROJECT_NAME="CounterfactualHOI"
 export PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-export PROJECT_STORAGE_ROOT="/data/sky/projects/$PROJECT_NAME"
-export SHARED_CACHE_ROOT="/data/sky/cache"
+# Large data under PROJECT_STORAGE_ROOT, shared caches under SHARED_CACHE_ROOT. On another machine point both at a
+# big disk first: CFHOI_STORAGE_ROOT=/big/disk/cfhoi CFHOI_CACHE_ROOT=/big/disk/cache source scripts/env.sh
+export PROJECT_STORAGE_ROOT="${CFHOI_STORAGE_ROOT:-/data/sky/projects/$PROJECT_NAME}"
+export SHARED_CACHE_ROOT="${CFHOI_CACHE_ROOT:-/data/sky/cache}"
 
 export TMPDIR="$PROJECT_STORAGE_ROOT/tmp"
 export XDG_CACHE_HOME="$SHARED_CACHE_ROOT"
@@ -31,6 +33,9 @@ export MANO_DIR="${MANO_DIR:-$(dirname "$PROJECT_ROOT")/mano_v1_2/models}"
 # Open-CHOIR runs from a working copy on /data (it writes assets/outputs into its own tree);
 # third_party/CHOIR only pins the version. See scripts/choir/setup.sh.
 export CHOIR_ROOT="$PROJECT_STORAGE_ROOT/build/CHOIR"
+export FP_DIR="$PROJECT_STORAGE_ROOT/build/FoundationPose"      # scripts/fprecon/setup.sh
+export FDR="$PROJECT_STORAGE_ROOT/build/FlashDexRetarget"       # scripts/flashdex/setup.sh
+export CFHOI_ROOT="$PROJECT_ROOT"                               # read by our FDR import source (runs inside FDR)
 export FLASHINFER_WORKSPACE_BASE="$PROJECT_STORAGE_ROOT/cache"
 
 # MiniMax H3 (self-hosted Ref2VA via SGLang)

@@ -16,7 +16,7 @@ export PATH="$CONDA_ENVS_PATH/flashdex/bin:\$PATH"
 export MUJOCO_GL=\${MUJOCO_GL:-disabled}
 export OMNI_KIT_ACCEPT_EULA=1
 export FDR_ROBOT_USD=\${FDR_ROBOT_USD:-$FDR/assets/robot/xhand/urdf/converted_spec/xhand_bimanual_spec.usd}
-export TMPDIR=$PROJECT_STORAGE_ROOT/tmp XDG_CACHE_HOME=/data/sky/cache PIP_CACHE_DIR=/data/sky/cache/pip
+export TMPDIR=$PROJECT_STORAGE_ROOT/tmp XDG_CACHE_HOME=$SHARED_CACHE_ROOT PIP_CACHE_DIR=$SHARED_CACHE_ROOT/pip
 export WANDB_MODE=\${WANDB_MODE:-offline} WANDB_DIR=$PROJECT_STORAGE_ROOT/runs/wandb
 export TORCHINDUCTOR_CACHE_DIR=$PROJECT_STORAGE_ROOT/cache/torchinductor CUDA_CACHE_PATH=$PROJECT_STORAGE_ROOT/cache/nv
 export TRITON_CACHE_DIR=$PROJECT_STORAGE_ROOT/cache/triton

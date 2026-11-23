@@ -10,8 +10,8 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REFINE="${1:?REFINE}"; FROM="${2:-}"
-ST=/data/sky/projects/CounterfactualHOI
-FDR="$ST/build/FlashDexRetarget"
+ST="${PROJECT_STORAGE_ROOT:-/data/sky/projects/CounterfactualHOI}"
+FDR="${FDR:-$ST/build/FlashDexRetarget}"
 D="$ST/runs/flashdex/data_${REFINE#refine_}"
 PY="$ST/conda_envs/flashdex/bin/python"
 mkdir -p "$D"

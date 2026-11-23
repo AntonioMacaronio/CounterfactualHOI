@@ -27,7 +27,8 @@ from scipy.spatial.transform import Rotation
 
 from retarget.human_demo.sources.base import Demo, Hand, Source as Base
 
-CFHOI = os.environ.get("CFHOI_ROOT", "/home/sky/sky_workdir/visualrecognition/CounterfactualHOI")
+# this repo: CFHOI_ROOT (scripts/env.sh), else from this file's real path (FDR imports it through a symlink)
+CFHOI = os.environ.get("CFHOI_ROOT", os.path.dirname(os.path.dirname(os.path.dirname(os.path.realpath(__file__)))))
 sys.path.insert(0, os.path.join(CFHOI, "scripts", "refine"))
 sys.path.insert(0, os.path.join(CFHOI, "scripts", "fprecon"))
 import mano as M  # noqa: E402
