@@ -1,0 +1,9 @@
+# FlashDexRetarget import source "cfhoi" (scripts/flashdex/cfhoi_source.py): our reconstructions of the real clips.
+name: cfhoi
+table_z: null            # we place the table ourselves (table_height)
+table_height: 0.8        # metres: z of the table top in the import world
+fps: 30
+refine: refine_r5        # runs/<refine>/VID/export: refine_r6+ has mano_params.npz; earlier runs use the tracker's MANO
+desk_over_recording: false
+clips: [pp_anthony_real_1, pp_anthony_real_2, pp_anthony_real_3, pp_anthony_real_4, pp_anthony_real_5,
+        prp_anthony_real_1, prp_anthony_real_2, prp_anthony_real_3, prp_anthony_real_4, prp_anthony_real_5]

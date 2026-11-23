@@ -1,0 +1,49 @@
+# @package _global_
+# FDR config/envs/rewards/flashdexretarget.yaml + the AdaDex GenEnv term (scripts/flashdex/policy/cfhoi_terms.py);
+# linked into FDR as config/envs/rewards/cfhoi_policy.yaml by scripts/flashdex/setup_cfhoi.sh
+
+rewards:
+  _target_: "cfhoi_terms.CfhoiRewards"
+
+  split_sides: ${per_hand_actor_critic}
+
+  reward_weights:
+    # ── Task ─────────────────────────────────
+    tracking_obj_pcd_match_error_exp: 1.0
+    tracking_ref_mano_tip_distance_bound_exp: 0.3
+
+    # ── Motion Tracking ──────────────────────
+    #   Wrist
+    tracking_ref_mano_wrist_trans_error_exp: 0.15
+    tracking_ref_mano_wrist_rot_error_exp:   0.15
+    #   Fingers
+    #     Translation
+    tracking_ref_mano_tip_trans_error_exp: 0.3
+    #     Joint Pos
+    tracking_joint_pos_bc_exp: 0.3
+
+    # ── GenEnv (AdaDex): sparse object success, 5 cm / 20 deg of the goal waypoint ──
+    #    (the hand-tracking terms above pay only in TrackEnv clips: cfhoi_terms.CfhoiRewards)
+    gen_obj_success: 1.0
+
+    # ── Regularization ────────────────────────
+    action_penalty: -0.01
+    termination_penalty: -50.0
+
+  reward_scales:
+    # ── Task ─────────────────────────────────
+    tracking_obj_pcd_match_error_exp: 10.0
+
+    # ── Motion Tracking ──────────────────────
+    #   Wrist
+    tracking_ref_mano_wrist_trans_error_exp: 10.0
+    tracking_ref_mano_wrist_rot_error_exp:    3.0
+    #   Fingers
+    #     Translation
+    tracking_ref_mano_tip_trans_error_exp: 20.0
+    #     Joint Pos
+    tracking_joint_pos_bc_exp: 500.0
+
+  reward_params:
+    gen_obj_success: { pos_th: 0.05, rot_th_deg: 20.0 }
+    tracking_obj_pcd_match_error_exp: { n_points: 128, topk: 3, norm_radius: 0.058 }
