@@ -202,11 +202,14 @@ def retarget_summary(rdir):
     prog = stt.median(r["progress"] for r in fdr)
     w2 = stt.median(r["frames_within_2cm"] for r in fdr)
     succ = sum(bool(r["success"]) for r in fdr)
-    txt = (f"Over the {len(fdr)} clips the policy tracks a median <b>{prog:.0%}</b> of each clip before the object "
+    steps = max((r.get("env_step") or 0) for r in fdr)
+    txt = ((f"<b>Status: early snapshot</b>, the policy after {steps / 1e6:.0f}M environment steps (still training; this "
+            f"section is refreshed from later evaluations). " if steps else "")
+           + f"Over the {len(fdr)} clips the policy tracks a median <b>{prog:.0%}</b> of each clip before the object "
            f"first leaves 5 cm / 20° of the reconstruction (AdaDex's progress); <b>{succ}/{len(fdr)}</b> clips stay within "
            f"it for the whole clip; the object is within 2 cm of the reconstruction on a median {w2:.0%} of frames")
     if daid:
-        txt += (f" (Do-as-I-Do's sampling-based retargeting of the same reconstructions: "
+        txt += (f" (Do-as-I-Do's sampling-based retargeting of the round-5 reconstructions: "
                 f"{stt.median(d['frames_within_2cm'] for d in daid if 'frames_within_2cm' in d):.0%})")
     return txt + "."
 
