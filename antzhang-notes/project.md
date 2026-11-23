@@ -73,26 +73,14 @@ The parameters the agent edits:
 - Table: height and tilt.
 
 
-| Type | Tool | Returns |
-|---|---|---|
-| look | `inspect(frames, mode=outline\|blend)` | up to 9 frames, cropped to the hand and object: rendered object (orange), hand (blue), SAM3 mask (green), 2D keypoints vs MANO joints, object axes |
-| look | `inspect(frames, mode=side\|top\|front)` | gravity-aligned virtual views with the table (5 cm grid): heights, contact |
-| look | **`view3d(frames, azimuths, elevation, zoom=action\|contact)`** (new) | up to 4 frames × 4 sides (0 = camera's right, 90 = from behind, 180 = left, 270 = camera side), or a close-up of where hand and object meet; hand red where it passes through / is inside the object, green where it touches |
-| look | `zoom(frame, box)` | full-resolution crop of one overlay |
-| look | `plot(signals, range)` | per-frame curves, current vs initial: fit, keypoint error, contact, penetration, **triangles through the object** (new), height, speed |
-| measure | `metrics(range, window)` | windowed medians + flagged frame runs (incl. "hand through the object's surface (fingers)") |
-| phases | `set_phases(phases)` | approach / grasp / lift / carry / rotate / place / release / rest; drives the contact terms |
-| edit object | `rotate_object`, `translate_object`, `move_along_ray`, `interpolate_object`, `hold_object_static`, `snap_object_to_table`, `smooth_object` | a new version with before/after numbers and overlays |
-| search object | `fit_object_silhouette(range)` | per-frame 6-DoF fit to the mask outside the hand + depth (gradient-free, trust region) |
-| search object | `polish_object(range)` | FoundationPose's refiner per frame, kept only where the fit improves |
-| search object | `propose_object_poses(frame, k)`, `apply_candidate` | FoundationPose's top-k registration hypotheses, rendered to choose from |
-| edit hand | `move_hand`, `attach_hand_to_object` | rigid hand edits |
-| edit hand | **`curl_finger(range, fingers, delta_deg)`** (new) | flex / open fingers on top of Dyn-HaMR's articulation (MANO skinning) |
-| search hand | `polish_hand(range)` | rigid hand fit to 2D keypoints (MANO joint regressor) + mask + depth, no penetration, contact while held |
-| search hand | **`fit_fingers(range, fingers)`** (new) | per-finger flexion search: keypoints, no triangles through the object's surface (FCL mesh-mesh), contact of the last segment while held |
-| search hand | **`separate_hand(range, max_cm)`** (new) | pushes the hand out along the surface normal where the palm passes through the object (keeps the keypoint fit) |
-| control | `history`, `revert(version)`, `finish(summary)` | |
-| verify (no agent) | blind A/B judge per changed range | overlays + 3D views from three sides + motion plot, vs the automatic fit; keeps the fit where the agent's edit loses |
+| Type | Tools |
+|---|---|
+| look | `inspect` (overlays on the video; gravity-aligned side/top/front views), `view3d` (any side or a contact close-up; hand red where it passes through the object, green where it touches), `view_motion` (wrist + fingertip paths and a filmstrip: shows jitter), `zoom`, `plot`, `metrics` |
+| phases | `set_phases` (approach / grasp / lift / carry / rotate / place / release / rest; drive the contact and grip terms) |
+| object | edits: `rotate_object`, `translate_object`, `move_along_ray`, `interpolate_object`, `hold_object_static`, `snap_object_to_table`, `smooth_object`; search: `fit_object_silhouette`, `polish_object` (FoundationPose refiner), `propose_object_poses` + `apply_candidate` |
+| hand (MANO parameters only: global pose, 15 joint rotations, shape) | edits: `move_hand`, `move_hand_to_depth`, `separate_hand`, `attach_hand_to_object`, `curl_finger` (MANO joint rotations), `smooth_hand`; **`fit_mano`** (new): gradient-based fit of the range's MANO parameters to 2D keypoints, masks and depth, with a hand-pose prior, temporal smoothness, no penetration, and contact / grip in the held phases |
+| control | `history`, `revert`, `finish` |
+| checks (no agent) | independent reviewer (absolute, every phase vs the video from four sides, 3 votes); blind A/B verifier per changed range vs the automatic fit |
 
 Agentic Framework Loop:
 1. Automatic start, no LLM: run the current pipeline, compute metrics, flag suspect frames.
@@ -103,55 +91,47 @@ Agentic Framework Loop:
 
 It plugs in as a new refine step after run_fprecon.sh, and the website gets a fourth section, "agent‑refined".
 
-### Implementation (`scripts/refine`) and results
-`bash scripts/refine/run_refine.sh VID [GPU]` (Claude Opus 5.5 on Bedrock, `AnthropicBedrock`, us-west-2), 5–19 min
-per clip; outputs in `/data/.../runs/refine_r4/VID` (report.md, transcript, versions/, export/ for the viewer and
-retargeting incl. hand_verts.npy = the final hand mesh per frame, table.json = the table at the object's resting
-height) and `outputs/refine_viser_r4/`.
-- **State:** per-frame object SE(3), rigid hand offset/rotation, per-finger flexion (MANO skinning on top of
-  Dyn-HaMR's articulation), phase labels; every edit is a new version.
-- **Final design (round 4):** (1) automatic fit, no LLM: `polish_hand` (hand to ViTPose keypoints via the MANO joint
-  regressor + SAM3 mask + depth), `fit_object_silhouette` (object pose vs mask outside the hand + depth),
-  `fit_fingers` (no hand triangle through the object's surface: FCL mesh-mesh tests), `separate_hand` (palm out along
-  the surface normal); (2) the agent starts from that, labels phases, looks at the 3D scene from several sides
-  (`view3d`: red = through / inside, green = touching) and fixes what per-frame fits can't see: contact while held
-  (`polish_hand` + `fit_fingers` with contact terms, `curl_finger`), a still object at rest, jumps, flips; (3) a blind
-  A/B verifier (overlays + 3D views from three sides + a motion plot) compares each changed range with the automatic
-  fit and keeps the fit where the agent's edit loses.
-- **Metrics (initial → final, medians):** hand keypoint error 19–41 → 9–13 px; object mask IoU (hand = occluder)
-  0.86–0.93 → 0.90–0.96; hand triangles through the object while held 143 → 0 (pp_4 mug), 221 → 11 (prp_4 mug),
-  170 → 0 (prp_5 bottle), 122 → 0 (prp_2 tape roll), median over clips 73 → 0; penetration ~0 everywhere; flagged
-  frames 261 → 43 (prp_1), 119 → 27 (pp_4). Table: `runs/refine_r4/summary.md`.
-- **Blind A/B over all frames of the 10 clips** (`scripts/refine/compare.py --tag final4`, chunks ≤ 60 frames at
-  phase boundaries, judge sees 3D views): final vs initial 78:0; final vs round 3 (no finger tools, no 3D views)
-  64:13 (1 tie); final vs automatic fit 43:7 (28 ties; not independent, the verifier selected with the same judge).
-  A human check is still needed.
-- **What we learned:** (a) rounds 1–2 started the agent from the initial reconstruction; a non-agentic script of its
-  own search tools (`scripts/refine/baseline.py`) matched it (22:19, 34 ties). Agents are bad at hand-tuning numbers
-  and good at what needs understanding of the motion; the judge only credits that when it sees the motion. (b) Round
-  3 changed the 3D reconstruction by ~0 cm on top of the automatic fit: it looked at 2–3 virtual views per clip, all
-  from the camera's right, and could not move fingers; from behind / the left the fingers were inside the mug.
-  Measured afterwards, round 3 still had hand triangles through the object while held on 9 of 10 clips (median
-  6-219, e.g. 219 prp_4, 98 pp_4, 75 prp_5). With 3D views from any side, finger tools and a mesh-mesh crossing
-  measure, round 4 gets 0-11 (64:13 vs round 3 in the blind A/B).
-  (c) The rigid hand fit cannot see thin walls (the SDF grid is ~3-4 mm): it now keeps the previous pose where it
-  would push the hand through the object (after round 4, which the verifier had to correct on prp_4).
-- **Known issues:** on a few frames of the mug clips a fingertip is still inside the cup (only the ring of triangles
-  where a finger crosses the wall counts, so the measure undercounts a finger fully through it; next: a per-finger
-  parity test along the bones); the object can rest at heights up to ~1 cm apart before and after a move (e.g. pp_2);
-  object 1's mesh underside sits ~1 cm into the measured table (handled by table.json).
+## 1.3 Retarget to robot morphology and agentic retargeting refinement
 
-## 1.3 Retarget to robot morphology
-We will retarget to a Sharpa URDF using `do-as-i-do`'s retargeting pipeline.
+After refining, we will add a retargeting agent that closes the loop. First, we retarget withHow
 
-- [x] `retargeting` env (`scripts/daid/setup.sh env retargeting`); inputs from a Do-as-I-Do run via
-  `scripts/retarget/prepare_daid_input.py`, run with `scripts/retarget/run_retarget.sh RAW_DIR TASK` (outputs under
-  `/data/.../runs/retarget`; replay with `third_party/do-as-i-do/retargeting/replay_viser.py --run-dir ...`)
-- [x] Test on IMG_5710_real (Do-as-I-Do recon): stages 1-4 (dataset, scene, IK) fine; stage 5 (MuJoCo Warp physics)
-  took 64 min and terminated early at sim step 1900/2567: the Sharpa hand never lifts the case (pushes it off its
-  pedestal at ~4.5 s), final object error 0.13 m. Pick-up + in-palm spin is a hard first test.
-- [ ] CHOIR -> retargeting adapter (CHOIR's MANO/object poses into `all_hand_meshes.npz` + layout + mesh), then retry
-  on a plain pick-and-place clip
+1. **Physics check, per time window (the verifier).** For each window: does the simulated object follow the reconstruction (within 2 cm and 10°)? Did it drop? How much penetration, and did the hand hit the pedestal? Plus images of that window: the simulated robot and object next to the reconstruction and the video frame, from several sides, with contacts marked.
+2. **Diagnosis: which layer caused it.**
 
-## 1.3 Train a policy
+   | Layer | Example | What the agent changes |
+   |---|---|---|
+   | reconstruction | no real grip, fingers inside the object, jittery thumb | our existing refinement tools, then re-prepare the window |
+   | retargeting targets | the Sharpa hand can't make the human's grasp (different size and joints) | which fingertips it tracks and how strongly, wrist offset, contact guidance (built in, currently off) |
+   | physics optimizer | too short a planning horizon for a regrasp, too little weight on carrying the object | horizon, samples, iterations and reward weights, per window |
+   | simulated world | object mass or friction, the collision mesh (simplifying a mug into convex pieces can fill in its handle or cavity), table height | the object's physical properties and collision shape, the table |
 
+3. **Fix Re-simulate only the failing window.** Restart the physics from the saved state at the start of the failing window and keep a fix if it helps that window and doesn't ruin later windows.
+
+4. **Repeat** until every window passes or the budget runs out
+
+
+## 1.4 Train a robot policy with the following embodiment and I/O 
+Imagine a Tianji 7 DoF arm with a 22 DoF sharpa connected to the end and a D405 on the wrist like there is in spd.bot. Since spd.bot uses a YAM, we have to mount the wrist camera on the palm side of the hand but it will be near the flange.
+
+
+| Item | Value |
+|---|---|
+| Hand | Sharpa Wave, 22 DoF |
+| Arm | Tianji 7-DoF force-controlled arm with anthropomorphic cross-axis wrist (see the arm section) |
+| Controlled joints | `N = 22 + 7 =` **29** |
+| Policy rate | 50 Hz (one step every 20 ms) |
+| Low-level control | Built-in joint controllers on hand and arm, servoing faster than the policy; arm targets interpolated between policy steps (see the arm section) |
+| Wrist camera | Intel RealSense D405, mounted on the wrist, looking along the hand (as in SPD's per-hand views) |
+| Exo camera | Fixed depth camera viewing the workspace (see the exo camera section) |
+| Tactile | Not used |
+
+Here is the input design spec of the policy. The outputs are pretty simple, just the 29 joint angle action space.
+ 
+| # | Group | Contents | Frame / encoding | Dim (N = 29) |
+|---|---|---|---|---|
+| 1 | **Proprioception** | Last 3 frames of measured joint angles `q`, and last 3 frames of the policy's own joint targets `q*` | Each joint normalized to [-1, 1] by its limits | 3 × 2N = **174** |
+| 2 | **Object pose (current)** | Position (3) + rotation (6D: first two columns of the rotation matrix) | Robot base frame | **9** |
+| 3 | **Future object trajectory** | K = 5 waypoints spaced 100 ms apart (0.1–0.5 s ahead) | Each as a change from the current object pose | 5 × 9 = **45** |
+| 4 | **Future hand/arm trajectory** | Reference joint angles at the same 5 time points | Each as a change from current measured `q` | 5 × N = **145** |
+| 5 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | See the wrist camera section | latent **64** |
+| 6 | **Exo depth** | Depth image + validity mask → separate CNN encoder | See the exo camera section | latent **64** |
