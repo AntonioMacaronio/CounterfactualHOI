@@ -114,6 +114,12 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
   well, a teacher-student distillation (DAgger: roll out the student, label with the teacher's actions) into the
   §1.4 observation space is likely the better design: RL then only fine-tunes, for example with the GenEnv goals.
 
+- **100M steps** (cfhoi_r7_flat, tab 5 since its 19:46 auto-export).
+  - Mean AdaDex progress 46%, position-only 80%.
+  - pp_1 and pp_5 are tracked end to end within 5 cm / 20°; FDR's success on 6/10.
+  - cfhoi_r7 at the same steps: 34% / 79%, with 0 end to end.
+  - The spatula clips (pp_3, prp_3) stay low on AdaDex progress. That is the tilted rest pose; it needs fixing in
+    the refinement.
 - **§1.4 policy learning curve** (p14_adadex_r7, 66% GenEnv). Learning starts after the assist decays:
 
   | | 60M | 80M | 90M | 100M |
@@ -131,7 +137,11 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
   | TrackEnv object error | 17.0 cm | 20.4 cm |
   | GenEnv position-only progress | 28% | 26% |
 
-  AdaDex progress is the same in both (19%). Judge again at 60-100M.
+  AdaDex progress is the same in both (19%).
+  - At 40-60M the gap closes: position-only progress (TrackEnv / GenEnv) is 34 / 33% for g25 and 33 / 32% for g66
+    at 60M.
+  - Inconclusive so far; compare again at 90-130M.
+  - g66 at 130M: TrackEnv AdaDex progress 29%, GenEnv 43%, GenEnv final-goal success 37%.
 
 ## §1.4 policy (`policy/`)
 
