@@ -10,11 +10,13 @@ a link to all of that method's viewers:
   1. Do-as-I-Do on the 4 IMG_5710 videos (the real clip + 3 MiniMax H3 edits)      -> recon/daid/
   2. Open-CHOIR on the 10 real videos                                               -> recon/choir/
   3. our pipeline (Depth Pro 2 + hand scale, SAM3, textured SAM3D, FoundationPose)   -> recon/ours/
-  4. agentic refinement of 3 (Claude edits the poses, a blind verifier checks)       -> recon/agent/
-then the generated-video gallery (videos/) and the retargeting test (img/). Sources: ../outputs/{recon_viser,
-choir_viser,fprecon_viser,refine_viser_r4,minimax_h3} (scripts/daid/build_recon_html.py,
-scripts/choir/build_choir_html.py [--method fprecon|refine]), the refinement comparisons in
-$PROJECT_STORAGE_ROOT/runs/compare/*_final4 (scripts/refine/compare.py --tag final4) and ../videos/grid2x2.mp4. The
+  4. agentic refinement of 3 (Claude edits MANO + object poses, a blind verifier checks) -> recon/agent/
+  5. the refined motions retargeted to the Sharpa hand in simulation (FlashDexRetarget) -> recon/retarget/
+then the generated-video gallery (videos/) and the first retargeting test (img/). Sources: ../outputs/{recon_viser,
+choir_viser,fprecon_viser,refine_viser_r7,flashdex_viser,minimax_h3} (scripts/daid/build_recon_html.py,
+scripts/choir/build_choir_html.py [--method fprecon|refine], scripts/flashdex/build_flashdex_html.py), the refinement
+comparisons in $PROJECT_STORAGE_ROOT/runs/compare/*_final7 (scripts/refine/compare.py --tag final7) and
+../videos/grid2x2.mp4. The
 viser viewers are self-contained HTML files, so the site is
 plain static files (plus .nojekyll so GitHub Pages serves them untouched). Re-run after new results.
 """
@@ -36,7 +38,8 @@ sys.path.insert(0, os.path.join(PROJECT_ROOT, "scripts", "daid"))
 from build_recon_html import EXAMPLES as DAID_CLIPS, RECON as DAID_RUNS, camera_query, caption as daid_caption  # noqa: E402
 
 NAV = [("index.html", "Home"), ("recon/daid/index.html", "1 · Do-as-I-Do"), ("recon/choir/index.html", "2 · Open-CHOIR"),
-       ("recon/ours/index.html", "3 · Our pipeline"), ("recon/agent/index.html", "4 · Agent refinement")]
+       ("recon/ours/index.html", "3 · Our pipeline"), ("recon/agent/index.html", "4 · Agent refinement"),
+       ("recon/retarget/index.html", "5 · Retargeted motions")]
 STYLE = """
   body { font-family: -apple-system, system-ui, sans-serif; margin: 0; color: #222; background: #fafafa; }
   .nav { background: #1f2937; padding: 10px 24px; display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
@@ -125,7 +128,7 @@ def results_table(rows):
 
 def refine_table(rdir):
     """Per-clip medians before -> after the agentic refinement, from build_choir_html.py --method refine's summaries."""
-    rows, agg = [], {k: [] for k in ("kp", "iou", "pen", "cross")}
+    rows, agg = [], {k: [] for k in ("kp", "iou", "pen", "cross", "jit", "grip")}
     for st in ("pp", "prp"):
         for i in range(1, 6):
             f = os.path.join(rdir, "summary", f"{st}_anthony_real_{i}.json")
@@ -137,16 +140,23 @@ def refine_table(rdir):
             agg["iou"].append(sm["all"]["iou"])
             agg["pen"].append(sm["held"]["penetration_cm"])
             agg["cross"].append(sm["held"].get("n_cross", [None, None]))
+            agg["jit"].append(sm["held"].get("hand_accel_mm", [None, None]))
+            agg["grip"].append(sm.get("grip_lifted", [None, None]))
+            rv = sm.get("reviewer")
+            rv_txt = f"{rv['overall']} ({rv['n_high']} high, {rv['n_medium']} medium)" if rv else "—"
             rows.append(f"<tr><td>{sm['video_id']}</td><td>{ba('all', 'hand_kp_px', 1)}</td><td>{ba('all', 'iou')}</td>"
-                        f"<td>{ba('held', 'penetration_cm')}</td><td>{ba('held', 'n_cross', 0) if 'n_cross' in sm['held'] else '—'}</td>"
+                        f"<td>{ba('held', 'n_cross', 0) if 'n_cross' in sm['held'] else '—'}</td>"
+                        f"<td>{ba('held', 'hand_accel_mm', 1) if 'hand_accel_mm' in sm['held'] else '—'}</td>"
+                        f"<td>{(lambda g: f'{g[0]:.0%} → <b>{g[1]:.0%}</b>' if g and None not in g else '—')(sm.get('grip_lifted'))}</td>"
                         f"<td>{sm['flagged_frames'][0]} → <b>{sm['flagged_frames'][1]}</b></td>"
-                        f"<td>{len(sm['verifier']) - sm['reverted']} / {len(sm['verifier'])}</td>"
+                        f"<td>{len(sm['verifier']) - sm['reverted']} / {len(sm['verifier'])}</td><td>{rv_txt}</td>"
                         f"<td>{sm['agent_minutes']:.0f} min</td></tr>")
     if not rows:
         return "", None
     table = ("<table><tr><th>clip</th><th>hand keypoint error (px)</th><th>object mask IoU</th>"
-             "<th>hand–object penetration while held (cm)</th><th>hand triangles through the object while held</th>"
-             "<th>flagged frames</th><th>verifier kept (chunks)</th>"
+             "<th>hand triangles through the object while held</th><th>hand jitter while held (mm/frame²)</th>"
+             "<th>lifted frames with a real grip</th><th>flagged frames</th><th>verifier kept (chunks)</th>"
+             "<th>reviewer on the result</th>"
              "<th>agent time</th></tr>" + "".join(rows) + "</table>")
     import statistics as stt
     med = {k: (stt.median([a for a, _ in v if a is not None] or [0]), stt.median([b for _, b in v if b is not None] or [0]))
@@ -156,12 +166,13 @@ def refine_table(rdir):
 
 def ablation_rows():
     """Blind A/B comparisons (scripts/refine/compare.py) as (label a, label b, wins a, wins b, ties)."""
-    names = {"initial": "initial (no refinement)", "refine_r4_auto": "automatic fit only (no agent)",
-             "refine_r3": "previous version (no finger tools, no 3D views)", "refine_r4": "automatic fit + agent (final)"}
+    names = {"initial": "initial (no refinement)", "refine_r7_auto": "automatic fit only (no agent)",
+             "refine_r5": "previous round (vertex-level hand edits)",
+             "refine_r6": "first MANO-only round (no penetration margin)", "refine_r7": "automatic fit + agent (final)"}
     out = []
     root = os.path.join(STORAGE, "runs", "compare")
     for d in sorted(os.listdir(root)) if os.path.isdir(root) else []:
-        if not d.endswith("_final4"):                  # the final runs (judge with 3D views + motion plot); others: earlier rounds
+        if not d.endswith("_final7"):                  # the final runs (judge with 3D views, paths + motion plot); others: earlier rounds
             continue
         js = [json.load(open(os.path.join(root, d, f))) for f in sorted(os.listdir(os.path.join(root, d))) if f.endswith(".json")]
         if not js:
@@ -170,6 +181,34 @@ def ablation_rows():
         out.append((names.get(js[0]["a"], js[0]["a"]), names.get(js[0]["b"], js[0]["b"]), w["a"], w["b"], w["tie"], len(js)))
     order = list(names.values())                       # initial vs script, initial vs agent, script vs agent
     return sorted(out, key=lambda r: tuple(order.index(x) if x in order else 9 for x in r[:2]))
+
+
+def retarget_summary(rdir):
+    """(FlashDexRetarget rollout metrics per clip (scripts/flashdex/export_viser.py), Do-as-I-Do's physics checks of the
+    same clips) as a sentence, or "" when there are no rollouts yet."""
+    fdr, daid = [], []
+    for st in ("pp", "prp"):
+        for i in range(1, 6):
+            vid = f"{st}_anthony_real_{i}"
+            f = os.path.join(rdir, f"{vid}.json")
+            if os.path.exists(f):
+                fdr.append(json.load(open(f)))
+            d = os.path.join(OUTPUTS, "retarget_viser", f"{vid}.json")
+            if os.path.exists(d):
+                daid.append(json.load(open(d)))
+    if not fdr or "progress" not in fdr[0]:
+        return ""
+    import statistics as stt
+    prog = stt.median(r["progress"] for r in fdr)
+    w2 = stt.median(r["frames_within_2cm"] for r in fdr)
+    succ = sum(bool(r["success"]) for r in fdr)
+    txt = (f"Over the {len(fdr)} clips the policy tracks a median <b>{prog:.0%}</b> of each clip before the object "
+           f"first leaves 5 cm / 20° of the reconstruction (AdaDex's progress); <b>{succ}/{len(fdr)}</b> clips stay within "
+           f"it for the whole clip; the object is within 2 cm of the reconstruction on a median {w2:.0%} of frames")
+    if daid:
+        txt += (f" (Do-as-I-Do's sampling-based retargeting of the same reconstructions: "
+                f"{stt.median(d['frames_within_2cm'] for d in daid if 'frames_within_2cm' in d):.0%})")
+    return txt + "."
 
 
 def video_gallery(out):
@@ -205,15 +244,25 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(WORKDIR, "CounterfactualHOI-site"))
     ap.add_argument("--featured", default="prp_anthony_real_4", help="real clip shown for CHOIR and ours")
-    ap.add_argument("--refine", default="refine_viser_r4", help="outputs/ dir of the agent-refined viewers")
+    ap.add_argument("--refine", default="refine_viser_r7", help="outputs/ dir of the agent-refined viewers")
+    ap.add_argument("--retarget", default="flashdex_viser", help="outputs/ dir of the retargeted motions")
     args = ap.parse_args()
     out, feat = args.out, args.featured
     os.makedirs(out, exist_ok=True)
 
-    for sub, src in (("daid", "recon_viser"), ("choir", "choir_viser"), ("ours", "fprecon_viser"), ("agent", args.refine)):
-        if not os.path.exists(os.path.join(OUTPUTS, src, "index.html")):
+    tabs = (("daid", "recon_viser"), ("choir", "choir_viser"), ("ours", "fprecon_viser"), ("agent", args.refine),
+            ("retarget", args.retarget))
+    have = {sub for sub, src in tabs if os.path.exists(os.path.join(OUTPUTS, src, "index.html"))}
+    NAV[:] = [(h, n) for h, n in NAV if h == "index.html" or h.split("/")[1] in have]   # no links to missing tabs
+    for sub, src in tabs:
+        if sub not in have:
             continue
         copy_tree(os.path.join(OUTPUTS, src), os.path.join(out, "recon", sub))
+        if sub in ("agent", "retarget"):               # their side-by-side tabs point at the other method's viewers
+            ix = os.path.join(out, "recon", sub, "index.html")
+            page = open(ix).read()
+            page = page.replace("../fprecon_viser/", "../ours/").replace(f"../{args.refine}/", "../agent/")
+            open(ix, "w").write(page)
         add_nav(os.path.join(out, "recon", sub, "index.html"), 2)
     stale = os.path.join(out, "recon", "index.html")           # the pre-restructure layout had "ours" at recon/
     if os.path.exists(stale):
@@ -256,29 +305,44 @@ def main():
                       f"object mask IoU {sm['all']['iou'][0]:.2f} → {sm['all']['iou'][1]:.2f}; "
                       f'<a href="recon/agent/reports/{feat}.html">the agent\'s report</a>, '
                       f'<a href="recon/agent/qc/{feat}.jpg">before / after frames</a>')
+    verdicts = {}                                     # reviewer majority per clip (summary.json, review.py)
+    for f in sorted(os.listdir(os.path.join(out, "recon", "agent", "summary"))) if os.path.isdir(os.path.join(out, "recon", "agent", "summary")) else []:
+        rv = json.load(open(os.path.join(out, "recon", "agent", "summary", f))).get("reviewer")
+        if rv:
+            verdicts.setdefault(rv["overall"], []).append(f[:-5].replace("_anthony_real", ""))
+    status = "; ".join(f"<b>{k}</b>: {', '.join(verdicts[k])}" for k in ("good", "acceptable", "bad") if k in verdicts)
+    prev = next(((wa, wb, t) for a, b, wa, wb, t, n in abl if a.startswith("previous")), None)
     agent_section = "" if not rtable else f"""
 <h2>4 · Agentic refinement of our reconstructions</h2>
-<p>Instead of a gradient-based optimizer, an agent refines the reconstruction's parameters by looking at it against
-the video. Three stages per clip (5–19 minutes):</p>
+<p>An agent refines the reconstruction by looking at it against the video and editing its parameters with tools. The
+hand is only ever the MANO hand model's parameters (per frame its global orientation, position and 15 joint
+rotations, plus one hand shape per clip): no tool edits mesh vertices, so the hand always stays a valid human hand
+that a retargeter can read. Per clip:</p>
 <ol>
-<li><b>Automatic fit (no LLM).</b> Gradient-free searches run frame by frame over the whole clip: the hand's rigid
-motion fitted to its 2D keypoints, SAM3 mask and depth (no penetration into the object); the object's 6-DoF pose
-fitted to its mask outside the hand and the depth, within a trust region; then each finger's flexion (MANO skinning
-on top of the hand tracker's articulation) fitted to its keypoints with no triangle of the hand through the object's
-surface (mesh–mesh intersection tests, which catch fingers through a thin wall such as a mug's), and the palm pushed
-out along the surface normal where it passes through.</li>
+<li><b>Automatic fit (no LLM).</b> The object's 6-DoF pose is fitted frame by frame to its SAM3 mask outside the
+hand and the depth (a search within a trust region, smoothed over time). Then <b>fit_mano</b>, a gradient-based fit
+of all the hand's MANO parameters over the whole clip at once (Adam on the GPU, ~15 s per clip): the detected 2D hand
+keypoints, the hand's SAM3 mask, the depth map (weighted by the image area each part of the hand covers), MANO's
+hand-pose prior and a pull to the hand tracker's pose, smoothness over time (joint angles and joint positions), no
+penetration into the object (its signed distance field, at the hand's vertices and triangle centres with a 1.5 mm
+margin, so fingers cannot slip through a thin wall or handle) or the table, and the clip's hand shape.</li>
 <li><b>Agent.</b> Claude (Opus 5.5) sees overlays of the rendered hand and object on the frames (with the SAM3 mask,
-the detected hand keypoints and the object's axes), the 3D scene from any side (hand red where it passes through
-the object, green where it touches), and per-frame plots and numbers. It labels the motion phases (approach, grasp, lift, carry, rotate, place, release, rest) and fixes
-what a per-frame fit cannot: the hand or fingers off the object while it is held (re-fit with a contact term over
-the held phases, curl fingers), fingers through it, the object jittering or drifting while it rests (hold static /
-smooth), jumps, flips and lag. Its tools edit the poses over frame ranges: rotate about the object's own axes or
-gravity, translate, move along the viewing ray, interpolate, hold static, snap to the table, smooth, curl / open
-fingers, re-run the searches, or pick among FoundationPose's re-registration hypotheses. Every edit is a new version with before / after images and numbers; it reverts what
-does not help.</li>
-<li><b>Verifier.</b> A separate blind A/B judge (fresh context, random order) compares the agent's result with the
-automatic fit on each changed range, from overlays, 3D views from three sides and a plot of the motion, and keeps
-the automatic fit wherever the agent's version looks worse.</li>
+the detected keypoints and the object's axes), the 3D scene from any side (hand red where it passes through the
+object, green where it touches), wrist and fingertip paths over time (jitter shows as zig-zags), and per-frame plots
+and numbers, including whether the hand really grips the object (thumb or palm against fingers). It labels the motion
+phases (approach, grasp, lift, carry, rotate, place, release, rest) and fixes what the automatic fit cannot: it re-runs
+fit_mano over the held phases with a grip term (the thumb and the closest fingers on the object's surface, the
+thumb's contact facing the fingers'), with more smoothing where the hand still jitters, moves or rotates the hand,
+turns fingers' MANO joints, pushes the palm out of the object, holds the object static or smooths it at rest, and
+fixes flips, jumps and lag with object edits or FoundationPose's re-registration hypotheses. Every edit is a new
+version with before / after images and numbers; it reverts what does not help.</li>
+<li><b>Reviewer.</b> When the agent wants to finish, an independent reviewer (fresh context) judges the result in
+absolute terms, every phase next to the video and from four sides, and the agent must fix what it finds or say why it
+cannot. The final result is reviewed three more times; the majority verdict and all three votes are in each clip's
+caption.</li>
+<li><b>Verifier.</b> A separate blind A/B judge compares the agent's result with the automatic fit on each changed
+range (overlays, 3D views from three sides, fingertip paths, a plot of the motion) and keeps the automatic fit wherever
+the agent's version looks worse.</li>
 </ol>
 {viewer(f"recon/agent/{feat}.html", out, "agent " + feat, agent_cap)}
 <p>Medians over each clip's frames, initial reconstruction → final.</p>
@@ -286,17 +350,28 @@ the automatic fit wherever the agent's version looks worse.</li>
 {("<p>Blind A/B judgements over every frame of the 10 clips, in chunks at phase boundaries (≤ 60 frames), by the "
   "same judge as the verifier, which sees overlays, 3D views from three sides and a motion plot. "
   "<i>Automatic fit vs final</i> is not an independent test: the verifier already used that judge to keep the "
-  "automatic fit wherever the agent's edit lost.</p>" + abl_table) if abl_table else ""}
-<p class="verdict">Summary: the hand improves most (median keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px)
-and is now physically consistent with the object: the median number of hand triangles through the object's surface
-while it is held goes from {rmed["cross"][0]:.0f} to {rmed["cross"][1]:.0f} (fingers inside the mug and the tape roll, the
-palm inside the bottle), penetration {rmed["pen"][0]:.2f} → {rmed["pen"][1]:.2f} cm. The object, already tracked well by
-FoundationPose, changes less (median IoU {rmed["iou"][0]:.2f} → {rmed["iou"][1]:.2f}). Still open: on a few frames of the mug
-clips a fingertip is still inside the cup (only the ring of triangles where it crosses the wall counts as crossing,
-so the measure undercounts it); the object can rest at heights up to ~1 cm apart before and after being moved; and
-with object 1 (the RealSense-style camera) the mesh's unseen underside puts the object ~1 cm into the measured table
-(the export puts the simulated table at the object's resting height).</p>
-<p class="more"><a href="recon/agent/index.html">→ All 10 refined viewers (with captions, QC frames and the agent's reports)</a></p>
+  "automatic fit wherever the agent's edit lost. The previous round edited the hand's mesh (a rigid motion plus "
+  "per-finger flexion by skinning, searched frame by frame).</p>" + abl_table) if abl_table else ""}
+<p class="verdict">Summary: median hand keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px; hand triangles
+through the object while held {rmed["cross"][0]:.0f} → {rmed["cross"][1]:.0f}; hand jitter while held
+{rmed["jit"][0]:.1f} → {rmed["jit"][1]:.1f} mm/frame² (the hand tracker's own motion is the first number); lifted
+frames with the thumb or palm against the fingers {rmed["grip"][0]:.0%} → {rmed["grip"][1]:.0%} (a hook grip through a
+mug's handle is not counted, see the reviewer); object mask IoU {rmed["iou"][0]:.2f} → {rmed["iou"][1]:.2f}.
+{f"Against the previous round (vertex-level hand edits), the judge preferred this round on {prev[1]} chunks and the previous one on {prev[0]} ({prev[2]} ties). " if prev else ""}
+<b>Reviewer on each final result (majority of three reviews):</b> {status or "pending"}.</p>
+<p class="more"><a href="recon/agent/index.html">→ Before / after, side by side for each clip (and all 10 refined viewers, with captions, QC frames and the agent's reports)</a></p>
+"""
+    rsum = retarget_summary(os.path.join(out, "recon", "retarget"))
+    retarget_section = "" if not os.path.exists(os.path.join(out, "recon", "retarget", "index.html")) else f"""
+<h2>5 · Retargeted motions (Sharpa Wave hand, physically simulated)</h2>
+<p>The agent-refined reconstructions (section 4: MANO hand + object poses) are turned into physically plausible robot
+motions with <a href="https://holiday-robot.github.io/FlashDexRetarget/">FlashDexRetarget</a>: a kinematic retarget
+of the human hand to the Sharpa Wave hand (22 DoF, floating wrist) gives a reference per clip, then one
+reference-conditioned RL policy (FlashSAC, Isaac Lab) is trained over all 10 clips in simulation to make the simulated
+object follow the reconstructed one. The object, table and gravity are simulated; the hand has to really hold the
+object. The viewers show the policy's rollout of each clip next to the refined reconstruction it tracks.
+{rsum}</p>
+<p class="more"><a href="recon/retarget/index.html">→ Refined reconstruction (left) vs retargeted motion (right), pp and prp tabs</a></p>
 """
     page = f"""<!doctype html>
 <html lang="en">
@@ -314,10 +389,11 @@ with object 1 (the RealSense-style camera) the mesh's unseen underside puts the 
 picking up, in-hand manipulating and setting down objects. Alvin, Anthony, Hyunsoo, Jayaram. Updated
 {time.strftime("%Y-%m-%d")}.</p>
 
-<p><b>Pipeline.</b> 1.0 generate counterfactual videos with MiniMax H3 <span class="status done">running</span> ·
+<p><b>Pipeline.</b> 1.0 generate counterfactual videos with MiniMax H3 <span class="status done">100 videos</span> ·
 1.1 reconstruct the hand and object in 4D <span class="status done">10/10 real videos</span> ·
-1.2 retarget to the Sharpa hand <span class="status wip">first test</span> ·
-1.3 train a policy <span class="status todo">not started</span></p>
+1.2 agentic refinement <span class="status done">10/10</span> ·
+1.3 retarget to the Sharpa hand <span class="status wip">FlashDexRetarget</span> ·
+1.4 train a policy <span class="status wip">started</span></p>
 
 <p>Step 1.1 went through three reconstruction methods, then an agentic refinement of the third. Each viewer shows the hand (blue), the object, the scene
 from the first frame (colored points) and the real camera's frustum with the current video frame, rotated so
@@ -364,11 +440,11 @@ the object there), and where the object ends up relative to the table once it is
 <h2>Generated counterfactual videos (MiniMax H3)</h2>
 {gallery or "<p>(no generated videos yet)</p>"}
 
-<h2>Retargeting test (Sharpa hand)</h2>
+{retarget_section}
+<h2>First retargeting test (IMG_5710)</h2>
 <p>Do-as-I-Do retargeting run on the Do-as-I-Do reconstruction of IMG_5710. Dataset processing, scene generation
 and IK work; the physics stage (MuJoCo Warp) ran 64 min and stopped early at step 1900/2567: the hand does not lift
-the case and pushes it off its pedestal at ~4.5 s (final object error 0.13 m). Next: retarget our new
-reconstructions, starting with a plain pick-and-place.</p>
+the case and pushes it off its pedestal at ~4.5 s (final object error 0.13 m).</p>
 {'<figure class="card"><img src="img/retarget_IMG5710.jpg" alt="retargeting snapshots"><figcaption>Simulated Sharpa hand and object at 8 times of the rollout.</figcaption></figure>' if has_retarget_img else ''}
 </main>
 </body>
