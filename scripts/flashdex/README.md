@@ -100,6 +100,12 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
   in-hand-rotation clips are not learned yet (position-only progress 19-89%).
   - Mean AdaDex / position-only progress: 16 / 34% at 30M, 24 / 69% at 60M.
   - cfhoi_r7_flat at 30M: 25 / 40% (pp_1 2 → 41%, prp_5 3 → 14%).
+- **Flat vs not, at equal steps** (mean AdaDex progress, cfhoi_r7 vs cfhoi_r7_flat): 22/22 at 10M, 20/23 at 20M,
+  16/25 at 30M, 19/24 at 40M, 18/23 at 50M and 24/28 at 60M.
+  - The flat run leads from 20M on. At 60M: pp_1 2 → 85%, prp_5 15 → 30%.
+  - The other clips swing both ways between runs, which is run-to-run variance.
+  - Position-only progress at 60M is 69% for cfhoi_r7 and 61% for flat.
+  - Tab 5 switched to cfhoi_r7_flat at its 60M eval (18:12), via `auto_refresh.conf`.
 - **§1.4 policy** (p14_adadex_r7) at 60M: TrackEnv progress 19% (position-only 33%), GenEnv 19% (32%), final-goal
   success 0/19. It learns much slower than FDR's privileged actor at equal steps.
 
