@@ -6,6 +6,10 @@
    first rollout that passes SR@1.0): <run>/evals/step<N>/ (manifest.json + rollouts/m<id>.npz, FDR's format). The
    viewers (export_viser.py) and the AdaDex-style progress curves (eval_curves.py) read them.
 2. Every logged metric is also appended to <run>/metrics.jsonl (wandb runs offline here).
+
+Opt-in, by environment variable (both off by default, so a plain launch is FDR's own behaviour):
+  CFHOI_FAST=1   speed patches that do not change what is learned (scripts/flashdex/fast.py)
+  CFHOI_SGS=1    Success-Guided Sampling of the episode resets (scripts/flashdex/sgs.py; log in <run>/sgs.jsonl)
 """
 
 from __future__ import annotations
@@ -81,6 +85,13 @@ def run(overrides):
     setup_logger(cfg.logger, cfg.runner)
     runner = create_runner(cfg.runner, cfg.eval, train_env, eval_env=eval_env, headless=True)
     R._cfhoi_base = runner._save_path_base
+    sys.path.insert(0, str(Path(__file__).resolve().parent))
+    if os.environ.get("CFHOI_FAST", "0") not in ("", "0"):
+        import fast
+        fast.install(runner._train_env.unwrapped, runner._train_env.share_obs, cfg.eval.command_name)
+    if os.environ.get("CFHOI_SGS", "0") == "1":
+        import sgs
+        sgs.install(runner._train_env.unwrapped, cfg.eval.command_name).log_path = runner._save_path_base / "sgs.jsonl"
     print(f"[cfhoi] run dir {runner._save_path_base}", flush=True)
     (runner._save_path_base).mkdir(parents=True, exist_ok=True)
     (runner._save_path_base / "config.yaml").write_text(OmegaConf.to_yaml(cfg))

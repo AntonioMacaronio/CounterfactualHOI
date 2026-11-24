@@ -44,6 +44,9 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
 | `rest_check.py` | MuJoCo drop test of each clip's first / last reference pose on its table disk (no hand) |
 | `flat_base.py` | flat-bottom collision meshes (coacd) for objects whose rest pose is unstable; visual mesh unchanged |
 | `eval_curves.py` | per-eval scores of a run -> `<run>/curves.json`, `curves.png` |
+| `profile_step.py` | where a training iteration spends its time (stages, GPU kernel launches and synchronizations), with and without `fast.py` |
+| `fast.py` | opt-in speed patches (`CFHOI_FAST=1`): applied at run time, FDR's checkout stays untouched |
+| `sgs.py` | opt-in Success-Guided Sampling of the episode resets (`CFHOI_SGS=1`) |
 | `auto_refresh.sh` | background job: keeps every run's curves current and re-exports tab 5 (+50M steps / +10 points) |
 | `build_flashdex_html.py` | the tab-5 page: refined reconstruction (left) vs FDR Sharpa rollout (right), pp / prp tabs |
 
@@ -215,3 +218,67 @@ is latest when it is built.
     30M.
   - Training-time object error is 2-3 cm, against 15-18 cm in the evals, which run without assist.
   - The unassisted evals should only improve once the assist is near zero (about 60-70M steps at this rate).
+
+## Speed (2026-11-24)
+
+Measured with `profile_step.py` (the runner's own loop body, a 180M-step policy loaded). All of it was measured on
+GPUs shared with a training, so the absolute rates are low; a run alone does 3.4 it/s at 2048 envs (6.9k env steps/s).
+
+- **A run alone keeps an H200 25-50% busy.** One iteration at 2048 envs issues about 10,700 GPU kernel launches,
+  41,000 torch operator calls and 1,400 GPU synchronizations: the loop is thousands of small operations that each
+  wait for the GPU. Shares of an iteration: physics (4 substeps) 23%, resets 22% (about 15 envs reset on every step;
+  Isaac Lab's scene reset is 13%, the command's reset 8%), observations 19%, the command's logging metrics 12%,
+  learner (2 updates) 8%, the rest 16%. The numpy round trip of observations and actions is under 2%.
+- **Two FDR processes on one GPU are slower than one.** Sharing GPU 3, a 2048-env profile and the `cfhoi_r7` training
+  each ran at 1.45 it/s (3.1-3.4 alone): 2.9 it/s together. Every synchronization waits for the other process's time
+  slice. One run per GPU, or MPS.
+- **More envs is the lever.** The iteration time depends little on the env count (the same ~11,000 kernel launches,
+  larger tensors). Each measured next to one training on its GPU:
+
+  | envs | it/s | env steps/s | vs 2048 | GPU memory (2M-row buffer) | scene build |
+  |---|---|---|---|---|---|
+  | 2048 | 1.45 | 2,970 | 1x | 13.0 GB | 19 min (12 alone) |
+  | 4096 | 1.30 | 5,310 | 1.79x | 15.5 GB | 40 min |
+  | 8192 | 1.04 | 8,530 | 2.88x | 21.1 GB | 92 min |
+
+  Physics is what grows (1.8x from 2048 to 8192); resets, observations and the command stay within 20%. The envs
+  need little memory (5.7 / 7.5 / 12.2 GB of simulation at 2048 / 4096 / 8192, the last with 4x the PhysX patch
+  buffer); the replay buffer fills an H200, at 1.76 GB per million rows. The cost is the scene build, which is per
+  env in per-env-object mode (the builds above ran while other scenes were building).
+- **`CFHOI_FAST=1`: 1.23x** at 2048 envs (1.40 -> 1.71 it/s in one process; 10,700 -> 8,450 kernel launches, 1,400
+  -> 1,040 synchronizations per iteration). Four patches, none changes what is learned: the critic observation group
+  reuses the actor's (they are identical with `share_actor_critic_obs`, and FDR computed every term twice); the
+  command's ~40 logging metrics are computed every 4th step in training; a reset reads its logging scalars back from
+  the GPU once, not one by one (checked against FDR's own code: `CFHOI_FAST_CHECK=30`); a scene reset resets each
+  asset once, not twice.
+- More envs lowers the updates per env step: scale `updates_per_interaction_step` (or the batch size) with
+  `num_envs` to keep the replay ratio (2 updates of 4096 samples per 2048 env steps).
+- **The object-assist curriculum paces a run, in iterations.** FDR lowers the assist gain by 0.9x at most once per
+  `decay_cooldown_epochs` (40) epochs of `num_steps_per_env` (32) iterations, i.e. every 1,280 iterations, and 80 ->
+  0 takes 70 decays. In `cfhoi_r7_flat` every gate passed with margin (task reward 0.84 against 0.6, completion 0.94
+  against 0.65), so the assist fell at exactly that pace: below 1 at 114M env steps, 0 at 189M = 92,400 iterations =
+  7.6 h. Evaluations run without the assist, so their scores only mean something near the end of that. More env
+  steps per second therefore do not shorten a run by themselves: with k times the envs, set
+  `curriculum.xfrc_curriculum_adaptive.params.num_steps_per_env=32/k` (the epoch length, used only there) so the
+  schedule stays the same in env steps. Faster iterations (`CFHOI_FAST`) shorten it directly.
+- Not done, in order of expected gain: resets every k steps instead of every step (22% of an iteration is reset
+  overhead that does not depend on how many envs reset), one contact sensor for all 13 links per hand instead of 13
+  (the contact observation alone is 4%), a right-hand-only robot (the parked left hand is simulated and observed),
+  `torch.compile` of the observation / reward terms. The learner's networks are already compiled; its CUDA-graph
+  modes are off because they crash inside Isaac Sim (rsl_rl_flashsac's `resolve_compile_mode`).
+
+## Success-Guided Sampling (`sgs.py`)
+
+[SGS](https://sgs-rl.github.io/) (Zhang et al., CoRL 2026) changes only which task configuration an env resets to:
+a fixed set of configurations, a ring buffer of the last 100 episode outcomes per configuration, and a draw weighted
+towards the configurations the policy solves about half the time (weight ∝ ((p + ε)(1 - p + ε))^(1/4) with the
+paper's manipulation settings: a never-solved one keeps 0.14x the peak, a 92%-solved one 0.73x). The paper's
+experiments are PPO with up to 2^20 envs; nothing in the sampler depends on the learner.
+
+Here a configuration is (clip, 0.5 s start-frame bin): 114 cells for the 10 TrackEnv clips. An episode succeeds
+when it ends by reaching its clip's end, and fails on any other termination. FDR pins each env to one object, so an
+env draws among its own object's cells (its clips' start bins); the share of envs per object stays fixed. A cell with
+no outcome yet gets the peak weight. `CFHOI_SGS=1` installs it; `<run>/sgs.jsonl` logs every cell's success rate and
+draw probability every 2 minutes. Checked in the simulator (bookkeeping, draws inside the env's clip); whether it
+learns faster than FDR's uniform start frames is not tested yet (A/B at equal env steps).
+
