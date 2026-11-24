@@ -143,7 +143,7 @@ Here is the I/O design spec of the policy.
 | # | Group | Contents | Frame / encoding | Dim (N = 29) |
 |---|---|---|---|---|
 | 1 | **Proprioception** | Last 3 frames of measured joint angles `q`, and last 3 frames of the policy's own joint targets `q*` | Each joint normalized to [-1, 1] by its limits | 3 × 2N = **174** |
-| 2 | **Text command** | One of "pick", "rotate", "place": the stage of the task the policy should carry out now. In training it comes from the clip's phase labels (approach / grasp / lift → pick; rotate → rotate; carry / place / release / rest → place) | One-hot | **3** |
+| 2 | **Text command** | "pick" or "place": the stage of the task the policy should carry out now. In training it comes from the clip's phase labels (approach / grasp / lift → pick; carry / place / release / rest → place) | One-hot | **2** |
 | 3 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | See the wrist camera section | latent **64** |
 | 4 | **Exo depth** | Depth image + validity mask → separate CNN encoder | See the exo camera section | latent **64** |
 
@@ -154,9 +154,11 @@ The outputs are pretty simple, just the 29 joint angle action chunk of 8 steps. 
 1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the FDR policy's joint targets for the next 8 steps. The text command comes from the clip's phase labels, looked up by time: the refinement labels phases in video frames (`runs/refine_<round>/VID/phases.json`), and the robot data is the same clip at 60 Hz.
 2. **RL finetuning (FPO++ + SGS):** finetune the flow-matching policy with an asymmetric actor-critic, where the critic receives privileged observations (below). The supervised loss stays on at the start with a decaying weight, so the first updates with an untrained critic do not undo stage 1. FPO++ runs with its per-sample ratio and plain PPO clipping: its asymmetric trust region did poorly with sparse rewards in the paper, and the success terms below are sparse.
 
-The policy gets no goal and no reference trajectory. "pick", "rotate" and "place" are three skills, each with its own definition of done, and where the object ends up does not matter. In RL the reference clips are only used to start episodes (SGS draws a clip and a start time) and for the supervised loss.
+**Scope for now: pick and place only.** The policy is trained on the five pick-place clips with the commands "pick" and "place". "rotate" is left for later: the videos turn each object about a different axis (the spatula and the bottle about their long axis, the mug about its vertical axis, the tape roll over a diameter), so no single definition of "rotated" fits all of them.
 
-An episode runs the commands in order: pick → rotate → place for the pick-rotate-place clips, pick → place for the pick-place clips. The command advances once the current one has been done for 0.2 s. An episode ends when "place" is done, on a failure, or when a command takes too long.
+The policy gets no goal and no reference trajectory. "pick" and "place" are two skills, each with its own definition of done, and where exactly the object ends up does not matter. In RL the reference clips are only used to start episodes (SGS draws a clip and a start time) and for the supervised loss.
+
+An episode is pick → place. The command advances to "place" once "pick" has been done for 0.2 s. An episode ends when "place" is done, on a failure, or when a command takes too long.
 
 #### Reward
 Computed per simulator step and summed over the 8 steps of a chunk. Only the rows of the current command are active.
@@ -166,14 +168,17 @@ Computed per simulator step and summed over the 8 steps of a chunk. Only the row
 | pick | reach | `0.2` | fingertips close to the object's surface |
 | pick | lift | `0.5` | the object's height above where it rested, up to 3 cm |
 | pick | **done** | `1.0` | the object is at least 3 cm above the table, touched by the thumb and at least one other finger |
-| rotate | turn | `0.5` | how far the object has turned relative to the palm since the command began, up to 45° |
-| rotate | **done** | `1.0` | the object has turned at least 45° relative to the palm and is still held at least 3 cm above the table |
-| place | lower | `0.5` | the object's height above the table going down |
-| place | **done** | `1.0` | the object rests on the table (lowest point within 1 cm, nearly still), no part of the hand touches it, and the fingertips are at least 3 cm away |
+| place | carry | `0.5` | how far the object is across the table from where it was picked up, up to 20 cm |
+| place | lower | `0.5` | once it is 20 cm away: its height above the table going down, and its vertical axis close to the table's normal |
+| place | **done** | `1.0` | the object rests on the table at least 20 cm from where it was picked up (lowest point within 1 cm, nearly still), upright (its vertical axis within 20° of the table's normal), no part of the hand touches it, and the fingertips are at least 3 cm away |
 | all | action rate and within-chunk smoothness | small, negative | prevents jitter |
-| all | termination | `-50` (as in FDR) | the object is dropped during pick or rotate, or leaves the workspace |
+| all | termination | `-50` (as in FDR) | the object is dropped before "place" is done, or leaves the workspace |
 
-The thresholds come from the 10 real clips (round-10 reconstructions): every clip lifts the object at least 4 cm (4–26 cm), and every pick-rotate-place clip turns it at least 53° relative to the palm (53–179°). The weights are starting values.
+**Upright** means the object stands on the side it started on. Its *vertical axis* is the direction, fixed in the object, that points along the table's normal while it rests at the start of the episode; upright is that axis along the table's normal again, within 20°. Which way the object is turned about that axis does not matter.
+
+**Where** the object is placed does not matter, except that it has to be carried away: at least 20 cm across the table. Without that, lifting the object 3 cm and putting it straight back down would count as a pick and place.
+
+The thresholds come from the five pick-place clips (round-10 reconstructions): they lift the object 4–10 cm, carry it 34–47 cm across the table, and put it down with its vertical axis 1–10° from where it started. The weights are starting values.
 
 The human-like grasp is not rewarded. It comes from stage 1 and from the supervised loss kept during early RL.
 
@@ -185,6 +190,6 @@ FPO++ is PPO-style, so the critic is a value function of the state at the start 
 | **Robot** | wrist pose and velocity; joint positions, velocities, and current targets; fingertip positions and velocities in the wrist frame |
 | **Object** | pose and velocity in the wrist frame; 128-point cloud |
 | **Contact** | contact force and location per hand link; object distance and surface normal at the palm and five fingertips |
-| **Task state (new)** | the text command as a one-hot; time since the command began; the object's height above the table; how far it has turned relative to the palm since "rotate" began |
+| **Task state (new)** | the text command as a one-hot; time since the command began; the object's height above the table; how far it is across the table from where it was picked up; the tilt of its vertical axis from the table's normal |
 
 The task-state terms are included because the value depends on them and nothing else in the observation carries them.
