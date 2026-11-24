@@ -23,11 +23,25 @@ export FDR
 # off; a later rewards.reward_weights.action_rate=... override on the command line wins. Launches that select
 # their own reward config (policy/train_policy.sh: envs/rewards@rewards=cfhoi_policy) keep theirs unless
 # CFHOI_ACTION_RATE is set.
+#
+# Object smoothness (the user, 2026-11-24: "I don't want a jittery object motion in the retargeted data but don't
+# overdo it"): FDR's own object velocity terms, tracking_obj_lin_vel_error_exp and tracking_obj_ang_vel_error_exp
+# = exp(-scale * mean |reference velocity - simulated velocity|), which it defines but gives no weight. The
+# reference (the filtered reconstruction) is smooth, so matching its velocity is what removes the shake without
+# penalising the motion itself. In cfhoi_r7_flat's final evaluation the object's velocity is off by a median 0.03
+# m/s and 0.6 rad/s per frame (eval/error_obj_lin_vel_r 0.06, eval/error_obj_ang_vel_r 1.2-1.4), and its
+# acceleration in a typical frame is about 1 mm and 1 deg per step^2 against 0.03 and 0.03 in the reference. With
+# scales 10 and 1 the terms are worth 0.70 and 0.53 there, 0.83 and 0.70 at half the error: at weight 0.1 each,
+# halving the object's jitter earns about 0.03 per step, 2% of what a step earns. They are in none of the assist
+# curriculum's reward groups and are not the early-reset term. CFHOI_OBJ_SMOOTH=<weight> changes the weight of
+# both, CFHOI_OBJ_SMOOTH=0 leaves them out.
 case " $* " in
-  *"envs/rewards@rewards="*) AR="${CFHOI_ACTION_RATE:-0}" ;;
-  *) AR="${CFHOI_ACTION_RATE:--0.02}" ;;
+  *"envs/rewards@rewards="*) AR="${CFHOI_ACTION_RATE:-0}"; OS="${CFHOI_OBJ_SMOOTH:-0}" ;;
+  *) AR="${CFHOI_ACTION_RATE:--0.02}"; OS="${CFHOI_OBJ_SMOOTH:-0.1}" ;;
 esac
 SMOOTH=(); [ "$AR" != "0" ] && SMOOTH+=("++rewards.reward_weights.action_rate=$AR")
+[ "$OS" != "0" ] && SMOOTH+=("++rewards.reward_weights.tracking_obj_lin_vel_error_exp=$OS" "++rewards.reward_scales.tracking_obj_lin_vel_error_exp=10.0" \
+                             "++rewards.reward_weights.tracking_obj_ang_vel_error_exp=$OS" "++rewards.reward_scales.tracking_obj_ang_vel_error_exp=1.0")
 exec python "$HERE/train_cfhoi.py" envs/robot@robot=sharpa_bimanual commands.motion_file="$MOTION" \
     logger.wandb.run_name="$NAME" "logger.wandb.tags=[cfhoi,sharpa]" logger.wandb.mode=offline \
     per_hand_actor_critic=false "${SMOOTH[@]}" "$@"          # right hand only: one actor-critic (the per-hand split needs both)
