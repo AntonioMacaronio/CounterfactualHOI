@@ -19,21 +19,28 @@
   <rect width="1200" height="770" fill="#ffffff"/>
 
   <!-- initial reconstruction -->
-  <rect class="code" x="30" y="40" width="230" height="92" rx="8"/>
+  <rect class="code" x="30" y="40" width="230" height="82" rx="8"/>
   <text class="title" x="46" y="66">Initial reconstruction</text>
-  <text x="46" y="88">from run_fprecon.sh: object</text>
-  <text x="46" y="105">poses, MANO hand, masks,</text>
-  <text x="46" y="122">depth, table (v0)</text>
+  <text x="46" y="88">run_fprecon.sh: object poses,</text>
+  <text x="46" y="105">MANO hand, masks, depth</text>
+
+  <!-- table-anchored depth -->
+  <rect class="code" x="30" y="152" width="230" height="110" rx="8"/>
+  <text class="title" x="46" y="178">Table-anchored depth</text>
+  <text class="sub" x="46" y="196">harness code, no LLM</text>
+  <text x="46" y="218">Each frame's depth is scaled so</text>
+  <text x="46" y="235">the table is one plane for the</text>
+  <text x="46" y="252">whole clip</text>
 
   <!-- automatic fit -->
-  <rect class="code" x="30" y="190" width="230" height="150" rx="8"/>
-  <text class="title" x="46" y="216">Automatic fit</text>
-  <text class="sub" x="46" y="234">harness code, no LLM</text>
-  <text x="46" y="258">Over the whole clip:</text>
-  <text x="46" y="276">· object → masks + depth</text>
-  <text x="46" y="294">· MANO hand → keypoints,</text>
-  <text x="46" y="311">  masks, depth</text>
-  <text class="head" x="46" y="331">Result: v1</text>
+  <rect class="code" x="30" y="292" width="230" height="145" rx="8"/>
+  <text class="title" x="46" y="318">Automatic fit</text>
+  <text class="sub" x="46" y="336">harness code, no LLM</text>
+  <text x="46" y="358">Over the whole clip:</text>
+  <text x="46" y="376">· object → masks + depth</text>
+  <text x="46" y="394">· MANO hand → keypoints,</text>
+  <text x="46" y="411">  masks, depth</text>
+  <text class="head" x="46" y="429">Result: v1</text>
 
   <!-- reconstruction agent -->
   <rect class="agent" x="340" y="40" width="430" height="350" rx="10"/>
@@ -94,10 +101,11 @@
   <text x="888" y="738">report + export → viewer, retargeting</text>
 
   <!-- edges -->
-  <path class="edge" d="M145,132 L145,190"/>
-  <path class="edge" d="M260,240 L340,240"/>
-  <text class="lab" x="268" y="232">v1: start</text>
-  <path class="edge" d="M145,340 L145,555 L340,555"/>
+  <path class="edge" d="M145,122 L145,152"/>
+  <path class="edge" d="M145,262 L145,292"/>
+  <path class="edge" d="M260,340 L340,340"/>
+  <text class="lab" x="268" y="332">v1: start</text>
+  <path class="edge" d="M145,437 L145,555 L340,555"/>
   <text class="lab" x="158" y="545">v1: the baseline</text>
 
   <path class="edge" d="M770,100 L870,100"/>

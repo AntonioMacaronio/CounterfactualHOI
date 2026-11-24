@@ -46,7 +46,7 @@ Old pipeline in [`choir.md`](choir.md).
 
 How it works (four commands per clip: `prepare_clip.sh`, `first_mask.sh`, `CHOIR_STAGE1_ONLY=1 run_choir.sh`, then `run_fprecon.sh`):
 
-1. **Prep and gravity:** `prepare_clip.sh` imports the clip and runs GeoCalib for the gravity direction, which is the initial "up" direction. Gets refined by the agentic framework later.
+1. **Prep and gravity:** `prepare_clip.sh` imports the clip and runs GeoCalib for the gravity direction, which is the initial "up" direction. Gets refined by the agentic framework later using vector normal of the table plane.
 2. **Masks and mesh:** SAM3 (image model, text prompts such as `"mug,cup"`) segments the object and hand on every frame, replacing CHOIR's SAM2 tracks (those drifted: a "hand" on the whole table, a hand mask that swallowed the mug, an object mask missing the camera's black panel). SAM3D then builds a textured mesh from frame 0 (CHOIR's copy of SAM3D strips the texture and 95% of the triangles, which is why the earlier viewers looked bad).
 3. **Depth:** Depth Pro 2 gives metric depth for every frame, using CHOIR's camera focal length.
 4. **Scale from the hand:** compare the MANO hand's depth with the depth map on the visible hand pixels. Depth Pro 2 was already close to metric: the correction factor is 0.95–1.16 across clips.
@@ -69,7 +69,7 @@ The parameters the agent edits:
 - Phase labels: frame ranges for approach, grasp, carry, rotate, release and rest. These drive the constraints.
 - Object: an SE3 pose for every frame. Shape, the scale along each of the three fixed axes.
 - Hand: MANO parameters for every frame
-- Table: height and tilt.
+- Table: one plane for the whole clip (every frame's depth is anchored to it); the agent can re-fit it.
 
 
 | Type | Tools |
@@ -87,13 +87,14 @@ The tools above belong to the **reconstruction agent**. Two more agents check it
 ![The three agents of the refinement and how they interact](refine_agents.svg)
 
 Agentic Framework Loop:
-1. **Automatic fit (no LLM).** Before any agent runs, the harness fits the whole clip: the object to its masks and depth, then the MANO hand to its keypoints, masks and depth. This is v1. The reconstruction agent starts from it, and it is the baseline the verifier compares against.
-2. **Overview and phases.** The reconstruction agent gets an overview of v1: outline overlays on the video, side views, 3D views where the hand meets the object, metric plots with flagged frames, and the hand's paths. It labels the motion phases with `set_phases`. The harness then runs `fit_object_thickness` once.
-3. **Fix loop.** The agent fixes one issue at a time, with up to 60 turns or 40 minutes. Every edit makes a new version and returns before/after metrics and images of the frames it touched. The agent decides whether to keep the edit or revert it; the harness does not enforce a metric rule.
-4. **Reviewer gate.** When the agent calls `finish`, the reviewer checks the result in absolute terms: every phase against the video and in 3D from four sides, plus the hand's paths. If it finds high or medium problems, the finish is refused once: the agent gets the list, fixes what it can, and calls `finish` again.
-5. **Verifier and merge.** The harness finds the frame ranges the agent changed. The span in which the hand holds the object is one range; the rest is split at phase boundaries, at most 60 frames each. For each range the verifier sees the automatic fit and the agent's version in random A/B order and says which matches the video better. For the held span, what decides is whether the object is really held. Ranges where the automatic fit wins with confidence ≥ 0.6 are set back to it, and the seams are blended and smoothed. This stops the reconstruction agent from talking itself into an edit.
-6. **Second pass.** The reviewer checks the merged result. If high or medium problems remain, the reconstruction agent gets a second, shorter pass on them (25 turns or 20 minutes), verified against the first pass's result.
-7. **Outputs.** `final.npz`, `report.md` (the edits, the verifier's verdicts, the reviewer's findings, metrics for initial / automatic fit / final) and `export/` for the viewer and retargeting.
+1. **Table-anchored depth (no LLM).** The camera is static, but Depth Pro 2's metric scale drifts over a clip: the table's distance changes by up to ±12% between frames, and the depth on the object and the hand changes with it. The harness fits the table's plane in every frame and scales each frame's depth so that the table is one plane for the whole clip. The tracked object, the size of its mesh and the hand are carried along. Up is that plane's normal (`scripts/fprecon/depth_anchor.py`).
+2. **Automatic fit (no LLM).** The harness then fits the whole clip: the object to its masks and depth, then the MANO hand to its keypoints, masks and depth. This is v1. The reconstruction agent starts from it, and it is the baseline the verifier compares against.
+3. **Overview and phases.** The reconstruction agent gets an overview of v1: outline overlays on the video, side views, 3D views where the hand meets the object, metric plots with flagged frames, and the hand's paths. It labels the motion phases with `set_phases`. The harness then runs `fit_object_thickness` once.
+4. **Fix loop.** The agent fixes one issue at a time, with up to 60 turns or 40 minutes. Every edit makes a new version and returns before/after metrics and images of the frames it touched. The agent decides whether to keep the edit or revert it; the harness does not enforce a metric rule.
+5. **Reviewer gate.** When the agent calls `finish`, the reviewer checks the result in absolute terms: every phase against the video and in 3D from four sides, plus the hand's paths. If it finds high or medium problems, the finish is refused once: the agent gets the list, fixes what it can, and calls `finish` again.
+6. **Verifier and merge.** The harness finds the frame ranges the agent changed. The span in which the hand holds the object is one range; the rest is split at phase boundaries, at most 60 frames each. For each range the verifier sees the automatic fit and the agent's version in random A/B order and says which matches the video better. For the held span, what decides is whether the object is really held. Ranges where the automatic fit wins with confidence ≥ 0.6 are set back to it, and the seams are blended and smoothed. This stops the reconstruction agent from talking itself into an edit.
+7. **Second pass.** The reviewer checks the merged result. If high or medium problems remain, the reconstruction agent gets a second, shorter pass on them (25 turns or 20 minutes), verified against the first pass's result.
+8. **Outputs.** `final.npz`, `report.md` (the edits, the verifier's verdicts, the reviewer's findings, metrics for initial / automatic fit / final) and `export/` for the viewer and retargeting.
 
 After a round over all clips, `scripts/refine/post_round.sh` runs the reviewer three times per clip (the verdict is the majority), writes the summaries, and runs blind A/B comparisons of the round against the initial reconstruction, the automatic fit and the previous round.
 
@@ -118,8 +119,10 @@ We cast retargeting as an RL tracking problem with FlashDexRetarget (FDR): one p
    - Progress (AdaDex): share of the clip before the object first leaves 5 cm / 20° of the reconstruction.
    - Success: the whole clip within 5 cm / 20°.
 
+Training speed: `CFHOI_FAST=1` applies run-time patches that make an iteration 1.23x faster without changing what is learned, and more envs raise the env steps per second further (2.9x at 8192 envs). `CFHOI_SGS=1` optionally samples episode starts by their success rate. Details in `scripts/flashdex/README.md`.
+
 ## 1.4 Distill into robot policy with the following embodiment and I/O 
-From FlashDexRetarget, we have a policy that is capable of tracking any of the hand+object motions in our 3D reconstruction dataset. We need to distill this into a text conditioned policy that can pick, in-hand-rotate, and place objects of various geometries and appearances.
+From FlashDexRetarget, we have a policy that is capable of tracking any of the hand+object motions in our 3D reconstruction dataset. We need to distill this into a text conditioned flow matching policy (text will be only "pick", "rotate", "place") that can pick, in-hand-rotate, and place objects of various geometries and appearances.
 
 Imagine a Tianji 7 DoF arm with a 22 DoF sharpa connected to the end and a D405 on the wrist like there is in spd.bot. Since spd.bot uses a YAM, we have to mount the wrist camera on the palm side of the hand but it will be near the flange.
 
