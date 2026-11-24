@@ -138,13 +138,53 @@ Imagine a Tianji 7 DoF arm with a 22 DoF sharpa connected to the end and a D405 
 | Exo camera | Fixed depth camera viewing the workspace (see the exo camera section) |
 | Tactile | Not used |
 
-Here is the input design spec of the policy. The outputs are pretty simple, just the 29 joint angle action space.
+Here is the I/O design spec of the policy. 
  
 | # | Group | Contents | Frame / encoding | Dim (N = 29) |
 |---|---|---|---|---|
 | 1 | **Proprioception** | Last 3 frames of measured joint angles `q`, and last 3 frames of the policy's own joint targets `q*` | Each joint normalized to [-1, 1] by its limits | 3 × 2N = **174** |
-| 2 | **Object pose (current)** | Position (3) + rotation (6D: first two columns of the rotation matrix) | Robot base frame | **9** |
-| 3 | **Future object trajectory** | K = 5 waypoints spaced 100 ms apart (0.1–0.5 s ahead) | Each as a change from the current object pose | 5 × 9 = **45** |
-| 4 | **Future hand/arm trajectory** | Reference joint angles at the same 5 time points | Each as a change from current measured `q` | 5 × N = **145** |
-| 5 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | See the wrist camera section | latent **64** |
-| 6 | **Exo depth** | Depth image + validity mask → separate CNN encoder | See the exo camera section | latent **64** |
+| 2 | **Text command** | One of "pick", "rotate", "place": the stage of the task the policy should carry out now. In training it comes from the clip's phase labels (approach / grasp / lift → pick; rotate → rotate; carry / place / release / rest → place) | One-hot | **3** |
+| 3 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | See the wrist camera section | latent **64** |
+| 4 | **Exo depth** | Depth image + validity mask → separate CNN encoder | See the exo camera section | latent **64** |
+
+The outputs are pretty simple, just the 29 joint angle action chunk of 8 steps. We will execute the whole chunk in RL because FPO++ treats a chunk as one action. Action will be absolute joint targets, normalized by joint limits. We will sample with 10 flow steps with noise, and at deployment we will test 5 or 10 sampling steps from zero noise.
+
+### Training phases
+
+1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the FDR policy's joint targets for the next 8 steps. The text command comes from the clip's phase labels, looked up by time: the refinement labels phases in video frames (`runs/refine_<round>/VID/phases.json`), and the robot data is the same clip at 60 Hz.
+2. **RL finetuning (FPO++ + SGS):** finetune the flow-matching policy with an asymmetric actor-critic, where the critic receives privileged observations (below). The supervised loss stays on at the start with a decaying weight, so the first updates with an untrained critic do not undo stage 1. FPO++ runs with its per-sample ratio and plain PPO clipping: its asymmetric trust region did poorly with sparse rewards in the paper, and the success terms below are sparse.
+
+The policy gets no goal and no reference trajectory. "pick", "rotate" and "place" are three skills, each with its own definition of done, and where the object ends up does not matter. In RL the reference clips are only used to start episodes (SGS draws a clip and a start time) and for the supervised loss.
+
+An episode runs the commands in order: pick → rotate → place for the pick-rotate-place clips, pick → place for the pick-place clips. The command advances once the current one has been done for 0.2 s. An episode ends when "place" is done, on a failure, or when a command takes too long.
+
+#### Reward
+Computed per simulator step and summed over the 8 steps of a chunk. Only the rows of the current command are active.
+
+| Command | Term | Weight | Definition |
+|---|---|---|---|
+| pick | reach | `0.2` | fingertips close to the object's surface |
+| pick | lift | `0.5` | the object's height above where it rested, up to 3 cm |
+| pick | **done** | `1.0` | the object is at least 3 cm above the table, touched by the thumb and at least one other finger |
+| rotate | turn | `0.5` | how far the object has turned relative to the palm since the command began, up to 45° |
+| rotate | **done** | `1.0` | the object has turned at least 45° relative to the palm and is still held at least 3 cm above the table |
+| place | lower | `0.5` | the object's height above the table going down |
+| place | **done** | `1.0` | the object rests on the table (lowest point within 1 cm, nearly still), no part of the hand touches it, and the fingertips are at least 3 cm away |
+| all | action rate and within-chunk smoothness | small, negative | prevents jitter |
+| all | termination | `-50` (as in FDR) | the object is dropped during pick or rotate, or leaves the workspace |
+
+The thresholds come from the 10 real clips (round-10 reconstructions): every clip lifts the object at least 4 cm (4–26 cm), and every pick-rotate-place clip turns it at least 53° relative to the palm (53–179°). The weights are starting values.
+
+The human-like grasp is not rewarded. It comes from stage 1 and from the supervised loss kept during early RL.
+
+#### Critic inputs
+FPO++ is PPO-style, so the critic is a value function of the state at the start of each chunk. It keeps FDR's privileged state terms from `policy/config/obs_cfhoi_policy.yaml` and drops the reference terms, since the reward no longer depends on a reference:
+
+| Group | Contents |
+|---|---|
+| **Robot** | wrist pose and velocity; joint positions, velocities, and current targets; fingertip positions and velocities in the wrist frame |
+| **Object** | pose and velocity in the wrist frame; 128-point cloud |
+| **Contact** | contact force and location per hand link; object distance and surface normal at the palm and five fingertips |
+| **Task state (new)** | the text command as a one-hot; time since the command began; the object's height above the table; how far it has turned relative to the palm since "rotate" began |
+
+The task-state terms are included because the value depends on them and nothing else in the observation carries them.
