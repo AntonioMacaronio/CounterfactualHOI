@@ -208,8 +208,28 @@ def retarget_summary(rdir):
     w2 = stt.median(r["frames_within_2cm"] for r in fdr)
     succ = sum(bool(r["success"]) for r in fdr)
     steps = max((r.get("env_step") or 0) for r in fdr)
-    txt = ((f"<b>Status: early snapshot</b>, the policy after {steps / 1e6:.0f}M environment steps (still training; this "
-            f"section is refreshed from later evaluations). " if steps else "")
+    budget = None                                      # the run's step budget (its config.yaml, next to evals/)
+    cfg = os.path.join(os.path.dirname(os.path.dirname(fdr[0].get("archive", ""))), "config.yaml")
+    if os.path.exists(cfg):
+        m = re.search(r"^num_env_steps: (\d+)", open(cfg).read(), re.M)
+        budget = int(m.group(1)) if m else None
+    if steps and budget and steps >= 0.995 * budget:    # the run has finished: this is its last evaluation
+        e = lambda k: sum(r[k] for r in fdr) / len(fdr)
+        status = (f"<b>Status: the final policy of this run</b> ({steps / 1e6:.0f}M environment steps). Its object follows "
+                  f"the reconstruction to {e('obj_pos_err_cm_mean'):.2f} cm and {e('obj_rot_err_deg_mean'):.0f}° on average "
+                  f"and ends {e('final_obj_pos_err_cm'):.1f} cm / {e('final_obj_rot_err_deg'):.0f}° from it. ")
+        cv = os.path.join(os.path.dirname(cfg), "curves.json")       # eval_curves.py: mean progress per evaluation
+        if os.path.exists(cv):
+            c = json.load(open(cv))
+            late = [v["summary"]["track"]["progress"] for k, v in c.items() if int(k) >= steps - 100e6]
+            if len(late) >= 3:
+                status += (f"Evaluations late in training differ from one another by more than they gain (mean progress "
+                           f"{min(late):.0%}–{max(late):.0%} over the last 100M steps), so the progress numbers below are "
+                           "one sample. ")
+    else:
+        status = (f"<b>Status: early snapshot</b>, the policy after {steps / 1e6:.0f}M environment steps (still training; this "
+                  f"section is refreshed from later evaluations). " if steps else "")
+    txt = (status
            + f"Over the {len(fdr)} clips the policy tracks a median <b>{prog:.0%}</b> of each clip before the object "
            f"first leaves 5 cm / 20° of the reconstruction (AdaDex's progress); <b>{succ}/{len(fdr)}</b> clips stay within "
            f"it for the whole clip; the object is within 2 cm of the reconstruction on a median {w2:.0%} of frames")
@@ -453,7 +473,14 @@ mug's handle is not counted, see the reviewer); object mask IoU {rmed["iou"][0]:
 <p class="more"><a href="recon/agent/index.html">→ Before / after, side by side for each clip (and all 10 refined viewers, with captions, QC frames and the agent's reports)</a></p>
 """
     rsum = retarget_summary(os.path.join(out, "recon", "retarget"))
-    retarget_note = (f" The policy was trained on the previous refinement round ({', '.join(sorted(set(retarget_round)))}), "
+    fdr_logs = os.path.join(os.environ.get("FDR", os.path.join(STORAGE, "build", "FlashDexRetarget")), "logs", "flashsac")
+    next_run = os.path.isdir(fdr_logs) and any(d.startswith(f"cfhoi_r{ROUND}") for d in os.listdir(fdr_logs))
+    retarget_note = (f" The policy was trained on an earlier refinement round ({', '.join(sorted(set(retarget_round)))}), "
+                     "which is what its page shows on the left. Its hand jitters: nothing in that run's reward penalised "
+                     f"fast changes of the action. A run on round {ROUND} (section 4 above), with a small reward on the "
+                     "action's rate of change, is training now, and this section will switch to it."
+                     if retarget_round and next_run else
+                     f" The policy was trained on the previous refinement round ({', '.join(sorted(set(retarget_round)))}), "
                      "which is what its page shows on the left; section 4 above is a newer round, and retargeting it is "
                      "the next step." if retarget_round else "")
     retarget_section = "" if not os.path.exists(os.path.join(out, "recon", "retarget", "index.html")) else f"""
