@@ -239,6 +239,55 @@ def retarget_summary(rdir):
     return txt + "."
 
 
+def next_retarget_run(rnd):
+    """What to say about the FlashDexRetarget run on refinement round `rnd` that tab 5 does not show yet: "" when
+    there is none, else a sentence on its state (training / paused at N steps / finished) and, when a control run
+    without the action-rate reward exists, how much that reward smooths the actions at their last common
+    evaluation (eval/action_rate_l2 in metrics.jsonl) and what it costs in tracking (curves.json)."""
+    logs = os.path.join(os.environ.get("FDR", os.path.join(STORAGE, "build", "FlashDexRetarget")), "logs", "flashsac")
+    runs = {}
+    for d in sorted(os.listdir(logs)) if os.path.isdir(logs) else []:
+        mj, cf = os.path.join(logs, d, "metrics.jsonl"), os.path.join(logs, d, "config.yaml")
+        if not d.startswith(f"cfhoi_r{rnd}") or not os.path.exists(mj) or not os.path.exists(cf):
+            continue
+        cfg = open(cf).read()
+        rows = [json.loads(ln) for ln in open(mj)]
+        ev = {int(r["step"]): r["eval/action_rate_l2"] for r in rows if "eval/action_rate_l2" in r}
+        cv = os.path.join(logs, d, "curves.json")
+        prog = {int(k): v["summary"]["track"]["progress"] for k, v in json.load(open(cv)).items()} if os.path.exists(cv) else {}
+        budget = re.search(r"^num_env_steps: (\d+)", cfg, re.M)
+        runs[d] = dict(smooth=re.search(r"^\s+action_rate: -", cfg, re.M) is not None, ev=ev, prog=prog,
+                       steps=max([int(r.get("step", 0)) for r in rows] + [0]), budget=int(budget.group(1)) if budget else 0,
+                       stopped=any(x.startswith("stop") for x in os.listdir(os.path.join(logs, d))),
+                       age=time.time() - os.path.getmtime(mj))
+    sm = [r for r in runs.values() if r["smooth"]]
+    if not sm:
+        return ""
+    a = max(sm, key=lambda r: r["steps"])
+    if a["budget"] and a["steps"] >= 0.995 * a["budget"]:
+        state = "has finished, and this section will switch to it"
+    elif a["stopped"] and a["age"] > 1800:
+        state = (f"is paused at {a['steps'] / 1e6:.0f}M of {a['budget'] / 1e6:.0f}M steps, and this section will switch "
+                 "to it when it has finished")
+    else:
+        state = "is training now, and this section will switch to it"
+    txt = (f" A run on round {rnd} (section 4 above), with a small reward on the action's rate of change, {state}.")
+    ctl = [r for r in runs.values() if not r["smooth"] and set(r["ev"]) & set(a["ev"])]
+    if ctl:
+        b = max(ctl, key=lambda r: r["steps"])
+        k = max(set(a["ev"]) & set(b["ev"]))
+        last = sorted(set(a["prog"]) & set(b["prog"]))[-4:]
+        if b["ev"][k] > 0 and a["ev"][k] > 0:
+            txt += (f" At {k / 1e6:.0f}M steps its actions change {b['ev'][k] / a['ev'][k]:.0f} times less from step to step "
+                    f"than the same run without that reward (action rate {a['ev'][k]:.2f} against {b['ev'][k]:.2f})"
+                    + ".")
+            if len(last) >= 2:                         # tracking, over the evaluations both runs have
+                pa, pb = (sum(r["prog"][x] for x in last) / len(last) for r in (a, b))
+                txt += (f" Its mean progress over the last {len(last)} evaluations both runs have is {pa:.0%} against {pb:.0%}"
+                        + (", a difference within what single evaluations vary by." if abs(pa - pb) < 0.08 else "."))
+    return txt
+
+
 def video_gallery(out):
     man = os.path.join(OUTPUTS, "minimax_h3", "manifest.jsonl")
     if not os.path.exists(man):
@@ -473,12 +522,10 @@ mug's handle is not counted, see the reviewer); object mask IoU {rmed["iou"][0]:
 <p class="more"><a href="recon/agent/index.html">→ Before / after, side by side for each clip (and all 10 refined viewers, with captions, QC frames and the agent's reports)</a></p>
 """
     rsum = retarget_summary(os.path.join(out, "recon", "retarget"))
-    fdr_logs = os.path.join(os.environ.get("FDR", os.path.join(STORAGE, "build", "FlashDexRetarget")), "logs", "flashsac")
-    next_run = os.path.isdir(fdr_logs) and any(d.startswith(f"cfhoi_r{ROUND}") for d in os.listdir(fdr_logs))
+    next_run = next_retarget_run(ROUND) if retarget_round else ""
     retarget_note = (f" The policy was trained on an earlier refinement round ({', '.join(sorted(set(retarget_round)))}), "
                      "which is what its page shows on the left. Its hand jitters: nothing in that run's reward penalised "
-                     f"fast changes of the action. A run on round {ROUND} (section 4 above), with a small reward on the "
-                     "action's rate of change, is training now, and this section will switch to it."
+                     "fast changes of the action." + next_run
                      if retarget_round and next_run else
                      f" The policy was trained on the previous refinement round ({', '.join(sorted(set(retarget_round)))}), "
                      "which is what its page shows on the left; section 4 above is a newer round, and retargeting it is "
