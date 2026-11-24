@@ -344,7 +344,7 @@ def main():
                         w[ch["winner"]] += 1
             held_note = f"; on the spans in which the hand holds the object, on {w['b']} of {sum(w.values())} clips"
     jumps, shaped = [0, 0], []                         # frames where a fingertip jumps, summed over the clips; shape changes
-    drift, tilts = [], []                              # depth anchoring: the table's distance range per clip, table vs GeoCalib
+    drift, tilts, sizes, across = [], [], [], []       # depth anchoring: the table's distance range per clip, table vs GeoCalib, mesh factor; scales across the view
     sdir = os.path.join(out, "recon", "agent", "summary")
     for f in sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []:
         sm = json.load(open(os.path.join(sdir, f)))
@@ -354,12 +354,21 @@ def main():
         if da:
             drift.append(100 * (da["table_distance_vs_reference"][2] - da["table_distance_vs_reference"][0]))
             tilts.append(da["tilt_vs_geocalib_deg"])
+            sizes.append(da["mesh_scale"])
         sc = sm.get("object_scale") or [1, 1, 1]
         if abs(sc[0] - 1) > 0.01:
             e = sm["object_extent_cm"]
             shaped.append(f"{f[:-5].replace('_anthony_real', '')} {e[0][0]:.1f} → {e[1][0]:.1f} cm")
+        for k in (1, 2):
+            if abs(sc[k] - 1) > 0.01:
+                across.append(f"{f[:-5].replace('_anthony_real', '')} ×{sc[k]:.2f}")
     shape_note = (("The object's extent along the first frame's viewing direction was changed on: " + ", ".join(shaped) + ". ")
                   if shaped else "No object's shape was changed. ")
+    if across:
+        shape_note += "The agent scaled an extent across that view on: " + ", ".join(across) + ". "
+    if sizes:
+        shape_note += (f"Before that, the depth anchoring scaled every mesh as a whole, by ×{min(sizes):.2f} to ×{max(sizes):.2f} "
+                       "(the first frame's depth scale against the clip's). ")
     anchor_note = f" by {min(drift):.0f}–{max(drift):.0f}% over a clip" if drift else ""
     tilt_note = f"{min(tilts):.1f}–{max(tilts):.1f}°" if tilts else "a few degrees"
     agent_section = "" if not rtable else f"""
