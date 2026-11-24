@@ -31,7 +31,8 @@ def main():
     for vid in sys.argv[1:]:
         o = os.path.join(root, vid)
         clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
-                    table=None if os.environ.get("REFIT_TABLE") else os.path.join(o, "table_fit.json"))
+                    table=None if os.environ.get("REFIT_TABLE") else os.path.join(o, "table_fit.json"),
+                    anchor=os.path.join(o, "depth_anchor.json"))
         phases = json.load(open(os.path.join(o, "phases.json")))
         rep = open(os.path.join(o, "report.md")).read()
         edits = {int(k): n for k, n in re.findall(r"^- v(\d+): (.*)$", rep, flags=re.M)}

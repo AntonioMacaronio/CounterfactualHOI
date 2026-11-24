@@ -60,6 +60,17 @@ REPORT_KEYS = ["coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bi
                "finger_accel_deg", "obj_ang_accel_deg",
                "thumb_gap_cm", "n_touching", "opposed"]
 
+# The system prompt's paragraph on the table: with the depth as it is (--raw-depth, rounds 1-9) and with table-anchored depth
+TABLE_RAW = """- Table: up for the world axes, the side / top / front views and the export is the normal of the table plane, fitted
+  to the depth points around the object where it rests at the start and at the end of the clip (GeoCalib's gravity
+  estimate is only its starting point; the depth map's table is not exactly one plane, so the plane is fitted through
+  both places). Heights are measured from that plane right around the object."""
+TABLE_ANCHORED = """- Depth and table: the camera is static, but the depth estimator's scale drifts over a clip (in its own depth the
+  table would move several centimetres nearer and farther, and the object and the hand with it). So every frame's
+  depth has been scaled so that the table is one and the same plane in all frames, and the tracked object and hand
+  were moved along with it. Up for the world axes, the side / top / front views and the export is that plane's
+  normal (GeoCalib's gravity estimate only helps to find the table). Heights are measured from the table right
+  around the object, which agrees with that plane to about a millimetre."""
 SYSTEM = """You refine a 4D reconstruction of a hand manipulating a rigid object, filmed by a static camera. The
 reconstruction will be retargeted to a robot hand and simulated, so it must match the video and be physically
 plausible: the object rests on the table when nobody holds it, is held by the hand while carried, never interpenetrates
@@ -104,10 +115,7 @@ How to read the images:
   video shows the object (the real fingers are behind it there); obj_over_hand the share that is hidden behind the
   object where the video shows the hand. Both should be ~0; a flag at 5%. This is direct evidence from the video
   of which side of the object the fingers are on, which the depth map cannot give at this scale.
-- Table: up for the world axes, the side / top / front views and the export is the normal of the table plane, fitted
-  to the depth points around the object where it rests at the start and at the end of the clip (GeoCalib's gravity
-  estimate is only its starting point; the depth map's table is not exactly one plane, so the plane is fitted through
-  both places). Heights are measured from that plane right around the object.
+@@TABLE@@
 - Shape: obj_height_cm at rest says whether the object sits on the table (0), in it (< 0) or above it. An object that
   rests in the table by the same amount in every rest phase while its outline and depth fit, or that the hand can only
   grip by leaving its keypoints (the fingers cannot get behind it, the hand stays in front of the depth map:
@@ -270,7 +278,7 @@ TOOLS = [
     tool("scale_object", "Scale the object's mesh (factor < 1 = smaller) along 'unseen' (the first frame's viewing direction: the extent that frame could not see) or 'seen_long' / 'seen_short' (its longer / shorter extent across that view). The side facing the camera stays in place; the object's poses are re-fitted to mask + depth and the hand is re-fitted over the whole clip.",
          {"axis": {"type": "string", "enum": ["unseen", "seen_long", "seen_short"]}, "factor": {"type": "number", "description": "0.3-3 (e.g. 0.5 halves that extent)"}}),
     tool("fit_table", "Re-fit the table plane from the depth around the object in the frames you give: one plane through the table around the object in all of them (choose frames where the table around the object is visible, from every rest phase). Up for edits, views and the export is the table's normal. Use it when the table drawn in the side views is not where the video's table is under the object at rest.",
-         {"frames": {"type": "array", "items": INT, "description": "1-8 frames"}}),
+         {"frames": {"type": "array", "items": INT, "description": "1-8 frames; none = back to the automatic plane"}}),
     tool("propose_object_poses", "The pose tracker's top-k alternative object poses at a frame, rendered for you to choose from.",
          {"frame": INT, "k": {"type": "integer", "description": "2-9"}}),
     tool("apply_candidate", "Use candidate c (from propose_object_poses) at frame and apply the same change on [start, end].",
@@ -537,6 +545,7 @@ class Session:
             fr = sorted({cl(i) for i in a["frames"][:8]})
             before = self.metrics_of(self.v.cur)
             note = c.fit_table(st, fr)
+            fr = fr or [0, c.N - 1]
             self.m.clear()                               # heights of every version are measured against the table
             self.table_note = note
             rows = self.metrics_of(self.v.cur)
@@ -710,7 +719,8 @@ def agent_loop(sess, client, args, log, first=None, max_turns=None, max_minutes=
     t_start = time.time()
     for turn in range(max_turns):
         t0 = time.time()
-        r = call(client, args, log, system=SYSTEM, tools=TOOLS, messages=msgs, context_management=ctx)
+        r = call(client, args, log, system=SYSTEM.replace("@@TABLE@@", TABLE_ANCHORED if sess.clip.anchor_info else TABLE_RAW),
+                 tools=TOOLS, messages=msgs, context_management=ctx)
         msgs.append({"role": "assistant", "content": r.content})
         uses = [b for b in r.content if b.type == "tool_use"]
         think = " ".join(b.thinking for b in r.content if b.type == "thinking" and b.thinking)
@@ -1005,19 +1015,34 @@ def merge_text(clip, final, seams):
 
 def write_scaled_obj(clip, scale, src, dst):
     """The reconstructed OBJ with its vertices (and normals) scaled along the object's shape axes about its centre
-    (Clip.scaled); texture coordinates, faces and the material reference are kept as they are."""
+    (Clip.scaled), after the uniform size factor of the depth anchoring (Clip.mesh_scale); texture coordinates, faces
+    and the material reference are kept as they are."""
     B, c = clip.shape_axes, clip.center_obj
     S, Sn = B @ np.diag(scale) @ B.T, B @ np.diag(1.0 / np.asarray(scale)) @ B.T
     with open(src) as fi, open(dst, "w") as fo:
         for ln in fi:
             if ln.startswith("v "):
                 t = ln.split()
-                v = c + S @ (np.array(t[1:4], float) - c)
+                v = c + S @ (clip.mesh_scale * np.array(t[1:4], float) - c)   # mesh_scale: the depth anchoring's size factor
                 ln = "v " + " ".join(f"{x:.6f}" for x in v) + (" " + " ".join(t[4:]) if len(t) > 4 else "") + "\n"
             elif ln.startswith("vn "):
                 n = Sn @ np.array(ln.split()[1:4], float)
                 ln = "vn " + " ".join(f"{x:.6f}" for x in n / max(np.linalg.norm(n), 1e-12)) + "\n"
             fo.write(ln)
+
+
+def depth_text(clip):
+    """The report's paragraph on the depth anchoring ("" when the depth maps are used as they are)."""
+    a = clip.anchor_info
+    if not a:
+        return ""
+    lo, _, hi = a["table_distance_vs_reference"]
+    return ("\n\nDepth: every frame's depth is scaled so that its table lies on one plane (the camera is static, but the "
+            f"depth estimator's scale drifts: in the frames' own depth the table is {a['table_rms_cm']:.2f} cm rms off a plane "
+            f"within a frame, while its distance ranges from x{lo:.3f} to x{hi:.3f} of the reference over the clip, and the "
+            "depth on the object moves with it). The tracked object and hand were moved along their viewing rays with "
+            f"it (object x{a['object_factor'][0]:.3f} to x{a['object_factor'][2]:.3f}), and the mesh, sized in frame 0's depth, "
+            f"was scaled x{a['mesh_scale']:.3f}.")
 
 
 def export(clip, state, out):
@@ -1043,13 +1068,13 @@ def export(clip, state, out):
             continue
         if os.path.lexists(dst):
             os.remove(dst)                               # a link or a scaled copy from an earlier export
-        if np.allclose(scale, 1):
+        if np.allclose(scale, 1) and clip.mesh_scale == 1.0:
             os.symlink(src, dst)
         elif f.endswith(".obj"):
             write_scaled_obj(clip, scale, src, dst)
         else:
             clip.mesh.export(dst)
-    json.dump({"scale": scale.tolist(), "axes": list(SHAPE_AXES), "axes_object_frame": clip.shape_axes.T.tolist(),
+    json.dump({"scale": scale.tolist(), "mesh_scale": clip.mesh_scale, "axes": list(SHAPE_AXES), "axes_object_frame": clip.shape_axes.T.tolist(),
                "center": clip.center_obj.tolist(), "extent_cm_reconstructed": (100 * clip.shape_extent0).tolist(),
                "extent_cm": (100 * clip.shape_extent).tolist(), "extent_cm_long_mid_short": (100 * clip.extent).tolist()},
               open(os.path.join(ex, "object_shape.json"), "w"), indent=1)
@@ -1064,12 +1089,9 @@ def export(clip, state, out):
     rest = [i for i in range(clip.N) if phase_of(state, i) in ("approach", "release", "rest")]
     low = [float((clip.sub_v @ state.obj[i, :3, :3].T + state.obj[i, :3, 3]).dot(n).min()) for i in rest]
     meas = [clip.local_table_c(state, i) for i in rest]
-    # each stretch of rest frames counts the same (the object rests in two places, before the grasp and after the
-    # release; the longer stretch must not decide alone)
-    spans = [[rest[0]]] if rest else []
-    for i in rest[1:]:
-        spans[-1].append(i) if i == spans[-1][-1] + 1 else spans.append([i])
-    per = [float(np.median([low[rest.index(i)] for i in sp])) for sp in spans]
+    # each stretch of rest counts the same (the object rests in two places, before the grasp and after the release;
+    # the longer stretch must not decide alone)
+    per = [float(np.median([low[rest.index(i)] for i in range(a_, b_ + 1)])) for a_, b_ in ops.rest_stretches(state, clip.N)]
     c = float(np.mean(per)) if low else float(n @ clip.table_p)
     json.dump({"normal_up": n.tolist(), "offset": c, "point": (c * n).tolist(),
                "rest_offset_vs_measured_cm": 100 * float(np.median(np.subtract(low, meas))) if low else None,
@@ -1082,6 +1104,12 @@ def export(clip, state, out):
     # the fitted plane itself (table.json is that plane moved to the object's resting height), for Clip(table=...)
     json.dump({"normal": clip.table_n.tolist(), "point": clip.table_p.tolist(), "info": clip.table_info},
               open(os.path.join(out, "table_fit.json"), "w"), indent=1)
+    # the depth anchoring (each frame's depth scaled onto one table plane), for Clip(anchor=...) and the viewer
+    clip.save_anchor(os.path.join(out, "depth_anchor.json"))
+    if os.path.lexists(os.path.join(ex, "depth_anchor.json")):
+        os.remove(os.path.join(ex, "depth_anchor.json"))
+    if os.path.exists(os.path.join(out, "depth_anchor.json")):
+        os.symlink(os.path.join(out, "depth_anchor.json"), os.path.join(ex, "depth_anchor.json"))
 
 
 def main():
@@ -1099,6 +1127,8 @@ def main():
     ap.add_argument("--max-turns2", type=int, default=25, help="turns of a later pass")
     ap.add_argument("--max-minutes2", type=float, default=20, help="minutes of a later pass")
     ap.add_argument("--no-verify", action="store_true")
+    ap.add_argument("--raw-depth", action="store_true",
+                    help="use the depth maps as they are (rounds 1-9) instead of scaling every frame's depth onto one table plane")
     ap.add_argument("--no-critic", action="store_true", help="skip the absolute reviewer (before finish and on the result)")
     ap.add_argument("--start", default="auto", choices=["auto", "initial"],
                     help="auto: start the agent from the search tools run over the whole clip (v1) and verify against it")
@@ -1120,7 +1150,8 @@ def main():
             print(f"   {rec['note']}", flush=True)
 
     t0 = time.time()
-    clip = Clip(args.video_dir, args.run_dir)
+    clip = Clip(args.video_dir, args.run_dir, anchor=None if args.raw_depth else "fit")
+    clip.save_anchor(os.path.join(args.out, "depth_anchor.json"))
     sess = Session(clip, args.out, args)
     client = AnthropicBedrock(aws_region=args.region)
     if not args.no_critic:
@@ -1188,8 +1219,10 @@ def main():
               f"\n\nObject shape: x{shape[0]:.2f} of the reconstructed mesh along the first frame's viewing direction (the unseen "
               f"extent), x{shape[1]:.2f} / x{shape[2]:.2f} across it; the object is {' x '.join(f'{100 * e:.1f}' for e in clip.extent)} cm "
               "along its long / mid / short axes.\n" + (sess.shape_table or "No thickness search ran.")
+              + depth_text(clip)
               + f"\n\nTable: {clip.table_info['source']}"
-              + (f" ({clip.table_info['points']} points, {clip.table_info['rms_cm']:.2f} cm rms off the plane)" if clip.table_info["rms_cm"] is not None else "")
+              + ((f" ({clip.table_info['points']} points, {clip.table_info['rms_cm']:.2f} cm rms off the plane)" if clip.table_info["points"] else
+                  f" ({clip.table_info['rms_cm']:.2f} cm rms off it within a frame)") if clip.table_info["rms_cm"] is not None else "")
               + f"; its normal is up, {clip.table_info['tilt_vs_geocalib_deg']:.1f} deg from GeoCalib's gravity estimate."
               + (f" {sess.table_note}" if sess.table_note else "")
               + "\n\n" + "\n\n".join(sections)

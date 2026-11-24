@@ -7,8 +7,10 @@ The Dyn-HaMR hand (CHOIR stage 1: stage1/hand/hand_meshes/[<side>/]hand_NNNNN.ob
 through MANO's size prior, so its depth is the scale reference (masks: SAM3 when present, else CHOIR's SAM2; see masks.py). Per frame, the hand's camera-facing vertices
 (z-buffered on a coarse pixel grid) that project inside the SAM2 hand mask (eroded, to stay off the silhouette
 edge where depth mixes hand and table, and minus the object mask, which SAM2's hand mask sometimes swallows) are compared with the depth map at their pixels; the per-frame scale is
-the median of z_hand / z_depth, and the clip scale is the median over frames, since the camera is static and Depth
-Pro 2 is temporally consistent. Writes OUT/hand_scale.json (scale, per-frame scales and their spread).
+the median of z_hand / z_depth, and the clip scale is the median over frames (the camera is static). Depth Pro 2's
+scale is not constant over a clip: the table's distance in its depth changes by up to +-12% from frame to frame,
+and the per-frame scales here follow it. The refinement corrects that with the table (depth_anchor.py); this step
+only sets the clip's one metric scale. Writes OUT/hand_scale.json (scale, per-frame scales and their spread).
 """
 
 import argparse

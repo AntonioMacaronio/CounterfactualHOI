@@ -24,6 +24,9 @@ for v in "${V[@]}"; do
   mkdir -p "$R/refine_${TAG}_auto/$v"
   cp "$R/refine_$TAG/$v/versions/v001.npz" "$R/refine_${TAG}_auto/$v/final.npz"
   cp "$R/refine_$TAG/$v/phases.json" "$R/refine_${TAG}_auto/$v/"
+  for f in depth_anchor.json table_fit.json; do          # the round's depth handling and table, for compare.py
+    [ -f "$R/refine_$TAG/$v/$f" ] && cp "$R/refine_$TAG/$v/$f" "$R/refine_${TAG}_auto/$v/"
+  done
 done
 pids=()
 for ((g = 0; g < NGPU && g < ${#V[@]}; g++)); do           # clips round-robin over the GPUs

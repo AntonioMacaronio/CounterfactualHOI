@@ -48,15 +48,24 @@ def main():
     client = AnthropicBedrock(aws_region=args.region)
     total = {"a": 0, "b": 0, "tie": 0}
     for vid in args.vids:
-        clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
-                    table=os.path.join(STORAGE, "runs", args.b, vid, "table_fit.json"))   # b's table when it has its own
+        rd = lambda root: os.path.join(STORAGE, "runs", root, vid)
+        mk = lambda root: Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
+                               table=os.path.join(rd(root), "table_fit.json"), anchor=os.path.join(rd(root), "depth_anchor.json"))
+        clip = mk(args.b)                                 # b's table and depth handling
         sa, sb = load(clip, args.a, vid), load(clip, args.b, vid)
+        anch = lambda root: os.path.exists(os.path.join(rd(root), "depth_anchor.json"))
+        clip_a = clip
+        if args.a != "initial" and anch(args.a) != anch(args.b):
+            # a's states live in another depth (as it is vs table-anchored: other positions and mesh size): a is
+            # rendered and measured in its own clip (render.py takes the clip a state carries)
+            clip_a = mk(args.a)
+            sa._clip = clip_a
         phases = sb.phases or sa.phases or [{"start": 0, "end": clip.N - 1, "label": "all"}]
         runs = chunks([0, clip.N - 1], phases)
         # verify_run(s0, s1) labels s1 "refined": here s0 = a, s1 = b; with both versions' per-frame metrics it also
         # shows the judge a plot of the motion (jitter / drift at rest that still frames do not show)
         sb.phases = phases
-        ra, rb = clip.metrics(sa), clip.metrics(sb)
+        ra, rb = clip_a.metrics(sa), clip.metrics(sb)
         with ThreadPoolExecutor(4) as ex:
             res = list(ex.map(lambda rn: verify_run(client, args, clip, sa, sb, rn, out, vid, ra, rb), runs))
         rows, wins = [], {"a": 0, "b": 0, "tie": 0}

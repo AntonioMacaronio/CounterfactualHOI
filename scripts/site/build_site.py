@@ -13,9 +13,9 @@ a link to all of that method's viewers:
   4. agentic refinement of 3 (Claude edits MANO + object poses, a blind verifier checks) -> recon/agent/
   5. the refined motions retargeted to the Sharpa hand in simulation (FlashDexRetarget) -> recon/retarget/
 then the generated-video gallery (videos/) and the first retargeting test (img/). Sources: ../outputs/{recon_viser,
-choir_viser,fprecon_viser,refine_viser_r9,flashdex_viser,minimax_h3} (scripts/daid/build_recon_html.py,
+choir_viser,fprecon_viser,refine_viser_r<ROUND>,flashdex_viser,minimax_h3} (scripts/daid/build_recon_html.py,
 scripts/choir/build_choir_html.py [--method fprecon|refine], scripts/flashdex/build_flashdex_html.py), the refinement
-comparisons in $PROJECT_STORAGE_ROOT/runs/compare/*_final9 (scripts/refine/compare.py --tag final9) and
+comparisons in $PROJECT_STORAGE_ROOT/runs/compare/*_final<ROUND> (scripts/refine/compare.py --tag final<ROUND>) and
 ../videos/grid2x2.mp4. The
 viser viewers are self-contained HTML files, so the site is
 plain static files (plus .nojekyll so GitHub Pages serves them untouched). Re-run after new results.
@@ -35,6 +35,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(HERE))
 WORKDIR = os.path.dirname(PROJECT_ROOT)
 OUTPUTS = os.path.join(WORKDIR, "outputs")
 STORAGE = os.environ.get("PROJECT_STORAGE_ROOT", "/data/sky/projects/CounterfactualHOI")
+ROUND, PREV = 10, 9                                    # the refinement round the site shows, and the one it is compared with
 sys.path.insert(0, os.path.join(PROJECT_ROOT, "scripts", "daid"))
 from build_recon_html import EXAMPLES as DAID_CLIPS, RECON as DAID_RUNS, camera_query, caption as daid_caption  # noqa: E402
 
@@ -170,13 +171,13 @@ def refine_table(rdir):
 
 def ablation_rows():
     """Blind A/B comparisons (scripts/refine/compare.py) as (label a, label b, wins a, wins b, ties)."""
-    names = {"initial": "initial (no refinement)", "refine_r9_auto": "automatic fit only (no agent)",
-             "refine_r8": "previous round (fixed object shape, GeoCalib's up, one agent pass)",
-             "refine_r9": "automatic fit + agent (final)"}
+    names = {"initial": "initial (no refinement)", f"refine_r{ROUND}_auto": "automatic fit only (no agent)",
+             f"refine_r{PREV}": "previous round (the depth maps as estimated, the table fitted through two frames)",
+             f"refine_r{ROUND}": "automatic fit + agent (final)"}
     out = []
     root = os.path.join(STORAGE, "runs", "compare")
     for d in sorted(os.listdir(root)) if os.path.isdir(root) else []:
-        if not d.endswith("_final9"):                  # the final runs (judge with 3D views, paths + motion plot); others: earlier rounds
+        if not d.endswith(f"_final{ROUND}"):           # the final runs (judge with 3D views, paths + motion plot); others: earlier rounds
             continue
         js = [json.load(open(os.path.join(root, d, f))) for f in sorted(os.listdir(os.path.join(root, d))) if f.endswith(".json")]
         if not js:
@@ -251,7 +252,7 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", default=os.path.join(WORKDIR, "CounterfactualHOI-site"))
     ap.add_argument("--featured", default="prp_anthony_real_4", help="real clip shown for CHOIR and ours")
-    ap.add_argument("--refine", default="refine_viser_r9", help="outputs/ dir of the agent-refined viewers")
+    ap.add_argument("--refine", default=f"refine_viser_r{ROUND}", help="outputs/ dir of the agent-refined viewers")
     ap.add_argument("--retarget", default="flashdex_viser", help="outputs/ dir of the retargeted motions")
     args = ap.parse_args()
     out, feat = args.out, args.featured
@@ -330,7 +331,7 @@ def main():
     held_note = ""                                     # the held spans in the comparison with the previous round
     cdir = os.path.join(STORAGE, "runs", "compare")
     for d in sorted(os.listdir(cdir)) if os.path.isdir(cdir) else []:
-        if d.endswith("_final9") and d.startswith("refine_r8_vs_"):
+        if d.endswith(f"_final{ROUND}") and d.startswith(f"refine_r{PREV}_vs_"):
             w = {"a": 0, "b": 0, "tie": 0}
             for f in sorted(os.listdir(os.path.join(cdir, d))):
                 sj = os.path.join(out, "recon", "agent", "summary", f)
@@ -343,17 +344,24 @@ def main():
                         w[ch["winner"]] += 1
             held_note = f"; on the spans in which the hand holds the object, on {w['b']} of {sum(w.values())} clips"
     jumps, shaped = [0, 0], []                         # frames where a fingertip jumps, summed over the clips; shape changes
+    drift, tilts = [], []                              # depth anchoring: the table's distance range per clip, table vs GeoCalib
     sdir = os.path.join(out, "recon", "agent", "summary")
     for f in sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []:
         sm = json.load(open(os.path.join(sdir, f)))
         j = sm.get("jump_frames") or [0, 0]
         jumps = [jumps[0] + j[0], jumps[1] + j[1]]
+        da = sm.get("depth_anchor")
+        if da:
+            drift.append(100 * (da["table_distance_vs_reference"][2] - da["table_distance_vs_reference"][0]))
+            tilts.append(da["tilt_vs_geocalib_deg"])
         sc = sm.get("object_scale") or [1, 1, 1]
         if abs(sc[0] - 1) > 0.01:
             e = sm["object_extent_cm"]
             shaped.append(f"{f[:-5].replace('_anthony_real', '')} {e[0][0]:.1f} → {e[1][0]:.1f} cm")
     shape_note = (("The object's extent along the first frame's viewing direction was changed on: " + ", ".join(shaped) + ". ")
                   if shaped else "No object's shape was changed. ")
+    anchor_note = f" by {min(drift):.0f}–{max(drift):.0f}% over a clip" if drift else ""
+    tilt_note = f"{min(tilts):.1f}–{max(tilts):.1f}°" if tilts else "a few degrees"
     agent_section = "" if not rtable else f"""
 <h2>4 · Agentic refinement of our reconstructions</h2>
 <p>An agent refines the reconstruction by looking at it against the video and editing its parameters with tools. The
@@ -361,9 +369,17 @@ hand is only ever the MANO hand model's parameters (per frame its global orienta
 rotations, plus one hand shape per clip): no tool edits mesh vertices, so the hand always stays a valid human hand
 that a retargeter can read. The object is its pose per frame and its shape: the mesh is reconstructed from the first
 frame only, so its extent along the direction that frame looked along (the side it never saw) is a guess, and a
-scale along that direction (and across it) is part of the reconstruction. Up is the normal of the table: one plane
-fitted to the depth points around the object where it rests at the start and at the end of the clip (the depth
-map's table is not exactly one plane; GeoCalib's gravity estimate is 3–7° from this plane on our clips). Per clip:</p>
+scale along that direction (and across it) is part of the reconstruction.</p>
+<p><b>One table for the whole clip.</b> The camera is static (background points move less than 4 px over a clip),
+but the depth estimator's metric scale is not: in each frame's own depth map the table is flat to about 2 mm, yet its
+distance from the camera changes from frame to frame{anchor_note}, mostly while the hand is in the scene, and
+the depth on the object and the hand changes with it (while the object rests, the depth on it follows the table's with
+slope 1, as if it moved up to 9 cm along the view). The table does not move, so it calibrates every frame: each
+frame's depth is scaled so that its table lies on one common plane, and the tracked object (its poses and the size of
+its mesh, which was measured in the first frame) and the hand are carried along. After that the table measured right
+around the object agrees with the one plane to about a millimetre wherever the object rests, and the object's two
+resting places agree on its height. Up is that plane's normal ({tilt_note} from GeoCalib's gravity estimate on our
+clips). Per clip:</p>
 <ol>
 <li><b>Automatic fit (no LLM).</b> The object's 6-DoF pose is fitted frame by frame to its SAM3 mask outside the
 hand and the depth (a search within a trust region, smoothed over time), and its poses are lightly smoothed (5
@@ -412,9 +428,9 @@ finds, verified against the first pass's result.</li>
   "is one chunk; the rest is split at phase boundaries, ≤ 60 frames), by the "
   "same judge as the verifier, which sees overlays, 3D views from three sides and a motion plot. "
   "<i>Automatic fit vs final</i> is not an independent test: the verifier already used that judge to keep the "
-  "automatic fit wherever the agent's edit lost. The previous round could not change the object's shape, used "
-  "GeoCalib's gravity estimate as up for the agent's views, judged a held span in pieces without a grip criterion "
-  "and had one agent pass.</p>" + abl_table) if abl_table else ""}
+  "automatic fit wherever the agent's edit lost. The previous round used the depth maps as estimated (the scale "
+  "drift above was in its object and hand trajectories) and a table plane fitted through the first and the last "
+  "frame's depth.</p>" + abl_table) if abl_table else ""}
 <p class="verdict">Summary: median hand keypoint error {rmed["kp"][0]:.0f} → {rmed["kp"][1]:.0f} px; hand triangles
 through the object while held {rmed["cross"][0]:.0f} → {rmed["cross"][1]:.0f}; hand jitter while held
 {rmed["jit"][0]:.1f} → {rmed["jit"][1]:.1f} mm/frame² (the hand tracker's own motion is the first number); frames

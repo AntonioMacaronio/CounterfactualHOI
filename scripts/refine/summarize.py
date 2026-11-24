@@ -58,7 +58,7 @@ def main():
     for vid in vids:
         o = os.path.join(out_root, vid)
         clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
-                    table=os.path.join(o, "table_fit.json"))
+                    table=os.path.join(o, "table_fit.json"), anchor=os.path.join(o, "depth_anchor.json"))
         phases = json.load(open(os.path.join(o, "phases.json")))
         s0 = clip.init_state.copy()
         s0.phases = phases
@@ -68,6 +68,9 @@ def main():
         rest = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in ("approach", "release", "rest")]
         summ = {"video_id": vid, "frames": clip.N, "phases": phases, "hand_jitter_ref_mm": clip.jitter_ref,
                 # the object's shape: scale and extents along the first frame's viewing direction and the two across it
+                # table-anchored depth (None: the depth maps as estimated): the table's distance range in the frames'
+                # own depth, the factors the object and the mesh were carried over with, the table vs GeoCalib
+                "depth_anchor": clip.anchor_info,
                 "object_scale": clip.shape_of(s1).tolist(), "object_extent_cm": [(100 * clip.shape_extent0).tolist(),
                                                                                  (100 * clip.shape_extent0 * clip.shape_of(s1)).tolist()]}
         for name, rows0, rows1 in (("all", m0, m1),

@@ -25,6 +25,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "choir"))
 sys.path.insert(0, HERE)
 import view_choir as vc  # noqa: E402
+import depth_anchor  # noqa: E402
 from hand_scale import corrected_hands  # noqa: E402
 from masks import hand_mask, object_mask, tracked_mesh  # noqa: E402
 from view_recon import free_port, write_embed_html  # noqa: E402
@@ -80,6 +81,10 @@ def load_fprecon(args):
     up = np.array(grav["vec3d"], float)
     up /= np.linalg.norm(up)
     depth0 = np.load(os.path.join(rd, "depth_dp2.npy"), mmap_mode="r")[0].astype(np.float32) * scale
+    aj = os.path.join(rd, "depth_anchor.json")           # refinement export: every frame's depth scaled onto one table plane
+    if os.path.exists(aj):
+        a = depth_anchor.load(aj)
+        depth0 = depth_anchor.apply_frame(depth0, K, a["co"][0], a["ref"])
     pts, cols, H, W = depth_scene_points(vd, rd, hs["side"], depth0, K, args.scene_stride)
     table = vc.fit_table(pts, up, np.random.default_rng(0))
     tj = os.path.join(rd, "table.json")                  # refinement export: the table at the object's resting height

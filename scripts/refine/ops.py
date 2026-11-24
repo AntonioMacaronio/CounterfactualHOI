@@ -25,6 +25,8 @@ import mano  # noqa: E402
 from Utils import nvdiffrast_render  # noqa: E402
 
 _EST = {}
+REST = ("approach", "release", "rest")
+LIFTED = ("lift", "carry", "rotate")
 
 
 def weights(N, start, end, falloff=0):
@@ -189,6 +191,12 @@ def attach_hand_to_object(clip, state, start, end, ref):
         f"attach hand to object on {start}-{end} (relative position of frame {ref}), fading out over {FADE} frames beyond the range")
 
 
+def rest_stretches(state, N):
+    """Frame ranges in which the object rests on the table untouched: runs of approach / release / rest phases
+    (usually two: before the grasp, and from the release on)."""
+    return [(r[0], r[-1]) for r in runs_of([i for i in range(N) if phase_of(state, i) in REST])]
+
+
 def fit_occlusion(clip, state, start, end, **kw):
     """fit_mano with the occlusion term, in two tries, each kept only if it puts the hand on the side of the object
     the video shows without paying for it elsewhere (means over the frames: occlusion error down by 30%, keypoint
@@ -220,8 +228,6 @@ def fit_occlusion(clip, state, start, end, **kw):
 
 
 # ---------- object shape ----------
-REST = ("approach", "release", "rest")
-LIFTED = ("lift", "carry", "rotate")
 
 
 def reshape_object(clip, state, scale):
@@ -273,23 +279,27 @@ def shape_evidence(clip, state):
     ph = [phase_of(state, r["frame"]) for r in m]
     pick = lambda labels: [r for r, p in zip(m, ph) if p in labels]
     med = lambda rows, k: (lambda x: float(np.median(x)) if x else None)([r[k] for r in rows if r.get(k) is not None])
-    rest, held = pick(REST), pick(HELD)
+    held = pick(HELD)
     occl = [r["hand_over_obj"] + r["obj_over_hand"] for r in held if r.get("hand_over_obj") is not None]
-    return dict(rest_cm=med(rest, "obj_height_cm"), iou=med(m, "iou"), depth_cm=med(m, "depth_res_cm"),
+    # the object's lowest point above the table in each stretch of rest (it rests in two places; pooled, an object
+    # in the table at one and above it at the other looks fine)
+    rest = [float(np.median([m[i]["obj_height_cm"] for i in range(a_, b_ + 1)])) for a_, b_ in rest_stretches(state, clip.N)]
+    return dict(rest_cm=rest, iou=med(m, "iou"), depth_cm=med(m, "depth_res_cm"),
                 kp_px=med(held, "hand_kp_px"), hand_cm=(lambda b: None if b is None else abs(b))(med(held, "hand_depth_bias_cm")),
                 cross=float(np.mean([r["n_cross"] for r in held])) if held else None,
                 occl=float(np.mean(occl)) if occl else None)
 
 
 def shape_score(ev, best, factor):
-    """Inconsistency of one candidate shape, in units of "clearly noticeable": 0.5 cm off the table at rest; 0.01 of
+    """Inconsistency of one candidate shape, in units of "clearly noticeable": 0.5 cm off the table at rest (the mean
+    over the stretches of rest); 0.01 of
     mask IoU or 0.3 cm of depth residual lost against the best candidate; while held, 2 px of keypoint error more
     than the best candidate, 1 cm of the hand off the depth map, 5 hand triangles through the object, 3% of the hand
     drawn on the wrong side of the object; plus a small cost for changing the reconstructed mesh at all (0.5 per
     halving or doubling)."""
     t = 0.5 * abs(np.log2(factor))
-    if ev["rest_cm"] is not None:
-        t += max(0.0, abs(ev["rest_cm"]) - 0.3) / 0.5
+    if ev["rest_cm"]:
+        t += float(np.mean([max(0.0, abs(h) - 0.3) / 0.5 for h in ev["rest_cm"]]))
     t += max(0.0, best["iou"] - ev["iou"]) / 0.01 + max(0.0, ev["depth_cm"] - best["depth_cm"]) / 0.3
     if ev["kp_px"] is not None:
         t += (max(0.0, ev["kp_px"] - best["kp_px"]) / 2.0 + max(0.0, (ev["hand_cm"] or 0.0) - 0.5) / 1.0 + ev["cross"] / 5.0
@@ -297,15 +307,15 @@ def shape_score(ev, best, factor):
     return t
 
 
-def fit_object_thickness(clip, state, margin=1.0):
+def fit_object_thickness(clip, state, margin=0.75):
     """Search the object's extent along the first frame's viewing direction (the mesh comes from that one frame, so
     this extent is a guess). The search runs only when the scene says the extent is off: at rest the object sits in
     the table or floats above it, or while held the hand is drawn on the wrong side of the object (in front of it
     where the video shows the object, behind it where it shows the hand). Each candidate (thinner when the object
     sits in the table or the hand cannot get to its side of it, thicker when it floats) gets the object's poses
     re-fitted to mask + depth and the hand re-fitted as in the automatic fit (no grip term; the occlusion term where
-    it helps), and is scored by shape_score. The best one
-    is applied if it beats the reconstructed extent by `margin`. Needs phases.
+    it helps), and is scored by shape_score. The best one is applied if it beats the reconstructed extent by
+    `margin` (about twice what a score varies by between re-fits of the same shape). Needs phases.
     Returns (state, touched, note, table of the evidence)."""
     clip.use(state)
     ph = [phase_of(state, i) for i in range(clip.N)]
@@ -316,15 +326,16 @@ def fit_object_thickness(clip, state, margin=1.0):
     s1, = refit(state)
     ev1 = shape_evidence(clip, s1)
     line = lambda f, ev, sc: (
-        f"  x{f:.2f} ({100 * clip.shape_extent0[0] * cur * f:4.1f} cm): at rest {ev['rest_cm']:+.1f} cm from the table, "
+        f"  x{f:.2f} ({100 * clip.shape_extent0[0] * cur * f:4.1f} cm): at rest {' / '.join(f'{h:+.1f}' for h in ev['rest_cm'])} cm from the table, "
         f"IoU {ev['iou']:.3f}, depth residual {ev['depth_cm']:.2f} cm"
         + (f"; while held: keypoints {ev['kp_px']:.1f} px, hand {ev['hand_cm']:.1f} cm off the depth map, {ev['cross']:.1f} triangles "
            f"through the object, {ev['occl']:.1%} of the hand on the wrong side of the object" if ev["kp_px"] is not None else "")
         + (f" -> score {sc:.1f}" if sc is not None else ""))
     head = ("object's extent along the first frame's viewing direction (the side that frame could not see), evidence per "
             "candidate (after re-fitting the object and the hand to it):")
-    thin = ev1["rest_cm"] < -0.5 or (ev1["rest_cm"] <= 0.5 and (ev1["occl"] or 0.0) > 0.05)
-    thick = ev1["rest_cm"] > 0.5
+    lo, hi = min(ev1["rest_cm"]), max(ev1["rest_cm"])        # in the table at one of its rests: thinner; above it: thicker
+    thin = lo < -0.5 or (hi <= 0.5 and (ev1["occl"] or 0.0) > 0.05)
+    thick = hi > 0.5 and not thin
     if not (thin or thick):
         return state, [], ("object thickness: no change (the object rests on the table and the hand is on the side of it "
                            "the video shows)"), head + "\n" + line(1.0, ev1, None)

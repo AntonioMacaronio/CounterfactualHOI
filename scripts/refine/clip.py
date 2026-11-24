@@ -2,7 +2,9 @@
 
 Inputs come from the FoundationPose + Depth Pro 2 run ($PROJECT_STORAGE_ROOT/runs/fprecon/VID) and CHOIR's stage 1
 ($CHOIR_ROOT/output/VID): RGB frames, SAM3 masks, hand-scaled metric depth, the textured SAM3D mesh, Dyn-HaMR hands
-(moved onto the depth map), GeoCalib gravity and the table plane fitted in the frame-0 depth.
+(moved onto the depth map), GeoCalib gravity and the table plane. With anchor= the depth is table-anchored
+(scripts/fprecon/depth_anchor.py): Depth Pro 2's scale drifts by up to +-12% over a clip, so every frame's depth is
+scaled so that its table lies on one plane, and the tracked object (poses and mesh size) and hand are carried along.
 
 State (what the agent edits): per-frame object pose (object -> OpenCV camera, metric), the hand as MANO parameters
 only (per frame: global orientation, translation, 15 finger-joint rotations; one shape per clip; scripts/refine/mano.py),
@@ -37,6 +39,7 @@ for p in (os.path.join(SCRIPTS, "fprecon"), os.path.join(SCRIPTS, "choir"),
     sys.path.insert(0, p)
 import nvdiffrast.torch as dr  # noqa: E402
 from Utils import make_mesh_tensors, nvdiffrast_render  # noqa: E402
+import depth_anchor  # noqa: E402
 from hand_scale import corrected_hands  # noqa: E402
 from masks import hand_mask, object_mask, tracked_mesh  # noqa: E402
 from table_fit import fit_table  # noqa: E402
@@ -111,7 +114,10 @@ def se3_interp(T0, T1, s):
 
 
 class Clip:
-    def __init__(self, vd, run, gravity=None, table=None):
+    def __init__(self, vd, run, gravity=None, table=None, anchor=None):
+        """anchor: None = the depth maps as they are (rounds 1-9); "fit" = table-anchored depth, fitted here; a path =
+        a refinement run's depth_anchor.json (save_anchor), used when it exists (else as None).
+        table: a refinement run's table_fit.json (its agent may have re-fitted the plane), used when it exists."""
         self.vd, self.run = os.path.abspath(vd), os.path.abspath(run)
         self.vid = os.path.basename(self.vd)
         self.K = np.array(json.load(open(os.path.join(vd, "inputs", "intrinsics.json")))["intrinsics"], float)
@@ -130,11 +136,22 @@ class Clip:
         self.J0 = mano.root_joint(self.betas, self.side)
         self._hv_cache = {}
         self.fps = cv2.VideoCapture(os.path.join(vd, "inputs", "video.mp4")).get(cv2.CAP_PROP_FPS) or 30.0
+        g = json.load(open(gravity or os.path.join(STORAGE, "runs", "choir_gravity", self.vid, "gravity.json")))
+        up = np.array(g["vec3d"], float)
+        self.up_geocalib = up / np.linalg.norm(up)           # GeoCalib's gravity estimate: the prior for the table fit
+        self._set_up(self.up_geocalib)
+        self.glctx = dr.RasterizeCudaContext()
+        self._rgb, self._ltab, self._xyz = {}, {}, None
+        self._anchor, self._AF, self.mesh_scale, self.anchor_info = None, None, 1.0, None
+        self._load_lowres()
+        self._anchor_init(anchor, P)
 
         # The object's mesh as reconstructed from one frame. Its extent along its own axes is a parameter of the
         # reconstruction (State.shape: the side the camera never saw is a guess): everything that depends on the mesh
         # (render tensors, SDF, collision model, sample points, extent) exists per shape and use() switches between them.
         self.mesh0 = trimesh.load(tracked_mesh(run), force="mesh", process=False)
+        if self._anchor is not None:                         # the tracked object and hand, carried into the anchored depth
+            poses, P["transl"] = self._anchor_carry(poses, P)
         v = np.asarray(self.mesh0.vertices)
         evals, evecs = np.linalg.eigh(np.cov((v - v.mean(0)).T))
         self.axes_obj = evecs[:, ::-1]                       # columns: long, mid, short of the mesh as reconstructed
@@ -155,11 +172,6 @@ class Clip:
         self.shape_extent0 = np.ptp(pa, 0)
         self._sub_idx = np.random.default_rng(0).choice(len(v), min(len(v), 3000), replace=False)
         self._shapes, self._shape_key = {}, None
-
-        g = json.load(open(gravity or os.path.join(STORAGE, "runs", "choir_gravity", self.vid, "gravity.json")))
-        up = np.array(g["vec3d"], float)
-        self.up_geocalib = up / np.linalg.norm(up)           # GeoCalib's gravity estimate: the prior for the table fit
-        self._set_up(self.up_geocalib)
 
         # 2D hand keypoints (ViTPose, OpenPose order, from CHOIR stage 1) and MANO's 21 joints in the same order:
         # 16 regressed joints (wrist, index, middle, pinky, ring, thumb) + 5 fingertip vertices.
@@ -191,10 +203,10 @@ class Clip:
         self.distal = [np.nonzero(self.skin_W[:, CHAINS[f][2]] > 0.5)[0] for f in FINGERS]   # last segment (pad + tip)
         self.palm_verts = np.nonzero(self.vert_finger == -1)[0]
 
-        self.glctx = dr.RasterizeCudaContext()
-        self._rgb, self._ltab, self._xyz = {}, {}, None
-        self._load_lowres()
-        self._fit_table([(0, self._obj0), (self.N - 1, poses[-1, :3, :3] @ v0c + poses[-1, :3, 3])])
+        if self._anchor is not None:
+            self._table_from_anchor()
+        else:
+            self._fit_table([(0, self._obj0), (self.N - 1, poses[-1, :3, :3] @ v0c + poses[-1, :3, 3])])
         if table and os.path.exists(table):                  # a refinement run's table (its agent may have re-fitted it)
             t = json.load(open(table))
             self.table_n, self.table_p, self.table_info = np.array(t["normal"], float), np.array(t["point"], float), t["info"]
@@ -237,7 +249,95 @@ class Clip:
         return om, hm
 
     def depth_full(self, i):
-        return self.depth[i].astype(np.float32) * self.depth_scale
+        d = self.depth[i].astype(np.float32) * self.depth_scale
+        if self._anchor is not None:                         # scaled so that the frame's table lies on the one plane
+            if self._AF is None:
+                self._AF = depth_anchor.rays(self.K, self.H, self.W).astype(np.float32)
+                self._AFref = self._AF @ self._anchor["ref"].astype(np.float32)
+            d *= (self._AF @ self._anchor["co"][i].astype(np.float32)) / self._AFref
+        return d
+
+    # ---------- table-anchored depth ----------
+    def _anchor_init(self, anchor, P):
+        """Table-anchored depth (scripts/fprecon/depth_anchor.py): fit the table's plane in every frame (or load a
+        run's), choose the one plane all frames are scaled onto, and scale the low-resolution depth (depth_full
+        scales the full-resolution one). The reference plane: the mean of the frames' normals, at the distance that
+        keeps the clip's hand-based metric scale: per frame, the hand's own depth scale (hand_scale.json: MANO hand
+        vs depth map) times the frame's table distance on the hand's ray; the median over the frames."""
+        if anchor is None or (anchor != "fit" and not os.path.exists(anchor)):
+            return
+        N = self.N
+        if anchor != "fit":
+            a = depth_anchor.load(anchor)
+            co, ref, info = a["co"][:N], a["ref"], a["info"]
+        else:
+            t = self._table_ransac()
+            if t is None:
+                return
+            co, rms = depth_anchor.fit_planes(self.dl, self.om | self.hm, self.Kl, depth_anchor.plane_co(t["normal"], t["point"]))
+            if co is None:
+                return
+            nrm = co[:, [1, 2, 0]] / np.linalg.norm(co, axis=1, keepdims=True)
+            n_ref = nrm.mean(0) / np.linalg.norm(nrm.mean(0))
+            hs = json.load(open(os.path.join(self.run, "hand_scale.json")))
+            hc = mano.mano_forward(P["global_orient"][:N], P["transl"][:N], P["hand_pose"][:N], P["betas"], self.side).mean(1)
+            g = []
+            for k, s_i in hs["per_frame"].items():
+                i = int(k)
+                if i < N:
+                    r = np.array([1.0, hc[i, 0] / hc[i, 2], hc[i, 1] / hc[i, 2]])
+                    g.append(s_i / hs["scale"] * (n_ref @ r[[1, 2, 0]]) / (co[i] @ r))
+            off = 1.0 / np.linalg.norm(co, axis=1)
+            c_ref = float(np.median(g)) if g else float(np.median(off))
+            ref = n_ref[[2, 0, 1]] / c_ref
+            info = {"frames": int(N), "frames_interpolated": int(np.isnan(rms).sum()),
+                    "table_rms_cm": float(100 * np.nanmedian(rms)),
+                    "table_distance_vs_reference": [float(v) for v in np.percentile(off / c_ref, [0, 50, 100])],
+                    "normal_spread_deg": float(np.degrees(np.arccos(np.clip(nrm @ n_ref, -1, 1))).max()),
+                    "reference_spread_iqr": float((np.percentile(g, 75) - np.percentile(g, 25)) / c_ref) if g else None}
+        A = depth_anchor.rays(self.Kl, self.hl, self.wl)
+        den = A @ ref
+        for i in range(N):
+            self.dl[i] *= ((A @ co[i]) / den).astype(np.float32)
+        self._anchor, self.anchor_info = {"co": co, "ref": ref}, dict(info)
+
+    def _anchor_carry(self, poses, P):
+        """The tracked object and hand carried into the anchored depth: in every frame they move along their viewing
+        rays by the frame's depth factor there (they were fitted to that frame's depth), and the mesh, which was
+        sized in frame 0's depth, is scaled by frame 0's factor. Returns (poses, MANO translations)."""
+        co, ref = self._anchor["co"], self._anchor["ref"]
+        V = np.asarray(self.mesh0.vertices)
+        c = V.mean(0)
+        pos = poses[:, :3, :3] @ c + poses[:, :3, 3]
+        k = np.array([depth_anchor.factor(co[i], ref, pos[i]) for i in range(len(poses))])
+        self.mesh_scale = float(k[0])
+        poses = poses.copy()
+        poses[:, :3, 3] = k[:, None] * pos - poses[:, :3, :3] @ (self.mesh_scale * c)
+        self.mesh0.vertices = V * self.mesh_scale
+        N = self.N
+        hc = mano.mano_forward(P["global_orient"][:N], P["transl"][:N], P["hand_pose"][:N], P["betas"], self.side).mean(1)
+        kh = np.array([depth_anchor.factor(co[i], ref, hc[i]) for i in range(N)])
+        tr = P["transl"].copy()
+        tr[:N] += hc * (kh[:, None] - 1)
+        self.anchor_info.update(mesh_scale=self.mesh_scale, object_factor=[float(v) for v in (k.min(), np.median(k), k.max())],
+                                object_factor_last=float(k[-1]), hand_factor=[float(v) for v in (kh.min(), np.median(kh), kh.max())])
+        return poses, tr
+
+    def save_anchor(self, path):
+        """Write this clip's depth anchoring for Clip(anchor=path) and the viewer (nothing when the depth is as it is)."""
+        if self._anchor is not None:
+            depth_anchor.save(path, self._anchor["co"], self._anchor["ref"], self.mesh_scale, self.anchor_info)
+
+    def _table_from_anchor(self):
+        """The table of an anchored clip: the plane every frame's depth is scaled onto."""
+        n_dn, c = depth_anchor.co_plane(self._anchor["ref"])
+        self.table_n, self.table_p = -n_dn, c * n_dn
+        self.table_info = {"source": "the one plane every frame's depth is scaled onto (the table, in all frames)", "points": 0,
+                           "rms_cm": self.anchor_info.get("table_rms_cm"),
+                           "tilt_vs_geocalib_deg": float(np.degrees(np.arccos(np.clip(self.table_n @ self.up_geocalib, -1, 1))))}
+        self.anchor_info["tilt_vs_geocalib_deg"] = self.table_info["tilt_vs_geocalib_deg"]
+        self._set_up(self.table_n)
+        self._table_auto = (self.table_n.copy(), self.table_p.copy(), dict(self.table_info))
 
     def _load_lowres(self):
         h, w = self.H // LOW, self.W // LOW
@@ -269,6 +369,19 @@ class Clip:
         ~0.5 cm of the table at both. Up for edits, views and the export is this plane's normal: on a tabletop the
         table is a better reference for gravity than a single-image estimate (GeoCalib is 3-6 deg from it on our
         clips), and a simulated object only rests on a table that is level."""
+        t = self._table_ransac()
+        self.table_n = t["normal"] if t else self.up_geocalib
+        self.table_p = t["point"] if t else np.zeros(3)
+        self.table_info = {"source": "plane of frame 0's depth" if t else "none found: GeoCalib's up", "points": 0, "rms_cm": None}
+        if t and where:
+            self._refit_table(where)
+        self.table_info["tilt_vs_geocalib_deg"] = float(np.degrees(np.arccos(np.clip(self.table_n @ self.up_geocalib, -1, 1))))
+        self._set_up(self.table_n)
+        self._table_auto = (self.table_n.copy(), self.table_p.copy(), dict(self.table_info))
+
+    def _table_ransac(self):
+        """The largest plane of frame 0's depth within 25 deg of GeoCalib's up, outside the object and the hand
+        (table_fit.fit_table: normal, point), or None."""
         d = self.depth_full(0)
         om, hm = self.masks_full(0)
         fg = cv2.dilate((om | hm).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
@@ -277,14 +390,7 @@ class Clip:
         ys, xs = ys[sel], xs[sel]
         z = d[ys, xs]
         pts = np.stack([(xs - self.K[0, 2]) / self.K[0, 0] * z, (ys - self.K[1, 2]) / self.K[1, 1] * z, z], 1)
-        t = fit_table(pts, self.up_geocalib, np.random.default_rng(0))
-        self.table_n = t["normal"] if t else self.up_geocalib
-        self.table_p = t["point"] if t else np.zeros(3)
-        self.table_info = {"source": "plane of frame 0's depth" if t else "none found: GeoCalib's up", "points": 0, "rms_cm": None}
-        if t and where:
-            self._refit_table(where)
-        self.table_info["tilt_vs_geocalib_deg"] = float(np.degrees(np.arccos(np.clip(self.table_n @ self.up_geocalib, -1, 1))))
-        self._set_up(self.table_n)
+        return fit_table(pts, self.up_geocalib, np.random.default_rng(0))
 
     def _refit_table(self, where, radius=0.20, band=0.06):
         """Least-squares plane through the table's depth points around the object: for each (frame, position) in
@@ -321,10 +427,22 @@ class Clip:
 
     def fit_table(self, state, frames):
         """Re-fit the table from the depth of `frames` around the object in them (outside the object's and the hand's
-        masks). For when the plane is off where the object rests. One table per clip: not versioned. Returns a note."""
+        masks): one plane through the table at every place the object is at in those frames. No frames: back to the
+        automatic plane. For when the plane is off where the object rests. One table per clip: not versioned.
+        Returns a note."""
         self.use(state)
         old_n, old_c = self.table_n.copy(), float(self.table_n @ self.table_p)
-        where = [(i, self.obj_center(state, i)) for i in frames]
+        if not frames:                                       # back to the automatic plane
+            self.table_n, self.table_p, self.table_info = self._table_auto[0].copy(), self._table_auto[1].copy(), dict(self._table_auto[2])
+            self._set_up(self.table_n)
+            self._ltab.clear()
+            return f"table set back to the automatic plane ({self.table_info['source']})"
+        places = []                                          # one patch per place the object is at (10 cm apart or more),
+        for i in frames:                                     # so a place does not count more for having more frames
+            c = self.obj_center(state, i)
+            if all(np.linalg.norm(c - q) > 0.10 for _, q in places):
+                places.append((i, c))
+        where = places
         if not self._refit_table(where):
             raise ValueError("too few table points around the object in one of these frames (the hand or the object hides "
                              "the table there): choose frames in which the table around the object is visible")
@@ -362,7 +480,7 @@ class Clip:
             if not one:
                 m = self.mesh0.copy()
                 m.vertices = self.scaled(self.mesh0.vertices, scale)
-            sdf, lo, hi = self._sdf_grid(m, os.path.join(self.run, "refine_sdf128.npz") if one else None)
+            sdf, lo, hi = self._sdf_grid(m, os.path.join(self.run, "refine_sdf128.npz") if one and self.mesh_scale == 1.0 else None)
             ob = fcl.BVHModel()                              # FCL BVH of the object, in the object frame
             ob.beginModel(len(self._col0[0]), len(self._col0[1]))
             ob.addSubModel(self.scaled(self._col0[0], scale), self._col0[1])

@@ -38,7 +38,7 @@ def main():
     for vid in args.vids:
         o = os.path.join(STORAGE, "runs", "refine" + tag, vid)
         clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
-                    table=os.path.join(o, "table_fit.json"))
+                    table=os.path.join(o, "table_fit.json"), anchor=os.path.join(o, "depth_anchor.json"))
         st = load_state(os.path.join(o, "final.npz"), json.load(open(os.path.join(o, "phases.json"))))
         revs = [critic_review(client, args, clip, st, o, f"final_s{k}") for k in range(args.samples)]
         votes = [r["overall"] for r in revs]

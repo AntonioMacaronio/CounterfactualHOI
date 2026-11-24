@@ -174,6 +174,14 @@ torchrun gets a port per GPU. The site's round 8 ran all ten refinements at once
 `bash scripts/choir/run_choir.sh $V $G` without `CHOIR_STAGE1_ONLY` also runs CHOIR's stages 2–3. That is the
 CHOIR baseline; it is not needed downstream.
 
+The refinement works on **table-anchored depth** (`scripts/fprecon/depth_anchor.py`). Depth Pro 2's metric scale
+drifts over a clip: with a static camera the table is flat in every frame's depth map, but its distance changes by up
+to ±12% between frames, and the depth on the object and the hand changes with it. So each frame's depth is scaled so
+that its table lies on one common plane, and the tracked object poses, the mesh size (measured in frame 0) and the
+hand are carried along. This assumes a static camera and a visible table. A run writes `depth_anchor.json`; the
+review, summary, comparison and viewer steps read it. `agent.py --raw-depth` uses the depth maps as estimated, as
+rounds 1–9 did.
+
 ## 3. After a refinement round
 
 ```bash
