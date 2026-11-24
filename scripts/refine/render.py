@@ -47,6 +47,7 @@ def _render(clip, mesh_tensors, T, K, H, W, light=True):
 
 def render_frame(clip, state, i):
     """Full-resolution object and hand renders in the real camera: (obj_color, obj_depth, hand_color, hand_depth)."""
+    clip.use(state)
     oc, od = _render(clip, clip.mt, state.obj[i], clip.K, clip.H, clip.W)
     hc, hd = _render(clip, clip.hand_tensors(clip.hand_verts(state, i)), np.eye(4), clip.K, clip.H, clip.W)
     return oc, od, hc, hd
@@ -54,6 +55,7 @@ def render_frame(clip, state, i):
 
 def action_box(clip, state, i, pad=0.45, min_size=260):
     """Pixel box around the object render, the hand and the object mask."""
+    clip.use(state)
     pts = []
     T = state.obj[i]
     for v in (clip.sub_v @ T[:3, :3].T + T[:3, 3], clip.hand_verts(state, i)):
@@ -75,6 +77,7 @@ def action_box(clip, state, i, pad=0.45, min_size=260):
 
 
 def overlay(clip, state, i, mode="outline", box="auto", axes=True, label=None):
+    clip.use(state)
     img = clip.rgb(i).copy()
     oc, od, hc, hd = render_frame(clip, state, i)
     so, sh = od > 0, hd > 0
@@ -119,6 +122,7 @@ def overlay(clip, state, i, mode="outline", box="auto", axes=True, label=None):
 
 def view(clip, state, i, which="side", size=(720, 540), dist=None, label=None):
     """Gravity-aligned virtual view of object + hand + table around the action at frame i."""
+    clip.use(state)
     up, right, fwd = clip.up, clip.right, clip.fwd
     c_obj = clip.obj_center(state, i)
     c = 0.5 * (c_obj + clip.hand_verts(state, i).mean(0)) if clip.hand_valid[i] else c_obj
@@ -176,6 +180,7 @@ def view_orbit(clip, state, i, az=0.0, el=25.0, zoom="action", size=(560, 440), 
     """Object + hand + table from azimuth `az` (degrees about gravity: 0 = from the real camera's right, 90 = from
     behind the object looking back at the camera, 180 = from the left, 270 = from the camera's side) and elevation
     `el` (0 = level, 90 = straight down); zoom "action" frames hand and object, "contact" the region where they meet."""
+    clip.use(state)
     up, right, fwd = clip.up, clip.right, clip.fwd
     hv = clip.hand_verts(state, i)
     T = state.obj[i]
@@ -248,6 +253,7 @@ TRACE_COLORS = [(40, 40, 40), (200, 60, 200), (40, 40, 230), (40, 160, 40), (230
 
 
 def motion_center(clip, state, frames):
+    clip.use(state)
     pts = [0.5 * (clip.obj_center(state, i) + clip.hand_verts(state, i).mean(0)) for i in frames]
     return np.mean(pts, 0)
 
@@ -256,6 +262,7 @@ def trace(clip, state, start, end, az=0.0, el=25.0, size=(720, 560), label=None)
     """One fixed 3D view of [start, end]: the scene at the middle frame and the paths of the wrist (dark) and the five
     fingertips (thumb magenta, index red, middle green, ring orange, pinky cyan) over the range, one dot per frame;
     real motion draws smooth curves, jitter draws zig-zags."""
+    clip.use(state)
     from clip import TIPS, FINGERS
     fr = list(range(start, end + 1))
     mid = fr[len(fr) // 2]
@@ -287,6 +294,7 @@ def trace(clip, state, start, end, az=0.0, el=25.0, size=(720, 560), label=None)
 def filmstrip(clip, state, start, count=8, az=0.0, el=25.0, zoom="action", tile=(360, 300)):
     """`count` consecutive frames from one fixed viewpoint (and, with zoom="contact", close to where hand and object
     meet), so frame-to-frame jitter is visible."""
+    clip.use(state)
     fr = [i for i in range(start, min(clip.N, start + count))]
     c = motion_center(clip, state, fr)
     dist = None
@@ -313,6 +321,7 @@ def sheet(imgs, ncols=3, tile_w=640):
 
 
 def crop(clip, state, i, box, mode="outline"):
+    clip.use(state)
     img = overlay(clip, state, i, mode=mode, box=None, label=f"frame {i} crop {box}")
     x0, y0, x1, y1 = [int(v) for v in box]
     x0, y0, x1, y1 = max(0, x0), max(0, y0), min(clip.W, x1), min(clip.H, y1)

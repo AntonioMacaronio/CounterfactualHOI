@@ -76,9 +76,13 @@ def caption(out_dir, vid):
     """Caption of a clip's viewer: QC numbers, or for the refinement the medians before -> after and links."""
     qc = json.load(open(os.path.join(out_dir, f"{vid}.json")))
     tilt = qc["table_tilt_vs_gravity_deg"]
-    cap = (f"{qc['frames']} frames @ {qc['fps']:.0f} fps · up = GeoCalib gravity (camera pitch "
-           f"{qc['gravity_pitch_deg']:.0f}°), " + ("no table plane found" if tilt is None else
-           f"{tilt:.1f}° from the table plane in the depth points{' ⚠' if tilt > 10 else ''}"))
+    if qc.get("up") == "table normal":            # viewers built since the table's normal became up
+        cap = (f"{qc['frames']} frames @ {qc['fps']:.0f} fps · up = the table's normal (GeoCalib's gravity estimate is "
+               f"{tilt:.1f}° from it{' ⚠' if tilt > 10 else ''})")
+    else:
+        cap = (f"{qc['frames']} frames @ {qc['fps']:.0f} fps · up = GeoCalib gravity (camera pitch "
+               f"{qc['gravity_pitch_deg']:.0f}°), " + ("no table plane found" if tilt is None else
+               f"{tilt:.1f}° from the table plane in the depth points{' ⚠' if tilt > 10 else ''}"))
     if qc.get("object_height_above_table_first_last_m"):
         h0, h1 = (100 * h for h in qc["object_height_above_table_first_last_m"])
         if qc.get("method") == "foundationpose+depthpro2":

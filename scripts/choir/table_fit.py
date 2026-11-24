@@ -24,7 +24,7 @@ def fit_table(points, up, rng, iters=600, tol=0.01, max_deg=25.0):
     n, a = best
     inl = p[np.abs((p - a) @ n) < tol]
     c = inl.mean(0)
-    n = np.linalg.svd(inl - c)[2][-1]                        # least-squares refit on the inliers
+    n = np.linalg.svd(inl - c, full_matrices=False)[2][-1]   # least-squares refit on the inliers
     n = n if n @ up > 0 else -n
     return dict(normal=n, point=c, inlier_frac=len(inl) / len(p),
                 tilt_deg=float(np.degrees(np.arccos(np.clip(n @ up, -1, 1)))))

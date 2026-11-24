@@ -92,5 +92,7 @@ class Source(Base):
         return [Demo(f"cfhoi_{vid}", float(self.cfg.fps), {"right": hand}, {"right": vid}, {vid: W})]
 
     def load_mesh(self, obj_id: str) -> trimesh.Trimesh:
-        _, run, _ = self._paths(obj_id)
-        return trimesh.load(run / "object_mesh.obj", force="mesh", process=False, skip_materials=True)
+        _, run, ref = self._paths(obj_id)
+        p = ref / "export" / "object_mesh.obj"            # the refinement's mesh: scaled where it changed the object's
+        return trimesh.load(p if p.exists() else run / "object_mesh.obj", force="mesh", process=False,   # shape (round 9+)
+                            skip_materials=True)

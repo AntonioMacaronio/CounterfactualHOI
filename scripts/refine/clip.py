@@ -47,6 +47,7 @@ FINGERS = ["thumb", "index", "middle", "ring", "pinky"]
 CHAINS = {"thumb": (13, 14, 15), "index": (1, 2, 3), "middle": (4, 5, 6), "ring": (10, 11, 12), "pinky": (7, 8, 9)}
 TIPS = {"thumb": 745, "index": 317, "middle": 444, "ring": 556, "pinky": 673}
 TIP_IDS = [TIPS[f] for f in FINGERS]
+SHAPE_AXES = ("unseen", "seen_long", "seen_short")   # Clip.shape_axes: along the first frame's view, and across it
 sys.path.insert(0, HERE)
 import mano  # noqa: E402
 
@@ -60,10 +61,12 @@ class State:
     phases: list = field(default_factory=list)   # [{"start", "end", "label"}]
     verts: np.ndarray = None                # (N, 778, 3) fixed hand vertices: read-only results from before MANO states
     betas: np.ndarray = None                # (10,) MANO shape, one per clip (None = the hand tracker's, Clip.betas)
+    shape: np.ndarray = None                # (3,) scale of the object's mesh along SHAPE_AXES (None = as reconstructed)
 
     def copy(self):
         return State(self.obj.copy(), self.go.copy(), self.tr.copy(), self.hp.copy(), [dict(p) for p in self.phases],
-                     None if self.verts is None else self.verts, None if self.betas is None else self.betas.copy())
+                     None if self.verts is None else self.verts, None if self.betas is None else self.betas.copy(),
+                     None if self.shape is None else self.shape.copy())
 
 
 def load_state(path, phases=None):
@@ -72,7 +75,7 @@ def load_state(path, phases=None):
     z = np.load(path)
     if "hand_pose" in z.files:
         return State(z["obj"], z["global_orient"], z["transl"], z["hand_pose"], phases or [],
-                     betas=z["betas"] if "betas" in z.files else None)
+                     betas=z["betas"] if "betas" in z.files else None, shape=z["shape"] if "shape" in z.files else None)
     N = len(z["obj"])
     hv = os.path.join(os.path.dirname(path), "export", "hand_verts.npy")
     if not os.path.exists(hv):
@@ -108,7 +111,7 @@ def se3_interp(T0, T1, s):
 
 
 class Clip:
-    def __init__(self, vd, run, gravity=None):
+    def __init__(self, vd, run, gravity=None, table=None):
         self.vd, self.run = os.path.abspath(vd), os.path.abspath(run)
         self.vid = os.path.basename(self.vd)
         self.K = np.array(json.load(open(os.path.join(vd, "inputs", "intrinsics.json")))["intrinsics"], float)
@@ -128,21 +131,35 @@ class Clip:
         self._hv_cache = {}
         self.fps = cv2.VideoCapture(os.path.join(vd, "inputs", "video.mp4")).get(cv2.CAP_PROP_FPS) or 30.0
 
-        self.mesh = trimesh.load(tracked_mesh(run), force="mesh", process=False)
-        self.mt = make_mesh_tensors(self.mesh)
-        v = np.asarray(self.mesh.vertices)
-        self.center_obj = 0.5 * (v.min(0) + v.max(0))
+        # The object's mesh as reconstructed from one frame. Its extent along its own axes is a parameter of the
+        # reconstruction (State.shape: the side the camera never saw is a guess): everything that depends on the mesh
+        # (render tensors, SDF, collision model, sample points, extent) exists per shape and use() switches between them.
+        self.mesh0 = trimesh.load(tracked_mesh(run), force="mesh", process=False)
+        v = np.asarray(self.mesh0.vertices)
         evals, evecs = np.linalg.eigh(np.cov((v - v.mean(0)).T))
-        self.axes_obj = evecs[:, ::-1]                       # columns: long, mid, short (object frame)
-        self.extent = np.ptp(v @ self.axes_obj, 0)
-        self.sub_v = v[np.random.default_rng(0).choice(len(v), min(len(v), 3000), replace=False)]
+        self.axes_obj = evecs[:, ::-1]                       # columns: long, mid, short of the mesh as reconstructed
+        # The shape's own axes (State.shape scales along them): the direction the first frame looked along, in the
+        # object's frame (the mesh was reconstructed from that frame, so this is the extent it could not see), and
+        # the two directions across that view, along the object's two principal axes that lie most across it.
+        v0c = v.mean(0)
+        c0 = poses[0, :3, :3] @ v0c + poses[0, :3, 3]            # the object in frame 0 (camera frame)
+        self._obj0 = c0
+        unseen = poses[0, :3, :3].T @ (c0 / np.linalg.norm(c0))
+        p, q = sorted(np.argsort(np.abs(self.axes_obj.T @ unseen))[:2])
+        u = self.axes_obj[:, p] - (self.axes_obj[:, p] @ unseen) * unseen
+        u /= np.linalg.norm(u)
+        w = np.cross(unseen, u)
+        self.shape_axes = np.stack([unseen, u, w * np.sign(w @ self.axes_obj[:, q])], 1)   # columns: SHAPE_AXES
+        pa = v @ self.shape_axes
+        self.center_obj = self.shape_axes @ (0.5 * (pa.min(0) + pa.max(0)))   # centre of its box along them: fixed under scaling
+        self.shape_extent0 = np.ptp(pa, 0)
+        self._sub_idx = np.random.default_rng(0).choice(len(v), min(len(v), 3000), replace=False)
+        self._shapes, self._shape_key = {}, None
 
         g = json.load(open(gravity or os.path.join(STORAGE, "runs", "choir_gravity", self.vid, "gravity.json")))
         up = np.array(g["vec3d"], float)
-        self.up = up / np.linalg.norm(up)
-        fwd = np.array([0, 0, 1.0]) - self.up * self.up[2]
-        self.fwd = fwd / np.linalg.norm(fwd)
-        self.right = np.cross(self.fwd, self.up)
+        self.up_geocalib = up / np.linalg.norm(up)           # GeoCalib's gravity estimate: the prior for the table fit
+        self._set_up(self.up_geocalib)
 
         # 2D hand keypoints (ViTPose, OpenPose order, from CHOIR stage 1) and MANO's 21 joints in the same order:
         # 16 regressed joints (wrist, index, middle, pinky, ring, thumb) + 5 fingertip vertices.
@@ -177,19 +194,19 @@ class Clip:
         self.glctx = dr.RasterizeCudaContext()
         self._rgb, self._ltab, self._xyz = {}, {}, None
         self._load_lowres()
-        self._fit_table()
-        self._sdf_grid()
-        V, F = np.asarray(self.mesh.vertices), np.asarray(self.mesh.faces)
+        self._fit_table([(0, self._obj0), (self.N - 1, poses[-1, :3, :3] @ v0c + poses[-1, :3, 3])])
+        if table and os.path.exists(table):                  # a refinement run's table (its agent may have re-fitted it)
+            t = json.load(open(table))
+            self.table_n, self.table_p, self.table_info = np.array(t["normal"], float), np.array(t["point"], float), t["info"]
+            self._set_up(self.table_n)
+        V, F = np.asarray(self.mesh0.vertices), np.asarray(self.mesh0.faces)
         if len(F) > 4000:                                    # collision copy: decimated (crossings stay the same)
             import open3d as o3d
             d = o3d.geometry.TriangleMesh(o3d.utility.Vector3dVector(V), o3d.utility.Vector3iVector(F))
             d = d.simplify_quadric_decimation(target_number_of_triangles=4000)
             V, F = np.asarray(d.vertices), np.asarray(d.triangles)
-        ob = fcl.BVHModel()                                  # FCL BVH of the object, in the object frame
-        ob.beginModel(len(V), len(F))
-        ob.addSubModel(V.astype(np.float64), F.astype(np.int32))
-        ob.endModel()
-        self.col_obj = fcl.CollisionObject(ob, fcl.Transform())
+        self._col0 = (V.astype(np.float64), F.astype(np.int32))
+        self.use(None)
         self.hand_faces_i = np.asarray(self.hand_faces, np.int32)
         self.init_state = State(poses.copy(), P["global_orient"][:self.N].copy(), P["transl"][:self.N].copy(),
                                 P["hand_pose"][:self.N].copy(), [])
@@ -236,7 +253,22 @@ class Clip:
         self.Kl = self.K.copy()
         self.Kl[:2] /= LOW
 
-    def _fit_table(self):
+    def _set_up(self, up):
+        """World axes for edits and views: up, forward (away from the camera, level) and right."""
+        self.up = up / np.linalg.norm(up)
+        fwd = np.array([0, 0, 1.0]) - self.up * self.up[2]
+        self.fwd = fwd / np.linalg.norm(fwd)
+        self.right = np.cross(self.fwd, self.up)
+
+    def _fit_table(self, where=None):
+        """The table: the largest plane of frame 0's depth within 25 deg of GeoCalib's up, then re-fitted to the depth
+        around where the object rests (`where`: [(frame, the object's position in it), ...]; at start-up its first and
+        last frame). The depth map's table is not one plane: patches 30-40 cm apart are each flat to a millimetre but
+        1-3.5 cm apart in height, so a plane fitted around the object's first position puts its last position 1-5 cm
+        off the table, and the other way round. One plane through the patches at both ends keeps the object within
+        ~0.5 cm of the table at both. Up for edits, views and the export is this plane's normal: on a tabletop the
+        table is a better reference for gravity than a single-image estimate (GeoCalib is 3-6 deg from it on our
+        clips), and a simulated object only rests on a table that is level."""
         d = self.depth_full(0)
         om, hm = self.masks_full(0)
         fg = cv2.dilate((om | hm).astype(np.uint8), np.ones((15, 15), np.uint8)) > 0
@@ -245,33 +277,124 @@ class Clip:
         ys, xs = ys[sel], xs[sel]
         z = d[ys, xs]
         pts = np.stack([(xs - self.K[0, 2]) / self.K[0, 0] * z, (ys - self.K[1, 2]) / self.K[1, 1] * z, z], 1)
-        t = fit_table(pts, self.up, np.random.default_rng(0))
-        self.table_n = t["normal"] if t else self.up
+        t = fit_table(pts, self.up_geocalib, np.random.default_rng(0))
+        self.table_n = t["normal"] if t else self.up_geocalib
         self.table_p = t["point"] if t else np.zeros(3)
+        self.table_info = {"source": "plane of frame 0's depth" if t else "none found: GeoCalib's up", "points": 0, "rms_cm": None}
+        if t and where:
+            self._refit_table(where)
+        self.table_info["tilt_vs_geocalib_deg"] = float(np.degrees(np.arccos(np.clip(self.table_n @ self.up_geocalib, -1, 1))))
+        self._set_up(self.table_n)
 
-    def _sdf_grid(self, n=128):
-        """Signed distance to the object surface on a grid in the object frame (negative inside), cached."""
-        path = os.path.join(self.run, f"refine_sdf{n}.npz")
-        if os.path.exists(path):
-            z = np.load(path)
-            self.sdf, self.sdf_lo, self.sdf_hi = z["sdf"], z["lo"], z["hi"]
+    def _refit_table(self, where, radius=0.20, band=0.06):
+        """Least-squares plane through the table's depth points around the object: for each (frame, position) in
+        `where`, that frame's depth within `radius` of the position (measured along the current plane) and `band` of
+        the current plane, outside the object's and the hand's masks; every patch counts the same. Kept when each
+        patch has at least 300 points. Returns whether it was."""
+        if self._xyz is None:
+            ys, xs = np.mgrid[0:self.hl, 0:self.wl]
+            self._xyz = np.stack([(xs - self.Kl[0, 2]) / self.Kl[0, 0], (ys - self.Kl[1, 2]) / self.Kl[1, 1]], -1)
+        n, c = self.table_n, self.table_n @ self.table_p
+        patches = []
+        for i, centre in where:
+            dm = self.dl[i]
+            fg = cv2.dilate((self.om[i] | self.hm[i]).astype(np.uint8), np.ones((5, 5), np.uint8)) > 0
+            ok = (dm > 0.05) & (dm < 8) & ~fg
+            P = np.concatenate([self._xyz[ok] * dm[ok][:, None], dm[ok][:, None]], 1)
+            flat = (P - centre) - ((P - centre) @ n)[:, None] * n
+            q = P[(np.abs(P @ n - c) < band) & (np.linalg.norm(flat, axis=1) < radius)]
+            if len(q) < 300:
+                return False
+            q = q[np.abs((q - q.mean(0)) @ n - np.median((q - q.mean(0)) @ n)) < 0.015]      # the patch's own surface
+            patches.append(q[np.random.default_rng(0).choice(len(q), min(len(q), 4000), replace=False)])
+        m_ = min(len(q) for q in patches)
+        near = np.concatenate([q[:m_] for q in patches])
+        m = near.mean(0)
+        nn = np.linalg.eigh(np.cov((near - m).T))[1][:, 0]    # least squares: the smallest eigenvector
+        self.table_n, self.table_p = (nn if nn @ n > 0 else -nn), m
+        self.table_info.update(
+            source=f"plane of the depth points within {100 * radius:.0f} cm of the object in frames {sorted({int(i) for i, _ in where})}",
+            points=int(len(near)), rms_cm=float(100 * np.sqrt((((near - m) @ self.table_n) ** 2).mean())),
+            patch_heights_cm=[float(100 * ((q.mean(0) - m) @ self.table_n)) for q in patches])
+        self._ltab.clear()
+        return True
+
+    def fit_table(self, state, frames):
+        """Re-fit the table from the depth of `frames` around the object in them (outside the object's and the hand's
+        masks). For when the plane is off where the object rests. One table per clip: not versioned. Returns a note."""
+        self.use(state)
+        old_n, old_c = self.table_n.copy(), float(self.table_n @ self.table_p)
+        where = [(i, self.obj_center(state, i)) for i in frames]
+        if not self._refit_table(where):
+            raise ValueError("too few table points around the object in one of these frames (the hand or the object hides "
+                             "the table there): choose frames in which the table around the object is visible")
+        self.table_info["tilt_vs_geocalib_deg"] = float(np.degrees(np.arccos(np.clip(self.table_n @ self.up_geocalib, -1, 1))))
+        self._set_up(self.table_n)
+        turn = np.degrees(np.arccos(np.clip(self.table_n @ old_n, -1, 1)))
+        return (f"table re-fitted from frames {list(frames)}: {self.table_info['points']} depth points around the object, "
+                f"{self.table_info['rms_cm']:.2f} cm rms off the plane (the patches' heights on it: "
+                f"{', '.join(f'{h:+.1f}' for h in self.table_info['patch_heights_cm'])} cm); its normal turned {turn:.1f} deg (now "
+                f"{self.table_info['tilt_vs_geocalib_deg']:.1f} deg from GeoCalib's gravity). Up for edits and views is this normal.")
+
+    # ---------- object shape ----------
+    def shape_of(self, state):
+        return np.ones(3) if state is None or state.shape is None else np.asarray(state.shape, float)
+
+    def scaled(self, v, scale):
+        """Object-frame points of the mesh as reconstructed -> the mesh scaled along its shape axes (SHAPE_AXES)
+        about center_obj."""
+        B = self.shape_axes
+        return self.center_obj + ((np.asarray(v) - self.center_obj) @ B * np.asarray(scale, float)) @ B.T
+
+    def use(self, state):
+        """Make `state`'s object shape (a State, a (3,) scale or None = as reconstructed) the active one: mesh, mt
+        (render tensors), extent, sub_v, sdf and col_obj are those of that shape from here on. Cheap when it already
+        is; every method and edit that takes a state calls it."""
+        scale = self.shape_of(state) if state is None or isinstance(state, State) else np.asarray(state, float)
+        key = tuple(np.round(scale, 4))
+        if key == self._shape_key:
             return
-        v = np.asarray(self.mesh.vertices)
+        if key not in self._shapes:
+            if len(self._shapes) >= 8:                       # a few shapes at a time (a thickness search tries ~6)
+                self._shapes.pop(next(k for k in self._shapes if k != self._shape_key))
+            one = bool(np.allclose(scale, 1))
+            m = self.mesh0
+            if not one:
+                m = self.mesh0.copy()
+                m.vertices = self.scaled(self.mesh0.vertices, scale)
+            sdf, lo, hi = self._sdf_grid(m, os.path.join(self.run, "refine_sdf128.npz") if one else None)
+            ob = fcl.BVHModel()                              # FCL BVH of the object, in the object frame
+            ob.beginModel(len(self._col0[0]), len(self._col0[1]))
+            ob.addSubModel(self.scaled(self._col0[0], scale), self._col0[1])
+            ob.endModel()
+            self._shapes[key] = dict(mesh=m, mt=make_mesh_tensors(m), extent=np.ptp(np.asarray(m.vertices) @ self.axes_obj, 0),
+                                     shape_extent=self.shape_extent0 * scale, sub_v=np.asarray(m.vertices)[self._sub_idx],
+                                     sdf=sdf, sdf_lo=lo, sdf_hi=hi, col_obj=fcl.CollisionObject(ob, fcl.Transform()))
+        self.__dict__.update(self._shapes[key])
+        self._shape_key = key
+
+    def _sdf_grid(self, mesh, path=None, n=128):
+        """Signed distance to a mesh's surface on a grid in the object frame (negative inside); cached at `path`."""
+        if path and os.path.exists(path):
+            z = np.load(path)
+            return z["sdf"], z["lo"], z["hi"]
+        v = np.asarray(mesh.vertices)
         pad = 0.25 * np.ptp(v, 0).max()
         lo, hi = v.min(0) - pad, v.max(0) + pad
         g = np.stack(np.meshgrid(*[np.linspace(lo[k], hi[k], n) for k in range(3)], indexing="ij"), -1).reshape(-1, 3)
         import open3d as o3d                                 # closest points (open3d's BVH: seconds, not minutes)
         scene = o3d.t.geometry.RaycastingScene()
-        scene.add_triangles(o3d.core.Tensor(np.asarray(self.mesh.vertices, np.float32)),
-                            o3d.core.Tensor(np.asarray(self.mesh.faces, np.uint32)))
+        scene.add_triangles(o3d.core.Tensor(np.asarray(mesh.vertices, np.float32)),
+                            o3d.core.Tensor(np.asarray(mesh.faces, np.uint32)))
         q = scene.compute_closest_points(o3d.core.Tensor(g.astype(np.float32)))
         closest, tri = q["points"].numpy().astype(np.float64), q["primitive_ids"].numpy().astype(np.int64)
         dist = np.linalg.norm(g - closest, axis=1)
-        sign = np.sign(np.einsum("ij,ij->i", g - closest, self.mesh.face_normals[tri]))
+        sign = np.sign(np.einsum("ij,ij->i", g - closest, mesh.face_normals[tri]))
         sign[sign == 0] = 1
-        self.sdf = (sign * dist).reshape(n, n, n).astype(np.float32)
-        self.sdf_lo, self.sdf_hi = lo, hi
-        np.savez(path, sdf=self.sdf, lo=lo, hi=hi)
+        sdf = (sign * dist).reshape(n, n, n).astype(np.float32)
+        if path:
+            np.savez(path, sdf=sdf, lo=lo, hi=hi)
+        return sdf, lo, hi
 
     def sdf_at(self, p_obj):
         """Trilinear SDF lookup for points in the object frame (outside the grid -> large positive)."""
@@ -344,6 +467,7 @@ class Clip:
 
     def hand_colors(self, state, i, verts=None):
         """Per-vertex hand colours for 3D views: red = crossing / inside the object, green = touching it (< 3 mm)."""
+        self.use(state)
         v = self.hand_verts(state, i) if verts is None else verts
         T = state.obj[i]
         sd = self.sdf_at((v - T[:3, 3]) @ T[:3, :3])
@@ -370,10 +494,12 @@ class Clip:
         return float(np.median(np.linalg.norm(self.hand_kp_proj(state, i)[ok] - self.kp2d[i, ok], axis=1)))
 
     def obj_center(self, state, i):
+        self.use(state)
         return state.obj[i, :3, :3] @ self.center_obj + state.obj[i, :3, 3]
 
     def axis(self, state, i, name):
         """Unit axis (camera frame) for edits: object_long/mid/short, world_up/right/forward, camera_x/y/z, ray."""
+        self.use(state)
         if name.startswith("object_"):
             return state.obj[i, :3, :3] @ self.axes_obj[:, ["long", "mid", "short"].index(name[7:])]
         if name.startswith("world_"):
@@ -390,6 +516,7 @@ class Clip:
         median over depth points 4-15 cm horizontally from the footprint (widened to 30, then 50 cm when the hand
         hides that ring), within 5 cm of the global plane, outside the object/hand masks. The global plane can be
         2-5 cm off away from the camera; falls back to it."""
+        self.use(state)
         n, c0 = self.table_n, self.table_n @ self.table_p
         key = (i, tuple(np.round(self.obj_center(state, i), 3)))
         if key in self._ltab:
@@ -418,12 +545,14 @@ class Clip:
 
     def height_above_table(self, state, frames):
         """Lowest point of the object above the local table surface (m), per frame."""
+        self.use(state)
         n = self.table_n
         return np.array([(self.sub_v @ state.obj[i, :3, :3].T + state.obj[i, :3, 3]).dot(n).min() - self.local_table_c(state, i)
                          for i in frames])
 
     # ---------- rendering (low-res, for metrics) ----------
     def render_obj_low(self, state, frames):
+        self.use(state)
         out_d = []
         for s in range(0, len(frames), 48):
             fr = frames[s:s + 48]
@@ -475,6 +604,7 @@ class Clip:
         over its vertices, in the camera and relative to the object), its fastest fingertip (tip_accel_mm: the mean
         over the mesh hides a finger that jumps) and the finger angles; None where a neighbour is missing or the hand
         is not tracked."""
+        self.use(state)
         if hv is None:
             need = sorted({j for i in frames for j in (i - 1, i, i + 1) if 0 <= j < self.N})
             hv = dict(zip(need, self.hand_verts_batch(state, need)))
@@ -511,6 +641,7 @@ class Clip:
 
     # ---------- metrics ----------
     def metrics(self, state, frames=None):
+        self.use(state)
         frames = list(range(self.N)) if frames is None else list(frames)
         need = sorted({j for i in frames for j in (i - 1, i, i + 1) if 0 <= j < self.N})
         hvc = dict(zip(need, self.hand_verts_batch(state, need)))     # one batched MANO forward
@@ -536,6 +667,11 @@ class Clip:
             r["hand_spill"] = float((sh & ~hm & ~m).sum() / max(sh.sum(), 1)) if n_h > 12 else None
             hb = sh & hm & (d > 0)
             r["hand_depth_bias_cm"] = float(100 * np.median(dh[k][hb] - d[hb])) if hb.sum() > 8 else None
+            # occlusion order where the rendered hand and object overlap, as shares of the rendered hand: the hand drawn
+            # in front where the video shows the object (not the hand), and hidden behind it where the video shows the hand
+            ov, n_sh = so & sh, int(sh.sum())
+            r["hand_over_obj"] = float((ov & (dh[k] < do[k] - 0.002) & m & ~self.hm[i]).sum() / n_sh) if n_sh > 12 else None
+            r["obj_over_hand"] = float((ov & (do[k] < dh[k] - 0.002) & hm).sum() / n_sh) if n_sh > 12 else None
             r["hand_kp_px"] = self.hand_kp_err(state, i)
             T = state.obj[i]
             hv = hvc.setdefault(i, self.hand_verts(state, i).astype(np.float64))
@@ -583,8 +719,8 @@ def flag(r, phase):
         out.append("hand penetrates object")
     if r.get("n_cross", 0) >= 6:
         out.append("hand through the object's surface" + (f" ({', '.join(r['cross_fingers'])})" if r.get("cross_fingers") else ""))
-    if phase in ("rest", "approach", "release") and abs(r["obj_height_cm"]) > 1.0:
-        out.append("object off table at rest")
+    if phase in ("rest", "approach", "release") and abs(r["obj_height_cm"]) > 0.7:
+        out.append("object not on the table at rest (in it or above it: its shape or depth is off)")
     if r["obj_height_cm"] < -1.5:
         out.append("object below table")
     if r["hand_height_cm"] < -1.0:
@@ -595,6 +731,10 @@ def flag(r, phase):
         out.append("no opposing grip (thumb or palm vs fingers)")
     if r.get("hand_depth_bias_cm") is not None and abs(r["hand_depth_bias_cm"]) > 1.5:
         out.append("hand off the depth map")
+    if r.get("hand_over_obj") is not None and r["hand_over_obj"] > 0.05:
+        out.append("hand drawn in front of the object where the video shows the object")
+    if r.get("obj_over_hand") is not None and r["obj_over_hand"] > 0.05:
+        out.append("hand hidden behind the object where the video shows the hand")
     if r.get("ang_speed_deg_per_frame", 0) > 12:
         out.append("rotation jump")
     if r.get("hand_accel_mm") is not None and r["hand_accel_mm"] > max(4.0, 2.5 * r.get("_jitter_ref", 2.0)):

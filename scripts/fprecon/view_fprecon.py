@@ -1,4 +1,5 @@
-"""Self-contained viser HTML of one FoundationPose + Depth Pro 2 reconstruction, gravity aligned (step 4).
+"""Self-contained viser HTML of one FoundationPose + Depth Pro 2 reconstruction, with the table's normal as up
+(GeoCalib's gravity when no table plane is found) (step 4).
 
   python scripts/fprecon/view_fprecon.py --video-dir $CHOIR_ROOT/output/VID --run-dir $PROJECT_STORAGE_ROOT/runs/fprecon/VID \
       --export-html out/VID.html      (sam3d env)
@@ -85,6 +86,10 @@ def load_fprecon(args):
     if table is not None and os.path.exists(tj):
         t = json.load(open(tj))
         table = dict(table, normal=np.array(t["normal_up"], float), point=np.array(t["point"], float))
+    up_geocalib = up
+    if table is not None:                                 # up = the table's normal: on a tabletop the table is a better
+        up = table["normal"] / np.linalg.norm(table["normal"])   # reference than GeoCalib's estimate, and the grid lies on it
+        table = dict(table, tilt_deg=float(np.degrees(np.arccos(np.clip(up @ up_geocalib, -1, 1)))))
     rot, trans = poses[:, :3, :3], poses[:, :3, 3]
     heights = None
     if table is not None:
@@ -92,7 +97,7 @@ def load_fprecon(args):
         heights = [float((mesh.vertices @ rot[i].T + trans[i]).dot(nrm).min() - c) for i in (0, n - 1)]
     fps = cv2.VideoCapture(os.path.join(vd, "inputs", "video.mp4")).get(cv2.CAP_PROP_FPS) or 30.0
     return dict(vd=vd, vid=vid, n=n, hv=hv.astype(np.float32), hf=hf, hvalid=hvalid, obj_mesh=mesh, rot=rot,
-                trans=trans, obj_v=None, pose_err=0.0, up=up, grav=grav,
+                trans=trans, obj_v=None, pose_err=0.0, up=up, grav=grav, up_source="table normal" if table is not None else "GeoCalib gravity",
                 R_world=Rotation.align_vectors([[0.0, 0.0, 1.0]], [up])[0], pts=pts, cols=cols, table=table,
                 scene_scale=1.0, obj_heights=heights, H=H, W=W, fov_y=float(2 * np.arctan(H / (2 * K[1, 1]))),
                 fps=float(fps), frames_dir=os.path.join(vd, "inputs", "frames", "rgb"), depth_scale=scale, fpose_qc=qc)
@@ -121,7 +126,7 @@ def main():
     write_embed_html(args.export_html, data, vc.default_camera(d))
     info = vc.summary(d)
     q = d["fpose_qc"]
-    info.update(method="foundationpose+depthpro2", depth_scale_from_hand=d["depth_scale"],
+    info.update(method="foundationpose+depthpro2", up=d["up_source"], depth_scale_from_hand=d["depth_scale"],
                 object_size_m=q["object_size_m"], iou_first_last=q["iou_first_last"],
                 iou_visible_frames_mean=q["iou_visible_frames_mean"], reregistered_frames=len(q["reregistered_frames"]))
     json.dump(info, open(os.path.splitext(args.export_html)[0] + ".json", "w"), indent=2)

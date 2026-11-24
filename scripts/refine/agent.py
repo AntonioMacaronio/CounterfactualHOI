@@ -5,14 +5,19 @@ rotations; no vertex edits); fit_mano is a gradient-based fit of them that the a
   python scripts/refine/agent.py --video-dir $CHOIR_ROOT/output/VID --run-dir $PROJECT_STORAGE_ROOT/runs/fprecon/VID \
       --out $PROJECT_STORAGE_ROOT/runs/refine/VID [--effort high] [--max-turns 60]      (fpose env, Amazon Bedrock)
 
-Loop: the agent gets an overview (contact sheet, side views, metric plots, flagged frames), labels the motion phases,
-then fixes issues one at a time with the edit tools (ops.py); every edit makes a new version and returns before/after
-metrics and images of the touched frames, so it can keep or revert. At the end an independent verifier (a fresh call,
-same model) compares initial vs refined on every changed frame range (split at phases, at most 60 frames) in random A/B
-order and reverts ranges where the initial reconstruction looks better. Outputs in OUT: final.npz, versions/,
-transcript.jsonl, images/, report.md, phases.json, table.json and export/ (the fprecon run with the refined result, for
-the viewer and retargeting: object_poses.npy, mano_params.npz = global_orient / transl / hand_pose per frame + betas,
-valid, side, all in the camera frame, and hand_verts.npy).
+Loop: the agent gets an overview (contact sheet, side views, metric plots, flagged frames) and labels the motion
+phases; the harness then searches the object's extent along the direction the first frame never saw (the mesh comes
+from that frame; fit_object_thickness). The agent fixes issues one at a time with the edit tools (ops.py); every edit
+makes a new version and returns before/after metrics and images of the touched frames, so it can keep or revert. An
+independent reviewer (a fresh call, same model) judges the result in absolute terms before the agent may finish. Then
+an independent verifier compares the result with the automatic fit on every changed frame range in random A/B order
+(the span in which the hand holds the object is one range; the rest is split at phases, at most 60 frames) and the
+ranges where the automatic fit looks better are set back to it. The reviewer checks that merged result, and a second
+pass of the agent works on what it still finds (--passes). Outputs in OUT: final.npz, versions/, transcript.jsonl,
+images/, report.md, phases.json, table.json and export/ (the fprecon run with the refined result, for the viewer and
+retargeting: object_poses.npy, mano_params.npz = global_orient / transl / hand_pose per frame + betas, valid, side,
+all in the camera frame, hand_verts.npy, object_shape.json and, when the object's shape was changed, the scaled
+object_mesh.obj).
 
 Claude on Amazon Bedrock via the SDK's AnthropicBedrock client (InvokeModel, the account's global inference profile);
 model, region and effort are flags. Prompt caching is automatic (top-level cache_control) and old tool results (the
@@ -36,7 +41,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import ops  # noqa: E402
 import render as R  # noqa: E402
-from clip import FINGERS, Clip, State, Versions, flag, jump_threshold, phase_of, se3_interp, summarize  # noqa: E402
+from clip import FINGERS, SHAPE_AXES, Clip, State, Versions, flag, jump_threshold, phase_of, se3_interp, summarize  # noqa: E402
 
 OBJECTS = {1: "small metal device (a RealSense-style depth camera)", 2: "blue tape roll", 3: "black spatula",
            4: "gray mug", 5: "dish soap bottle"}
@@ -48,9 +53,11 @@ AXES = ["object_long", "object_mid", "object_short", "world_up", "world_right", 
 SIGNALS = ["coverage", "spill", "iou", "depth_res_cm", "depth_bias_cm", "hand_kp_px", "hand_coverage", "hand_spill",
            "hand_depth_bias_cm", "contact_cm", "penetration_cm", "n_cross", "obj_height_cm", "hand_height_cm",
            "ang_speed_deg_per_frame", "speed_cm_per_frame", "hand_accel_mm", "hand_rel_accel_mm", "tip_accel_mm", "finger_accel_deg",
+           "hand_over_obj", "obj_over_hand",
            "obj_accel_cm", "obj_ang_accel_deg", "thumb_gap_cm", "n_touching", "opposed"]
 REPORT_KEYS = ["coverage", "spill", "depth_res_cm", "hand_kp_px", "hand_depth_bias_cm", "contact_cm", "penetration_cm",
-               "n_cross", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "tip_accel_mm", "finger_accel_deg", "obj_ang_accel_deg",
+               "n_cross", "hand_over_obj", "obj_over_hand", "obj_height_cm", "ang_speed_deg_per_frame", "hand_accel_mm", "tip_accel_mm",
+               "finger_accel_deg", "obj_ang_accel_deg",
                "thumb_gap_cm", "n_touching", "opposed"]
 
 SYSTEM = """You refine a 4D reconstruction of a hand manipulating a rigid object, filmed by a static camera. The
@@ -61,6 +68,9 @@ replaying a jittery trajectory shakes).
 
 What you are editing (all metric, in the real camera's frame):
 - the object's pose in every frame (a textured mesh reconstructed from the first frame);
+- the object's shape: because the mesh comes from that one frame, its extent along the direction that frame looked
+  along (the side it never saw) is a guess. A scale of the mesh along that direction, and along the two directions
+  across that view, is part of the reconstruction;
 - the hand, as the MANO hand model's parameters in every frame: its global orientation and position and its 15
   joint rotations (the hand model's own articulation, so the hand always stays a valid human hand; there are no
   vertex edits);
@@ -90,6 +100,20 @@ How to read the images:
   it; the overview gives the hand tracker's own smoothness as the reference (refined motion should not be much
   jitterier). view_motion shows a range's wrist and fingertip paths in one fixed 3D view (smooth curves = good,
   zig-zags = jitter) and a filmstrip of consecutive frames from one viewpoint.
+- Occlusion order: hand_over_obj is the share of the rendered hand that is drawn in front of the object where the
+  video shows the object (the real fingers are behind it there); obj_over_hand the share that is hidden behind the
+  object where the video shows the hand. Both should be ~0; a flag at 5%. This is direct evidence from the video
+  of which side of the object the fingers are on, which the depth map cannot give at this scale.
+- Table: up for the world axes, the side / top / front views and the export is the normal of the table plane, fitted
+  to the depth points around the object where it rests at the start and at the end of the clip (GeoCalib's gravity
+  estimate is only its starting point; the depth map's table is not exactly one plane, so the plane is fitted through
+  both places). Heights are measured from that plane right around the object.
+- Shape: obj_height_cm at rest says whether the object sits on the table (0), in it (< 0) or above it. An object that
+  rests in the table by the same amount in every rest phase while its outline and depth fit, or that the hand can only
+  grip by leaving its keypoints (the fingers cannot get behind it, the hand stays in front of the depth map:
+  hand_depth_bias_cm < 0), has the wrong extent on the side the camera never saw: no hand pose can grip it as the
+  video shows, and a simulated copy would sink into the table. That is an error of the object's shape, not of the
+  hand and not noise.
 - Jumps: tip_accel_mm is the acceleration of the fastest fingertip. hand_accel_mm is a mean over the whole hand and a
   median over frames hides single frames, so a hand or a finger that jumps between two frames (the end of an edit's
   range, a fit that changed its solution from one frame to the next) only shows in tip_accel_mm: a spike of 10+
@@ -110,6 +134,12 @@ Edits (each makes a new version and shows you before/after numbers and images of
   not hand-tuned numbers: fit_object_silhouette (search against the mask outside the hand + depth) and polish_object
   (the tracker's refiner) sharpen poses within a trust region; they will not fix a wrong orientation or a jump.
   Your own rotate/translate edits are for what search cannot do: flips, wrong sides, jumps, lag, structure.
+- Object shape: fit_object_thickness searches the object's extent along the first frame's viewing direction and shows
+  its evidence for every candidate (rest height, mask and depth fit, and whether a grip fit reaches an opposed grip
+  and at what keypoint error); scale_object scales the mesh by a factor you choose along "unseen" (that viewing
+  direction) or along "seen_long" / "seen_short" (the object's longer / shorter extent across that view). Both keep
+  the side of the object that faces the camera in place and re-fit the object's poses and the hand over the whole
+  clip, so do them before detailed work (they undo hold_object_static / smooth_object edits).
 - Hand: fit_mano is a gradient-based fit of all MANO parameters of a frame range at once: 2D keypoints, the hand's
   mask and the depth map, MANO's hand-pose prior, smoothness over time, no penetration into the object or the table,
   and in the held phases you labeled (so label phases first) a grip: the thumb or palm and a finger on the object's
@@ -131,19 +161,29 @@ Edits (each makes a new version and shows you before/after numbers and images of
 How to work:
 Unless the overview says otherwise, you start from v1, the automatic fit: fit_object_silhouette frame by frame
 (smoothed over time), smooth_object over the whole clip (window 5: the pose tracker's frame-to-frame noise), then
-fit_mano over the whole clip without the grip term (it knows no phases yet).
+fit_mano over the whole clip without the grip term (it knows no phases yet), and once more with the occlusion term
+where that puts the hand on the right side of the object without costing keypoint fit.
 It is usually more precise per frame than the initial reconstruction (v0), and a
 verifier will compare your result against v1, chunk by chunk, keeping v1 wherever yours looks worse. The automatic
 fit knows nothing about the motion: it fits the object frame by frame, so it can make it jitter or drift while it
 rests, leaves the hand floating off the object while it is held (no phases yet, so no grip term), follows a bad
 mask, or keeps a wrong orientation it started from. Fixing that is your job:
-1. Look at the overview and label the phases with set_phases first (frame ranges covering the whole clip).
+1. Look at the overview and label the phases with set_phases first (frame ranges covering the whole clip). Right
+   after your first set_phases the harness runs fit_object_thickness once and shows you its evidence table. Check its
+   decision against what you know: compare the object's size in cm with what such an object really measures and with
+   the hand next to it, and look at a rest frame and a held frame from the side (view3d). Correct it with
+   scale_object if it is clearly off (too thick to be held as in the video, sunk into the table, or squashed).
 2. Grip: while held, the hand must grip the object (opposed), not rest a fingertip on it. fit_mano over the held
    phases (grasp to place) so the hand and its fingers grip the object there; it already weighs the depth map against
    the keypoints, so a remaining hand_depth_bias_cm of 1-3 cm is usually the evidence disagreeing, not an error. Use
    move_hand_to_depth only when the hand is clearly on the wrong side of the object (then fit_mano again). Where held
    frames are still not opposed, raise contact_weight (3-10), or move_hand first so the thumb and the fingers can
-   reach opposite sides, then fit_mano again. Then look at held frames in 3D from at least three sides (view3d, azimuths
+   reach opposite sides, then fit_mano again. If a grip is only reached by pulling the hand off its keypoints
+   (hand_kp_px up by 5+ px, fingers where the video shows none), the fingers are not the problem: the object is too
+   thick or at the wrong depth for the hand (step 5). Fix that, not the hand. Where the hand is flagged in front of
+   the object while the video shows the object (hand_over_obj), the hand is on the wrong side of it: a fit cannot
+   carry it through the object, so move_hand_to_depth (or move_hand along camera z) first, then fit_mano with
+   occlusion_weight 1-3 and check that hand_kp_px stays. Then look at held frames in 3D from at least three sides (view3d, azimuths
    0, 90, 180, 270; zoom "contact"): fingers must wrap on the outside of the object, none red; where the palm is red
    use separate_hand (or fit_mano again), where a finger is red or floats use fit_mano mode fingers or curl_finger.
 3. Rest: nobody moves the object before the grasp or after the release, so it should be still there. Where the
@@ -154,12 +194,15 @@ mask, or keeps a wrong orientation it started from. Fixing that is your job:
    closely (zoom, several frames, a virtual view), make the smallest edit that fixes it, and check the before/after
    result. Revert if it did not help; never stack edits on a version you have not checked. Compare with v0 (history
    / plot) when the automatic fit looks worse somewhere.
-5. Heights: when the image fit and the depth agree, a height of under ~0.7 cm above the table at rest is
-   measurement noise: leave it. If the object sits at about the same offset (up to ~2 cm, above or below) in every
-   rest phase while its outline and depth fit well, that is usually the mesh's unseen underside or the depth of a
-   thin object blending into the table, not a pose error. Leave it if one move_along_ray on the rest frames raises
-   depth_res_cm past ~1 cm; the export puts the simulated table at the object's resting height, so a constant
-   offset is harmless. What must be fixed is a rest height that differs between rest phases or drifts within one.
+5. Object on the table and in the hand: at rest the object's lowest point belongs at the table (within ~0.5 cm) with
+   its outline and depth still fitting, and while held the object must fit between the thumb and the fingers. The
+   same offset in every rest phase, or an object too thick to be gripped as the video shows, is the object's unseen
+   side: fit_object_thickness, or scale_object when you can tell by how much; move_along_ray only when the object's
+   visible surface is off the depth map too (depth_bias_cm). Afterwards the rest height must be ~0 with coverage,
+   spill and depth_res_cm about unchanged, and a grip fit must reach an opposed grip without the keypoint error
+   rising; revert a shape change that does not do that. snap_object_to_table moves the object along the table's
+   normal, off its outline: use it only where one rest phase is off. A rest height that differs between rest phases
+   or drifts within one is a pose error: hold_object_static or smooth_object.
 6. Smoothness: per-frame fits (separate_hand, fit_object_silhouette, polish_object) and hand edits can add jitter
    (fit_mano has its own smoothness term; raise smooth_weight if it is still jittery), and any range edit with a
    sharp end can add a jump. After such edits plot tip_accel_mm / hand_accel_mm and look at view_motion over the
@@ -223,6 +266,11 @@ TOOLS = [
          {**RANGE, "max_rot_deg": NUM, "max_trans_cm": NUM}),
     tool("fit_object_silhouette", "Fit the object's pose per frame to its mask (ignoring pixels the hand covers) and the depth by search, within a trust region; for small systematic offsets.",
          {**RANGE, "max_rot_deg": NUM, "max_trans_cm": NUM}),
+    tool("fit_object_thickness", "Search the object's extent along the first frame's viewing direction, the side that frame could not see (thinner when the object rests in the table or cannot be gripped, thicker when it floats): each candidate gets the object's poses re-fitted and a grip fit on the held phases, and you get the evidence for each. Applies the most consistent one. Needs phases.", {}),
+    tool("scale_object", "Scale the object's mesh (factor < 1 = smaller) along 'unseen' (the first frame's viewing direction: the extent that frame could not see) or 'seen_long' / 'seen_short' (its longer / shorter extent across that view). The side facing the camera stays in place; the object's poses are re-fitted to mask + depth and the hand is re-fitted over the whole clip.",
+         {"axis": {"type": "string", "enum": ["unseen", "seen_long", "seen_short"]}, "factor": {"type": "number", "description": "0.3-3 (e.g. 0.5 halves that extent)"}}),
+    tool("fit_table", "Re-fit the table plane from the depth around the object in the frames you give: one plane through the table around the object in all of them (choose frames where the table around the object is visible, from every rest phase). Up for edits, views and the export is the table's normal. Use it when the table drawn in the side views is not where the video's table is under the object at rest.",
+         {"frames": {"type": "array", "items": INT, "description": "1-8 frames"}}),
     tool("propose_object_poses", "The pose tracker's top-k alternative object poses at a frame, rendered for you to choose from.",
          {"frame": INT, "k": {"type": "integer", "description": "2-9"}}),
     tool("apply_candidate", "Use candidate c (from propose_object_poses) at frame and apply the same change on [start, end].",
@@ -234,7 +282,8 @@ TOOLS = [
          {**RANGE, "mode": {"type": "string", "enum": ["all", "fingers", "rigid"]},
           "contact": {"type": "boolean", "description": "grip term in held phases (default true)"},
           "smooth_weight": {"type": "number", "description": "smoothness over time (default 1; 3-10 for a jittery range)"},
-          "contact_weight": {"type": "number", "description": "grip term weight (default 1; 3-10 when held frames still float off the object)"}},
+          "contact_weight": {"type": "number", "description": "grip term weight (default 1; 3-10 when held frames still float off the object)"},
+          "occlusion_weight": {"type": "number", "description": "0 (default) to 3: keep the hand behind the object where the video shows the object and in front of it where it shows the hand"}},
          required=["start", "end", "mode"]),
     tool("separate_hand", "Per frame, push the hand out of the object along the surface normal where the palm passes through it (at most max_cm; keeps the keypoint fit).",
          {**RANGE, "max_cm": NUM}),
@@ -271,22 +320,57 @@ class Session:
         os.makedirs(os.path.join(out, "versions"), exist_ok=True)
         self.base = 0                                  # the version the verifier compares the result against
         self.client, self.critic_rounds, self.critique = None, 0, None
+        self.shape_done, self.shape_table, self.edits_since_base, self.table_note = False, None, 0, None
 
     def auto_fit(self):
         """v1 = the fits run over the whole clip (object silhouette, a light smoothing of the object's poses, then
-        MANO without the grip term): the agent starts from it."""
+        MANO without the grip term, then with the occlusion term where that helps): the agent starts from it."""
         c = self.clip
         st, _, n1 = ops.fit_object_silhouette(c, self.v.state, 0, c.N - 1)
         st, _, n1b = ops.smooth_object(c, st, 0, c.N - 1, 5)       # the tracker's frame-to-frame pose noise
         st, _, n2 = ops.fit_mano(c, st, 0, c.N - 1, contact=False, shape=True)
-        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n1b}; {n2}")
+        st, n3 = ops.fit_occlusion(c, st, 0, c.N - 1, contact=False)
+        k = self.v.add(st, f"automatic fit over the whole clip: {n1}; {n1b}; {n2}; {n3}")
         self.save(k, st)
         self.base = k
         return k
 
     def save(self, k, st):
         np.savez(os.path.join(self.out, "versions", f"v{k:03d}.npz"), obj=st.obj, global_orient=st.go, transl=st.tr,
-                 hand_pose=st.hp, betas=self.clip.betas_of(st))
+                 hand_pose=st.hp, betas=self.clip.betas_of(st), shape=self.clip.shape_of(st))
+
+    def rebase(self, direct=False):
+        """The verifier's base must have the working version's object shape (one rigid object per clip, and the
+        verifier judges the agent's edits, not the shape). After an edit that changed the shape the base becomes the
+        automatic fit under the new shape: the working version itself when nothing else was edited since the base
+        (direct), else the old base re-shaped, with its object and hand re-fitted (no grip term)."""
+        c, st = self.clip, self.v.state
+        if np.allclose(c.shape_of(st), c.shape_of(self.v.states[self.base])):
+            return ""
+        if direct:
+            self.base = self.v.cur
+        else:
+            nb = ops.reshape_object(c, self.v.states[self.base], c.shape_of(st))
+            nb = ops.fit_object_silhouette(c, nb, 0, c.N - 1)[0]
+            nb = ops.fit_mano(c, nb, 0, c.N - 1, contact=False)[0]
+            cur = self.v.cur
+            self.base = self.v.add(nb, f"automatic fit (v{self.base}) under the new object shape: object and hand re-fitted")
+            self.save(self.base, nb)
+            self.v.cur = cur
+        self.edits_since_base = 0
+        return (f"\nThe object's shape is one per clip, so the verifier now compares your result against v{self.base}: the "
+                "automatic fit under this shape.")
+
+    def thickness(self):
+        """fit_object_thickness on the working version (the harness runs it once after the first set_phases)."""
+        self.shape_done = True
+        direct = self.edits_since_base == 0
+        st, touched, note, table = ops.fit_object_thickness(self.clip, self.v.state)
+        self.shape_table = table
+        if not touched:
+            return [{"type": "text", "text": note + "\n" + table}]
+        out = self.edit(lambda clip, state: (st, touched, note))
+        return out + [{"type": "text", "text": table + self.rebase(direct)}]
 
     def img(self, im, tag):
         self.n_img += 1
@@ -304,9 +388,11 @@ class Session:
     def edit(self, fn, *a, **kw):
         """Apply an edit to the working version -> new version; report before/after on the touched frames."""
         before = self.v.cur
+        self.clip.use(self.v.state)
         st, touched, note = fn(self.clip, self.v.state, *a, **kw)
         k = self.v.add(st, note)
         self.save(k, st)
+        self.edits_since_base += bool(touched)
         if not touched:
             return [{"type": "text", "text": f"v{k}: {note}. No frames changed."}]
         mb, ma = self.metrics_of(before), self.metrics_of(k)
@@ -390,8 +476,18 @@ class Session:
                                    key=lambda p: p["start"])
                 return s2, [], "phases: " + ", ".join(f"{p['label']} {p['start']}-{p['end']}" for p in s2.phases)
             out = self.edit(f)
+            if not self.shape_done:                      # the object's unseen extent, as soon as rest / held are known
+                out += [{"type": "text", "text": "The harness ran fit_object_thickness (once, after the first set_phases):"}] + self.thickness()
             rows = self.metrics_of(self.v.cur)
             return out + [{"type": "text", "text": summarize(c, self.v.state, rows)}]
+        if name == "fit_object_thickness":
+            return self.thickness()
+        if name == "scale_object":
+            if a["axis"] not in ops.SHAPE_AXES:
+                raise ValueError("axis must be unseen, seen_long or seen_short")
+            direct = self.edits_since_base == 0
+            out = self.edit(ops.scale_object, a["axis"], float(min(max(a["factor"], 0.3), 3.0)))
+            return out + [{"type": "text", "text": self.rebase(direct)}]
         if name == "rotate_object":
             return self.edit(ops.rotate_object, cl(a["start"]), cl(a["end"]), a["axis"], float(a["angle_deg"]), int(a["falloff"]))
         if name == "translate_object":
@@ -435,7 +531,19 @@ class Session:
                 raise ValueError("mode must be all, fingers or rigid")
             return self.edit(ops.fit_mano, cl(a["start"]), cl(a["end"]), a["mode"], None if a.get("contact", True) else False,
                              smooth_weight=float(min(max(a.get("smooth_weight", 1.0), 0.1), 30)),
-                             contact_weight=float(min(max(a.get("contact_weight", 1.0), 0.0), 30)))
+                             contact_weight=float(min(max(a.get("contact_weight", 1.0), 0.0), 30)),
+                             occl_weight=float(min(max(a.get("occlusion_weight", 0.0), 0.0), 3.0)))
+        if name == "fit_table":
+            fr = sorted({cl(i) for i in a["frames"][:8]})
+            before = self.metrics_of(self.v.cur)
+            note = c.fit_table(st, fr)
+            self.m.clear()                               # heights of every version are measured against the table
+            self.table_note = note
+            rows = self.metrics_of(self.v.cur)
+            rest = [r["frame"] for r in rows if phase_of(st, r["frame"]) in ops.REST] or fr
+            h = lambda rr: np.median([rr[i]["obj_height_cm"] for i in rest])
+            return [{"type": "text", "text": f"{note} The object's lowest point at rest: {h(before):+.1f} -> {h(rows):+.1f} cm from the table."},
+                    self.img(R.sheet([R.view(c, st, i, "side") for i in fr[:4]], ncols=2), "table")]
         if name == "separate_hand":
             return self.edit(ops.separate_hand, cl(a["start"]), cl(a["end"]), float(min(max(a["max_cm"], 0.2), 3.0)))
         if name == "move_hand_to_depth":
@@ -525,8 +633,10 @@ def overview(sess):
     task = TASKS[vid.split("_")[0]]
     obj = OBJECTS.get(int(vid.split("_")[-1]), "object")
     text = (f"Clip {vid}: a {c.side} hand {task}. Object: {obj}. {c.N} frames at {c.fps:.0f} fps, {c.W}x{c.H}. "
-            f"Object size (long/mid/short axes): {', '.join(f'{100 * e:.1f}' for e in c.extent)} cm.\n"
-            + (f"You start from v{k}, the automatic fit ({sess.v.notes[k]}); v0 is the initial reconstruction.\n"
+            f"Object size (long/mid/short axes): {', '.join(f'{100 * e:.1f}' for e in c.extent)} cm; reconstructed from the "
+            f"first frame, so its extent along that frame's viewing direction ({100 * c.shape_extent[0]:.1f} cm) is a guess, its "
+            f"extents across that view ({100 * c.shape_extent[1]:.1f} and {100 * c.shape_extent[2]:.1f} cm) were seen.\n"
+            + (f"You start from v{k} ({sess.v.notes[k]}); v0 is the initial reconstruction.\n"
                if k else "You start from v0, the initial reconstruction (no automatic fit; the verifier compares against "
                          "v0): fit_mano over the whole clip early on is usually worth it.\n")
             + f"v{k} metrics:\n" + summarize(c, st, rows) +
@@ -572,12 +682,33 @@ def call(client, args, log, **kw):
     raise RuntimeError("Bedrock: retries exhausted")
 
 
-def agent_loop(sess, client, args, log):
-    msgs = [{"role": "user", "content": overview(sess)}]
+def followup(sess, rev, verdicts):
+    """First message of another pass: what the reviewer still finds in the merged result of the pass before, and what
+    the verifier rejected of it."""
+    k = sess.v.cur
+    text = (f"Your earlier pass is finished. Its result is v{k}: your last version with the ranges the verifier rejected set "
+            "back to the version you started from. An independent reviewer (fresh context, absolute standards, every phase "
+            "next to the video and from four sides) still finds these problems in it:\n"
+            + "\n".join(f"- [{p['severity']}] frames {p['start']}-{p['end']}: {p['issue']} (hint: {p['fix_hint']})" for p in rev["problems"])
+            + ("\nThe verifier rejected these ranges of your earlier pass:\n" + "\n".join(
+                f"- frames {run[0]}-{run[1]}: {v['reason']}" for run, v in verdicts if not v["keep_refined"])
+               if any(not v["keep_refined"] for _, v in verdicts) else "")
+            + f"\nThis pass starts from v{k} and the verifier compares what you change now against v{k}, so make the edits that "
+              "clearly fix a listed problem, most severe first, and check each one from several sides. What was rejected "
+              "before will be rejected again unless you do it differently: when a grip could only be reached by pulling "
+              "the hand off the video, the object's shape or depth is the likely cause (fit_object_thickness, scale_object). "
+              "If a problem cannot be fixed with your tools, say why in your finish summary.\n\n")
+    ov = overview(sess)
+    return [{"type": "text", "text": text + ov[0]["text"]}] + ov[1:]
+
+
+def agent_loop(sess, client, args, log, first=None, max_turns=None, max_minutes=None):
+    msgs = [{"role": "user", "content": first or overview(sess)}]
+    max_turns, max_minutes = max_turns or args.max_turns, max_minutes or args.max_minutes
     ctx = {"edits": [{"type": "clear_tool_uses_20250919", "trigger": {"type": "input_tokens", "value": 140000},
                       "keep": {"type": "tool_uses", "value": 8}}]}
     t_start = time.time()
-    for turn in range(args.max_turns):
+    for turn in range(max_turns):
         t0 = time.time()
         r = call(client, args, log, system=SYSTEM, tools=TOOLS, messages=msgs, context_management=ctx)
         msgs.append({"role": "assistant", "content": r.content})
@@ -609,20 +740,38 @@ def agent_loop(sess, client, args, log):
             msgs.append({"role": "user", "content": results})
             break
         elapsed = (time.time() - t_start) / 60
-        if turn >= args.max_turns - 3 or elapsed > args.max_minutes:
+        if turn >= max_turns - 3 or elapsed > max_minutes:
             results.append({"type": "text", "text": "Budget almost used up: wrap up and call finish within the next turn."})
         msgs.append({"role": "user", "content": results})
     return sess.v.cur
 
 
+def held_spans(phases):
+    """Maximal runs of consecutive held phases (grasp ... place) as [start, end]."""
+    spans = []
+    for p in sorted(phases, key=lambda p: p["start"]):
+        if p["label"] in HELD_PHASES:
+            if spans and p["start"] <= spans[-1][1] + 1:
+                spans[-1][1] = max(spans[-1][1], p["end"])
+            else:
+                spans.append([p["start"], p["end"]])
+    return spans
+
+
 def chunks(run, phases, max_len=60):
-    """Split a changed frame range at phase boundaries and into pieces of at most max_len frames, so the verifier
-    judges (and can revert) parts of a long edit separately."""
+    """Split a changed frame range for the verifier. The span in which the hand holds the object (consecutive held
+    phases) is one piece, judged as a whole: a grip is one thing from grasp to place, and pieces of it that are kept
+    and rejected in turn cannot be joined. The rest is split at phase boundaries and into pieces of at most max_len
+    frames, so parts of a long edit are judged (and can be rejected) separately."""
     a, b = run
-    cuts = sorted({p["start"] for p in phases if a < p["start"] <= b})
+    spans = held_spans(phases)
+    inside = lambda f: any(s0 < f <= s1 for s0, s1 in spans)          # a boundary within a held span is no cut
+    cuts = sorted({p["start"] for p in phases if a < p["start"] <= b and not inside(p["start"])}
+                  | {s1 + 1 for s0, s1 in spans if a < s1 + 1 <= b})
     pieces, s = [], a
     for c in cuts + [b + 1]:
-        while c - s > max_len:
+        held = any(s0 <= s and c - 1 <= s1 for s0, s1 in spans)
+        while c - s > max_len and not held:
             pieces.append([s, s + max_len - 1])
             s += max_len
         if c > s:
@@ -724,14 +873,17 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
     metrics of the whole clip) add a plot of the motion over the range, which still frames cannot show (jitter,
     drift at rest)."""
     a, b = run
-    fr = sorted(set(int(x) for x in np.linspace(a, b, min(4, b - a + 1))))
+    held = all(phase_of(s1, i) in HELD_PHASES for i in (a, b))       # the span in which the hand holds the object
+    n_fr = 6 if held and b - a > 40 else 4
+    fr = sorted(set(int(x) for x in np.linspace(a, b, min(n_fr, b - a + 1))))
     order = random.Random(hash((clip.vid, a, b))).random() < 0.5
     A, B = (s1, s0) if order else (s0, s1)
     tiles = []
     for i in fr:
         tiles += [R.overlay(clip, A, i, label=f"frame {i}: A"), R.overlay(clip, B, i, label=f"frame {i}: B")]
     views = []                                            # 3D from three sides, A's row then B's row, per frame
-    for i in (fr[0], fr[-1]) if len(fr) > 1 else fr:
+    for i in ((fr[len(fr) // 4], fr[len(fr) // 2], fr[(3 * len(fr)) // 4]) if held and len(fr) >= 4 else
+              (fr[0], fr[-1]) if len(fr) > 1 else fr):
         for lab, S_ in (("A", A), ("B", B)):
             views += [R.view_orbit(clip, S_, i, z, label=f"frame {i} {R.AZ_NAMES[z]}: {lab}") for z in (0, 90, 180)]
     im1, im2 = R.sheet(tiles, ncols=2), R.sheet(views, ncols=3, tile_w=440)
@@ -762,6 +914,26 @@ def verify_run(client, args, clip, s0, s1, run, out, tag, rows0=None, rows1=None
                    "(mean over its surface) and of its fastest fingertip (jitter; a spike on one to three frames is the hand "
                    "or a finger jumping). A real object does not jitter or drift while it rests on the table and moves "
                    "smoothly while held, and real hands and fingers move smoothly; spikes there are reconstruction errors.")
+    if held and rows0 is not None and rows1 is not None:
+        def numbers(rows, st):
+            sel = [r for r in rows if a <= r["frame"] <= b]
+            lifted = [r for r in sel if phase_of(st, r["frame"]) in ("lift", "carry", "rotate")]
+            kp = [r["hand_kp_px"] for r in sel if r.get("hand_kp_px") is not None]
+            return ((f"thumb or palm against the fingers on {np.mean([bool(r['opposed']) for r in lifted]):.0%} of the lifted frames, "
+                     if lifted else "") +
+                    f"{np.mean([r['n_cross'] for r in sel]):.1f} hand triangles through the object on average, keypoint "
+                    f"error {np.median(kp) if kp else 0:.0f} px")
+        prompt += (f" Frames {a}-{b} are the whole span in which the hand holds the object (grasp to place), and what "
+                   "decides here is whether the object is really held. While it is off the table it must be gripped as "
+                   "the video shows: thumb or palm on one side and fingers on the other with the object between them, or "
+                   "fingers hooked through a handle, or wrapped around it. Fingertips resting on one side of an object "
+                   "that hangs in the air is not a grip: nothing would hold it, and a robot replaying it drops the "
+                   "object. Prefer the reconstruction in which the object is held, even when its hand lies a little "
+                   "further from the white keypoints (keypoints of fingers hidden behind the object are guesses). Do not "
+                   "prefer one whose hand plainly contradicts the video (a finger or the thumb where the video shows "
+                   "none, the hand through the object). Measured over this span, A: "
+                   + numbers(rows1 if order else rows0, A) + "; B: " + numbers(rows0 if order else rows1, B)
+                   + " (a hook grip through a handle counts as no thumb-against-fingers grip in these numbers).")
     r = client.messages.create(model=args.model, max_tokens=8000, output_config={"effort": "high", "format": {"type": "json_schema", "schema": VERIFY_SCHEMA}},
                                messages=[{"role": "user", "content": [R.encode(im) for im in ims] + [{"type": "text", "text": prompt}]}])
     v = json.loads(next(b.text for b in r.content if b.type == "text"))
@@ -794,6 +966,8 @@ def merge(clip, s0, s1, runs_to_revert, kept=(), blend=6):
     revert, kept, notes = sorted(runs_to_revert), sorted(kept), []
     if not revert:
         return s1.copy(), notes
+    if not np.allclose(clip.shape_of(s0), clip.shape_of(s1)):       # one rigid object per clip (Session.rebase)
+        s0 = ops.reshape_object(clip, s0, clip.shape_of(s1))
     while True:
         w = revert_weights(clip.N, revert, blend)
         s = s1.copy()
@@ -829,19 +1003,56 @@ def merge_text(clip, final, seams):
             + (f"frames {frames_text(jumps)}" if jumps else "none") + ".")
 
 
+def write_scaled_obj(clip, scale, src, dst):
+    """The reconstructed OBJ with its vertices (and normals) scaled along the object's shape axes about its centre
+    (Clip.scaled); texture coordinates, faces and the material reference are kept as they are."""
+    B, c = clip.shape_axes, clip.center_obj
+    S, Sn = B @ np.diag(scale) @ B.T, B @ np.diag(1.0 / np.asarray(scale)) @ B.T
+    with open(src) as fi, open(dst, "w") as fo:
+        for ln in fi:
+            if ln.startswith("v "):
+                t = ln.split()
+                v = c + S @ (np.array(t[1:4], float) - c)
+                ln = "v " + " ".join(f"{x:.6f}" for x in v) + (" " + " ".join(t[4:]) if len(t) > 4 else "") + "\n"
+            elif ln.startswith("vn "):
+                n = Sn @ np.array(ln.split()[1:4], float)
+                ln = "vn " + " ".join(f"{x:.6f}" for x in n / max(np.linalg.norm(n), 1e-12)) + "\n"
+            fo.write(ln)
+
+
 def export(clip, state, out):
     """Write the result and an export/ run dir (the fprecon run with refined object poses + hand motion) for the viewer."""
+    clip.use(state)
+    scale = clip.shape_of(state)
     np.savez(os.path.join(out, "final.npz"), obj=state.obj, global_orient=state.go, transl=state.tr, hand_pose=state.hp,
-             betas=clip.betas_of(state))
+             betas=clip.betas_of(state), shape=scale)
     json.dump(state.phases, open(os.path.join(out, "phases.json"), "w"), indent=1)
     ex = os.path.join(out, "export")
     os.makedirs(ex, exist_ok=True)
+    meshes = ("object_mesh.obj", "object_mesh.ply")
     for f in os.listdir(clip.run):
-        if f in ("object_poses.npy", "hand_rigid.npz", "hand_verts.npy", "mano_params.npz"):
+        if f in ("object_poses.npy", "hand_rigid.npz", "hand_verts.npy", "mano_params.npz", "object_shape.json") + meshes:
             continue
         dst = os.path.join(ex, f)
         if not os.path.lexists(dst):
             os.symlink(os.path.join(clip.run, f), dst)
+    # the object's mesh: the reconstructed one (a link), or a copy scaled along its axes (State.shape)
+    for f in meshes:
+        src, dst = os.path.join(clip.run, f), os.path.join(ex, f)
+        if not os.path.exists(src):
+            continue
+        if os.path.lexists(dst):
+            os.remove(dst)                               # a link or a scaled copy from an earlier export
+        if np.allclose(scale, 1):
+            os.symlink(src, dst)
+        elif f.endswith(".obj"):
+            write_scaled_obj(clip, scale, src, dst)
+        else:
+            clip.mesh.export(dst)
+    json.dump({"scale": scale.tolist(), "axes": list(SHAPE_AXES), "axes_object_frame": clip.shape_axes.T.tolist(),
+               "center": clip.center_obj.tolist(), "extent_cm_reconstructed": (100 * clip.shape_extent0).tolist(),
+               "extent_cm": (100 * clip.shape_extent).tolist(), "extent_cm_long_mid_short": (100 * clip.extent).tolist()},
+              open(os.path.join(ex, "object_shape.json"), "w"), indent=1)
     np.save(os.path.join(ex, "object_poses.npy"), state.obj)
     # the hand: MANO parameters per frame (camera frame; mano.py's convention) and the mesh they give
     np.savez(os.path.join(ex, "mano_params.npz"), global_orient=state.go, transl=state.tr, hand_pose=state.hp,
@@ -853,14 +1064,24 @@ def export(clip, state, out):
     rest = [i for i in range(clip.N) if phase_of(state, i) in ("approach", "release", "rest")]
     low = [float((clip.sub_v @ state.obj[i, :3, :3].T + state.obj[i, :3, 3]).dot(n).min()) for i in rest]
     meas = [clip.local_table_c(state, i) for i in rest]
-    c = float(np.median(low)) if low else float(n @ clip.table_p)
+    # each stretch of rest frames counts the same (the object rests in two places, before the grasp and after the
+    # release; the longer stretch must not decide alone)
+    spans = [[rest[0]]] if rest else []
+    for i in rest[1:]:
+        spans[-1].append(i) if i == spans[-1][-1] + 1 else spans.append([i])
+    per = [float(np.median([low[rest.index(i)] for i in sp])) for sp in spans]
+    c = float(np.mean(per)) if low else float(n @ clip.table_p)
     json.dump({"normal_up": n.tolist(), "offset": c, "point": (c * n).tolist(),
                "rest_offset_vs_measured_cm": 100 * float(np.median(np.subtract(low, meas))) if low else None,
-               "source": "object's lowest point at rest" if low else "fitted table plane"},
+               "rest_heights_cm": [100 * (h - c) for h in per],
+               "source": "object's lowest point at rest (mean over the rest stretches)" if low else "fitted table plane"},
               open(os.path.join(out, "table.json"), "w"), indent=1)
     if os.path.lexists(os.path.join(ex, "table.json")):
         os.remove(os.path.join(ex, "table.json"))
     os.symlink(os.path.join(out, "table.json"), os.path.join(ex, "table.json"))
+    # the fitted plane itself (table.json is that plane moved to the object's resting height), for Clip(table=...)
+    json.dump({"normal": clip.table_n.tolist(), "point": clip.table_p.tolist(), "info": clip.table_info},
+              open(os.path.join(out, "table_fit.json"), "w"), indent=1)
 
 
 def main():
@@ -873,6 +1094,10 @@ def main():
     ap.add_argument("--effort", default="high", choices=["low", "medium", "high", "xhigh", "max"])
     ap.add_argument("--max-turns", type=int, default=60)
     ap.add_argument("--max-minutes", type=float, default=40)
+    ap.add_argument("--passes", type=int, default=2,
+                    help="agent passes: after each, the reviewer checks the merged result; another pass works on what it finds")
+    ap.add_argument("--max-turns2", type=int, default=25, help="turns of a later pass")
+    ap.add_argument("--max-minutes2", type=float, default=20, help="minutes of a later pass")
     ap.add_argument("--no-verify", action="store_true")
     ap.add_argument("--no-critic", action="store_true", help="skip the absolute reviewer (before finish and on the result)")
     ap.add_argument("--start", default="auto", choices=["auto", "initial"],
@@ -905,43 +1130,73 @@ def main():
         t1 = time.time()
         sess.auto_fit()
         log(f"automatic fit (v{sess.base}) in {time.time() - t1:.0f}s: {sess.v.notes[sess.base]}")
-    final_k = agent_loop(sess, client, args, log)
-    s0, s1 = sess.v.states[sess.base], sess.v.states[final_k]       # verify against the version the agent started from
-    runs = [piece for run in changed_runs(clip, s0, s1) for piece in chunks(run, s1.phases)]
-    log(f"agent finished at v{final_k} after {(time.time() - t0) / 60:.1f} min; changed ranges vs v{sess.base} {runs}")
-    verdicts = []
-    if runs and not args.no_verify:
-        r0, r1 = sess.metrics_of(sess.base), sess.metrics_of(final_k)
-        with ThreadPoolExecutor(4) as ex:
-            verdicts = list(ex.map(lambda rn: verify_run(client, args, clip, s0, s1, rn, args.out, "final", r0, r1), runs))
-        for run, v in verdicts:
-            log(f"verify {run}: winner {v['winner']} (refined = {v['refined_label']}), confidence {v['confidence']:.2f}, keep {v['keep_refined']}: {v['reason'][:200]}")
-    revert = [run for run, v in verdicts if not v["keep_refined"]]
-    final, seams = merge(clip, s0, s1, revert, [run for run, v in verdicts if v["keep_refined"]])
-    final.phases = s1.phases
-    merged = merge_text(clip, final, seams)
-    log(merged)
-    export(clip, final, args.out)
-    final_rev = None
-    if not args.no_critic:                            # what is still wrong with the result, for the report
-        final_rev = critic_review(client, args, clip, final, args.out, "final")
-        log(f"reviewer on the final result: {critic_text(final_rev)[:600]}")
-    cols = [("initial", sess.metrics_of(0))] + ([(f"start (v{sess.base})", sess.metrics_of(sess.base))] if sess.base else [])
+    sections, summaries, n_rev, n_runs = [], [], 0, 0
+    for n_pass in range(max(1, args.passes)):
+        if n_pass == 0:
+            final_k = agent_loop(sess, client, args, log)
+        else:                                         # on what the reviewer still finds in the merged result
+            final_k = agent_loop(sess, client, args, log, first=followup(sess, final_rev, verdicts),
+                                 max_turns=args.max_turns2, max_minutes=args.max_minutes2)
+        summaries.append(sess.done or "(none)")
+        s0, s1 = sess.v.states[sess.base], sess.v.states[final_k]       # verify against the version the pass started from
+        runs = [piece for run in changed_runs(clip, s0, s1) for piece in chunks(run, s1.phases)]
+        log(f"agent finished at v{final_k} after {(time.time() - t0) / 60:.1f} min; changed ranges vs v{sess.base} {runs}")
+        verdicts = []
+        if runs and not args.no_verify:
+            r0, r1 = sess.metrics_of(sess.base), sess.metrics_of(final_k)
+            with ThreadPoolExecutor(4) as ex:
+                verdicts = list(ex.map(lambda rn: verify_run(client, args, clip, s0, s1, rn, args.out, f"pass{n_pass + 1}", r0, r1), runs))
+            for run, v in verdicts:
+                log(f"verify {run}: winner {v['winner']} (refined = {v['refined_label']}), confidence {v['confidence']:.2f}, keep {v['keep_refined']}: {v['reason'][:200]}")
+        revert = [run for run, v in verdicts if not v["keep_refined"]]
+        n_rev, n_runs = n_rev + len(revert), n_runs + len(runs)
+        final, seams = merge(clip, s0, s1, revert, [run for run, v in verdicts if v["keep_refined"]])
+        final.phases = s1.phases
+        merged = merge_text(clip, final, seams)
+        log(merged)
+        export(clip, final, args.out)
+        final_rev = None
+        if not args.no_critic:                        # what is still wrong with the result
+            final_rev = critic_review(client, args, clip, final, args.out, "final")
+            log(f"reviewer on the {'final' if n_pass else 'first'} result: {critic_text(final_rev)[:600]}")
+        sections.append(
+            f"Verifier (v{sess.base} vs refined, blind A/B):\n" +
+            "\n".join(f"- frames {run[0]}-{run[1]}: {'kept' if v['keep_refined'] else 'REVERTED'} (winner {v['winner']}, refined = {v['refined_label']}, "
+                      f"confidence {v['confidence']:.2f}): {v['reason']}" for run, v in verdicts)
+            + "\n\n" + merged
+            + (f"\n\nIndependent reviewer, before the agent could finish: {critic_text(sess.critique)}" if sess.critique else ""))
+        serious = [q for q in final_rev["problems"] if q["severity"] in ("high", "medium")] if final_rev else []
+        if n_pass + 1 >= args.passes or not serious:
+            break
+        # another pass: it starts from the merged result and is verified against it
+        json.dump(final_rev, open(os.path.join(args.out, f"critic_pass{n_pass + 1}.json"), "w"), indent=1)
+        sections[-1] += f"\n\nReviewer on this pass's result (the next pass works on it): {critic_text(final_rev)}"
+        k = sess.v.add(final, f"result of pass {n_pass + 1}: v{final_k} with the ranges the verifier rejected set back to v{sess.base}")
+        sess.save(k, final)
+        sess.base, sess.done, sess.critic_rounds, sess.critique, sess.edits_since_base = k, None, 0, None, 0
+        log(f"pass {n_pass + 2} starts from v{k}: the reviewer found {len(serious)} high/medium problems")
+    cols = [("initial", sess.metrics_of(0))] + [("automatic fit (v1)", sess.metrics_of(1))] * (args.start == "auto")
     cols.append(("final", clip.metrics(final)))
     table = report_table(cols)
+    clip.use(final)
+    shape = clip.shape_of(final)
     report = (f"# Refinement of {clip.vid}\n\nModel {args.model}, effort {args.effort}; {sess.v.cur + 1} versions; "
-              f"{(time.time() - t0) / 60:.1f} min.\n\nAgent summary: {sess.done or '(none)'}\n\n"
-              f"Phases: {', '.join(p['label'] + ' ' + str(p['start']) + '-' + str(p['end']) for p in s1.phases)}\n\n"
+              f"{len(sections)} pass{'es' if len(sections) > 1 else ''}; {(time.time() - t0) / 60:.1f} min.\n\nAgent summary: "
+              + "\n\nSecond pass, on the reviewer's findings: ".join(summaries) + "\n\n"
+              f"Phases: {', '.join(p['label'] + ' ' + str(p['start']) + '-' + str(p['end']) for p in final.phases)}\n\n"
               "Edits:\n" + "\n".join(f"- v{k}: {n}" for k, n in enumerate(sess.v.notes)) +
-              f"\n\nVerifier (v{sess.base} vs refined, blind A/B):\n" +
-              "\n".join(f"- frames {run[0]}-{run[1]}: {'kept' if v['keep_refined'] else 'REVERTED'} (winner {v['winner']}, refined = {v['refined_label']}, "
-                        f"confidence {v['confidence']:.2f}): {v['reason']}" for run, v in verdicts)
-              + "\n\n" + merged
-              + (f"\n\nIndependent reviewer, before the agent could finish: {critic_text(sess.critique)}" if sess.critique else "")
+              f"\n\nObject shape: x{shape[0]:.2f} of the reconstructed mesh along the first frame's viewing direction (the unseen "
+              f"extent), x{shape[1]:.2f} / x{shape[2]:.2f} across it; the object is {' x '.join(f'{100 * e:.1f}' for e in clip.extent)} cm "
+              "along its long / mid / short axes.\n" + (sess.shape_table or "No thickness search ran.")
+              + f"\n\nTable: {clip.table_info['source']}"
+              + (f" ({clip.table_info['points']} points, {clip.table_info['rms_cm']:.2f} cm rms off the plane)" if clip.table_info["rms_cm"] is not None else "")
+              + f"; its normal is up, {clip.table_info['tilt_vs_geocalib_deg']:.1f} deg from GeoCalib's gravity estimate."
+              + (f" {sess.table_note}" if sess.table_note else "")
+              + "\n\n" + "\n\n".join(sections)
               + (f"\n\nIndependent reviewer on the final result (what is still wrong): {critic_text(final_rev)}" if final_rev else "")
               + f"\n\n{table}\n")
     open(os.path.join(args.out, "report.md"), "w").write(report)
-    log(f"done in {(time.time() - t0) / 60:.1f} min; reverted {len(revert)}/{len(runs)} ranges")
+    log(f"done in {(time.time() - t0) / 60:.1f} min; reverted {n_rev}/{n_runs} ranges")
     print(report)
 
 

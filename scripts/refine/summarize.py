@@ -57,7 +57,8 @@ def main():
     table = []
     for vid in vids:
         o = os.path.join(out_root, vid)
-        clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid))
+        clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
+                    table=os.path.join(o, "table_fit.json"))
         phases = json.load(open(os.path.join(o, "phases.json")))
         s0 = clip.init_state.copy()
         s0.phases = phases
@@ -65,7 +66,10 @@ def main():
         m0, m1 = clip.metrics(s0), clip.metrics(s1)
         held = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in HELD]
         rest = [r["frame"] for r in m0 if phase_of(s1, r["frame"]) in ("approach", "release", "rest")]
-        summ = {"video_id": vid, "frames": clip.N, "phases": phases, "hand_jitter_ref_mm": clip.jitter_ref}
+        summ = {"video_id": vid, "frames": clip.N, "phases": phases, "hand_jitter_ref_mm": clip.jitter_ref,
+                # the object's shape: scale and extents along the first frame's viewing direction and the two across it
+                "object_scale": clip.shape_of(s1).tolist(), "object_extent_cm": [(100 * clip.shape_extent0).tolist(),
+                                                                                 (100 * clip.shape_extent0 * clip.shape_of(s1)).tolist()]}
         for name, rows0, rows1 in (("all", m0, m1),
                                    ("held", [m0[i] for i in held], [m1[i] for i in held])):
             summ[name] = {k: [med(rows0, k), med(rows1, k)] for k in KEYS}

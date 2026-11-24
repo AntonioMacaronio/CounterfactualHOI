@@ -48,7 +48,8 @@ def main():
     client = AnthropicBedrock(aws_region=args.region)
     total = {"a": 0, "b": 0, "tie": 0}
     for vid in args.vids:
-        clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid))
+        clip = Clip(os.path.join(CHOIR_ROOT, "output", vid), os.path.join(STORAGE, "runs", "fprecon", vid),
+                    table=os.path.join(STORAGE, "runs", args.b, vid, "table_fit.json"))   # b's table when it has its own
         sa, sb = load(clip, args.a, vid), load(clip, args.b, vid)
         phases = sb.phases or sa.phases or [{"start": 0, "end": clip.N - 1, "label": "all"}]
         runs = chunks([0, clip.N - 1], phases)

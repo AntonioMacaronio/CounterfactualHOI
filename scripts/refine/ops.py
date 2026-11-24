@@ -20,7 +20,7 @@ import numpy as np
 import torch
 from scipy.spatial.transform import Rotation
 
-from clip import FINGERS, LOW, TIP_IDS, TIPS, Clip, State, se3_interp  # noqa: F401
+from clip import FINGERS, LOW, SHAPE_AXES, TIP_IDS, TIPS, Clip, State, phase_of, se3_interp  # noqa: F401
 import mano  # noqa: E402
 from Utils import nvdiffrast_render  # noqa: E402
 
@@ -87,6 +87,7 @@ def world_vec(clip, dx, dy, dz, frame):
 
 
 def rotate_object(clip, state, start, end, axis, angle_deg, falloff=0):
+    clip.use(state)
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     for i in _touched(w):
@@ -99,6 +100,7 @@ def rotate_object(clip, state, start, end, axis, angle_deg, falloff=0):
 
 
 def translate_object(clip, state, start, end, dx_cm, dy_cm, dz_cm, frame="world", falloff=0):
+    clip.use(state)
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     d = world_vec(clip, dx_cm, dy_cm, dz_cm, frame) / 100
@@ -109,6 +111,7 @@ def translate_object(clip, state, start, end, dx_cm, dy_cm, dz_cm, frame="world"
 
 def move_along_ray(clip, state, start, end, dist_cm, falloff=0):
     """Move the object along the camera ray through its center: depth changes, image position does not."""
+    clip.use(state)
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     for i in _touched(w):
@@ -119,6 +122,7 @@ def move_along_ray(clip, state, start, end, dist_cm, falloff=0):
 
 def interpolate_object(clip, state, start, end):
     """Replace the poses strictly between start and end by an SE(3) interpolation of the two endpoint poses."""
+    clip.use(state)
     s = state.copy()
     for i in range(start + 1, end):
         s.obj[i] = se3_interp(state.obj[start], state.obj[end], (i - start) / (end - start))
@@ -126,6 +130,7 @@ def interpolate_object(clip, state, start, end):
 
 
 def hold_object_static(clip, state, start, end, ref):
+    clip.use(state)
     s = state.copy()
     s.obj[start:end + 1] = state.obj[ref]
     return s, list(range(start, end + 1)), f"hold object static at frame {ref}'s pose on {start}-{end}"
@@ -133,6 +138,7 @@ def hold_object_static(clip, state, start, end, ref):
 
 def snap_object_to_table(clip, state, start, end, mode="per_frame"):
     """Translate along the table normal so the object's lowest point touches the table."""
+    clip.use(state)
     s = state.copy()
     fr = list(range(start, end + 1))
     h = clip.height_above_table(state, fr)
@@ -144,6 +150,7 @@ def snap_object_to_table(clip, state, start, end, mode="per_frame"):
 
 
 def smooth_object(clip, state, start, end, window=5):
+    clip.use(state)
     s = state.copy()
     half = max(1, window // 2)
     for i in range(start, end + 1):
@@ -155,6 +162,7 @@ def smooth_object(clip, state, start, end, window=5):
 
 def move_hand(clip, state, start, end, dx_cm, dy_cm, dz_cm, frame="world", rot_axis=None, rot_deg=0.0, falloff=0):
     """Rigidly move the hand (MANO global orientation + translation): rotate about its centroid, then translate."""
+    clip.use(state)
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     d = world_vec(clip, dx_cm, dy_cm, dz_cm, frame) / 100
@@ -169,6 +177,7 @@ def move_hand(clip, state, start, end, dx_cm, dy_cm, dz_cm, frame="world", rot_a
 
 def attach_hand_to_object(clip, state, start, end, ref):
     """Keep the hand's centroid fixed relative to the object over [start, end] (as at frame ref); fingers unchanged."""
+    clip.use(state)
     s = state.copy()
     T = state.obj[ref]
     c_rel = T[:3, :3].T @ (clip.hand_verts(state, ref).mean(0) - T[:3, 3])
@@ -180,17 +189,183 @@ def attach_hand_to_object(clip, state, start, end, ref):
         f"attach hand to object on {start}-{end} (relative position of frame {ref}), fading out over {FADE} frames beyond the range")
 
 
+def fit_occlusion(clip, state, start, end, **kw):
+    """fit_mano with the occlusion term, in two tries, each kept only if it puts the hand on the side of the object
+    the video shows without paying for it elsewhere (means over the frames: occlusion error down by 30%, keypoint
+    error up by at most 2 px, at most 3 more hand triangles through the object): from where the hand is; and, if the error is still
+    over 3% of the hand, from the hand moved to its measured depth (a hand in front of an object that its fingers
+    really wrap cannot get behind it in small steps). Returns (state, note)."""
+    clip.use(state)
+    fr = list(range(start, end + 1))
+
+    def measure(s):
+        m = clip.metrics(s, fr)
+        kp = [r["hand_kp_px"] for r in m if r.get("hand_kp_px") is not None]
+        oc = [r["hand_over_obj"] + r["obj_over_hand"] for r in m if r.get("hand_over_obj") is not None]
+        # means, not medians: the term acts on the frames where hand and object overlap, often fewer than half
+        return float(np.mean(oc)) if oc else 0.0, float(np.mean(kp)) if kp else 0.0, float(np.mean([r["n_cross"] for r in m]))
+    cur, m0, notes = state, measure(state), []
+    for name, start_from in (("as it is", lambda s: s), ("from its measured depth", lambda s: move_hand_to_depth(clip, s, start, end)[0])):
+        if m0[0] < 0.03:
+            break
+        t = fit_mano(clip, start_from(cur), start, end, occl_weight=1.0, **kw)[0]
+        m1 = measure(t)
+        ok = m1[0] <= 0.7 * m0[0] and m1[1] <= m0[1] + 2.0 and m1[2] <= m0[2] + 3.0
+        notes.append(f"{name}: {m0[0]:.1%} -> {m1[0]:.1%} of the hand on the wrong side of the object, keypoints {m0[1]:.1f} -> "
+                     f"{m1[1]:.1f} px, {m0[2]:.1f} -> {m1[2]:.1f} triangles through it: {'kept' if ok else 'not kept'}")
+        if ok:
+            cur, m0 = t, m1
+    return cur, ("occlusion order (hand behind the object where the video shows the object, in front where it shows the hand): "
+                 + ("; ".join(notes) if notes else f"fine as fitted ({m0[0]:.1%} of the hand on the wrong side)"))
+
+
+# ---------- object shape ----------
+REST = ("approach", "release", "rest")
+LIFTED = ("lift", "carry", "rotate")
+
+
+def reshape_object(clip, state, scale):
+    """`state` with the object's mesh scaled to `scale` (along its shape axes: the first frame's viewing direction
+    and the two directions across it; about its centre) and every frame's pose shifted so that the side of the
+    object that faces the camera stays where it is: the shift along an axis is its change in half-extent times how
+    much that axis points along the frame's viewing ray (none for an axis seen side-on, whose two ends are both
+    visible)."""
+    clip.use(state)
+    s = state.copy()
+    old, new = clip.shape_of(state), np.asarray(scale, float)
+    for k in range(3):
+        if abs(new[k] - old[k]) < 1e-6:
+            continue
+        h = 0.5 * clip.shape_extent0[k]
+        for i in range(clip.N):
+            a = state.obj[i, :3, :3] @ clip.shape_axes[:, k]
+            c = state.obj[i, :3, :3] @ clip.center_obj + state.obj[i, :3, 3]
+            s.obj[i, :3, 3] += (a @ (c / np.linalg.norm(c))) * (new[k] - old[k]) * h * a
+    s.shape = new
+    return s
+
+
+def scale_object(clip, state, axis, factor, contact=None):
+    """Scale the object's mesh along one of its shape axes (unseen: the first frame's viewing direction, the extent
+    that frame could not see; seen_long / seen_short: the longer / shorter extent across that view), keeping the
+    side that faces the camera in place (reshape_object). Then the object's poses are re-fitted to the masks and
+    depth and the hand is re-fitted over the whole clip (with the grip term in held phases unless contact=False)."""
+    clip.use(state)
+    k = SHAPE_AXES.index(axis)
+    old = clip.shape_of(state)
+    new = old.copy()
+    new[k] = float(np.clip(new[k] * factor, 0.2, 3.0))
+    s = reshape_object(clip, state, new)
+    s, _, _ = fit_object_silhouette(clip, s, 0, clip.N - 1)
+    s, _, n = fit_mano(clip, s, 0, clip.N - 1, contact=contact)
+    clip.use(s)
+    return s, list(range(clip.N)), (
+        f"scale object x{new[k] / old[k]:.2f} along its {axis} extent ({100 * clip.shape_extent0[k] * old[k]:.1f} -> "
+        f"{100 * clip.shape_extent[k]:.1f} cm; the object is now {' x '.join(f'{100 * e:.1f}' for e in clip.extent)} cm along its "
+        f"long / mid / short axes); poses shifted so the side facing the camera stays, then re-fitted to mask + depth; hand: {n}")
+
+
+def shape_evidence(clip, state):
+    """How consistent the object's shape is with the scene, from a state whose hand was re-fitted to it: the object
+    on the table at rest and on its mask and depth; the hand on its keypoints and depth, not through the object, and
+    in front of / behind the object where the video shows it so."""
+    m = clip.metrics(state)
+    ph = [phase_of(state, r["frame"]) for r in m]
+    pick = lambda labels: [r for r, p in zip(m, ph) if p in labels]
+    med = lambda rows, k: (lambda x: float(np.median(x)) if x else None)([r[k] for r in rows if r.get(k) is not None])
+    rest, held = pick(REST), pick(HELD)
+    occl = [r["hand_over_obj"] + r["obj_over_hand"] for r in held if r.get("hand_over_obj") is not None]
+    return dict(rest_cm=med(rest, "obj_height_cm"), iou=med(m, "iou"), depth_cm=med(m, "depth_res_cm"),
+                kp_px=med(held, "hand_kp_px"), hand_cm=(lambda b: None if b is None else abs(b))(med(held, "hand_depth_bias_cm")),
+                cross=float(np.mean([r["n_cross"] for r in held])) if held else None,
+                occl=float(np.mean(occl)) if occl else None)
+
+
+def shape_score(ev, best, factor):
+    """Inconsistency of one candidate shape, in units of "clearly noticeable": 0.5 cm off the table at rest; 0.01 of
+    mask IoU or 0.3 cm of depth residual lost against the best candidate; while held, 2 px of keypoint error more
+    than the best candidate, 1 cm of the hand off the depth map, 5 hand triangles through the object, 3% of the hand
+    drawn on the wrong side of the object; plus a small cost for changing the reconstructed mesh at all (0.5 per
+    halving or doubling)."""
+    t = 0.5 * abs(np.log2(factor))
+    if ev["rest_cm"] is not None:
+        t += max(0.0, abs(ev["rest_cm"]) - 0.3) / 0.5
+    t += max(0.0, best["iou"] - ev["iou"]) / 0.01 + max(0.0, ev["depth_cm"] - best["depth_cm"]) / 0.3
+    if ev["kp_px"] is not None:
+        t += (max(0.0, ev["kp_px"] - best["kp_px"]) / 2.0 + max(0.0, (ev["hand_cm"] or 0.0) - 0.5) / 1.0 + ev["cross"] / 5.0
+              + (ev["occl"] or 0.0) / 0.03)
+    return t
+
+
+def fit_object_thickness(clip, state, margin=1.0):
+    """Search the object's extent along the first frame's viewing direction (the mesh comes from that one frame, so
+    this extent is a guess). The search runs only when the scene says the extent is off: at rest the object sits in
+    the table or floats above it, or while held the hand is drawn on the wrong side of the object (in front of it
+    where the video shows the object, behind it where it shows the hand). Each candidate (thinner when the object
+    sits in the table or the hand cannot get to its side of it, thicker when it floats) gets the object's poses
+    re-fitted to mask + depth and the hand re-fitted as in the automatic fit (no grip term; the occlusion term where
+    it helps), and is scored by shape_score. The best one
+    is applied if it beats the reconstructed extent by `margin`. Needs phases.
+    Returns (state, touched, note, table of the evidence)."""
+    clip.use(state)
+    ph = [phase_of(state, i) for i in range(clip.N)]
+    if not any(p in REST for p in ph):
+        raise ValueError("label the phases first (set_phases): the search needs the frames where the object rests")
+    refit = lambda s: (fit_occlusion(clip, fit_mano(clip, s, 0, clip.N - 1, contact=False)[0], 0, clip.N - 1, contact=False)[0],)
+    cur = clip.shape_of(state)[0]
+    s1, = refit(state)
+    ev1 = shape_evidence(clip, s1)
+    line = lambda f, ev, sc: (
+        f"  x{f:.2f} ({100 * clip.shape_extent0[0] * cur * f:4.1f} cm): at rest {ev['rest_cm']:+.1f} cm from the table, "
+        f"IoU {ev['iou']:.3f}, depth residual {ev['depth_cm']:.2f} cm"
+        + (f"; while held: keypoints {ev['kp_px']:.1f} px, hand {ev['hand_cm']:.1f} cm off the depth map, {ev['cross']:.1f} triangles "
+           f"through the object, {ev['occl']:.1%} of the hand on the wrong side of the object" if ev["kp_px"] is not None else "")
+        + (f" -> score {sc:.1f}" if sc is not None else ""))
+    head = ("object's extent along the first frame's viewing direction (the side that frame could not see), evidence per "
+            "candidate (after re-fitting the object and the hand to it):")
+    thin = ev1["rest_cm"] < -0.5 or (ev1["rest_cm"] <= 0.5 and (ev1["occl"] or 0.0) > 0.05)
+    thick = ev1["rest_cm"] > 0.5
+    if not (thin or thick):
+        return state, [], ("object thickness: no change (the object rests on the table and the hand is on the side of it "
+                           "the video shows)"), head + "\n" + line(1.0, ev1, None)
+    cands = {1.0: (s1, ev1)}
+    for f in ((0.8, 0.65, 0.5, 0.4, 0.3) if thin else (1.25, 1.5, 1.8)):
+        if not 0.2 <= cur * f <= 3.0:
+            continue
+        new = clip.shape_of(state).copy()
+        new[0] *= f
+        s = refit(fit_object_silhouette(clip, reshape_object(clip, state, new), 0, clip.N - 1)[0])[0]
+        cands[f] = (s, shape_evidence(clip, s))
+    evs = [ev for _, ev in cands.values()]
+    best = dict(iou=max(e["iou"] for e in evs), depth_cm=min(e["depth_cm"] for e in evs),
+                kp_px=min((e["kp_px"] for e in evs if e["kp_px"] is not None), default=None))
+    score = {f: shape_score(ev, best, f) for f, (_, ev) in cands.items()}
+    f = min(score, key=score.get)
+    if score[1.0] - score[f] < margin:
+        f = 1.0
+    table = head + "\n" + "\n".join(line(g, cands[g][1], score[g]) for g in sorted(cands, reverse=True))
+    if f == 1.0:
+        return state, [], "object thickness: no change (no candidate is clearly more consistent than the reconstructed mesh)", table
+    s = cands[f][0]
+    clip.use(s)
+    return s, list(range(clip.N)), (
+        f"object thickness x{f:.2f} along the first frame's viewing direction ({100 * clip.shape_extent0[0] * cur:.1f} -> "
+        f"{100 * clip.shape_extent[0]:.1f} cm; the object is now {' x '.join(f'{100 * e:.1f}' for e in clip.extent)} cm along its long / mid / "
+        f"short axes; score {score[1.0]:.1f} -> {score[f]:.1f}); object poses re-fitted to mask + depth, hand re-fitted to it"), table
+
+
 # ---------- FoundationPose-backed ----------
 def _fp(clip):
-    if clip.vid not in _EST:
+    """FoundationPose for the clip's active object shape (rebuilt when the shape changes)."""
+    if _EST.get(clip.vid, (None, None))[0] != clip._shape_key:
         from estimater import FoundationPose, PoseRefinePredictor, ScorePredictor
         import logging
         logging.disable(logging.INFO)
         m = clip.mesh
-        _EST[clip.vid] = FoundationPose(model_pts=m.vertices, model_normals=m.vertex_normals, mesh=m,
-                                        scorer=ScorePredictor(), refiner=PoseRefinePredictor(), glctx=clip.glctx,
-                                        debug=0, debug_dir=os.path.join(clip.run, "fpose_debug"))
-    return _EST[clip.vid]
+        _EST[clip.vid] = (clip._shape_key, FoundationPose(
+            model_pts=m.vertices, model_normals=m.vertex_normals, mesh=m, scorer=ScorePredictor(),
+            refiner=PoseRefinePredictor(), glctx=clip.glctx, debug=0, debug_dir=os.path.join(clip.run, "fpose_debug")))
+    return _EST[clip.vid][1]
 
 
 def _fp_inputs(clip, i):
@@ -217,6 +392,7 @@ def frame_quality(r):
 
 
 def polish_object(clip, state, start, end, max_rot_deg=6.0, max_trans_cm=1.5, iterations=3):
+    clip.use(state)
     est = _fp(clip)
     s = state.copy()
     kept = []
@@ -238,6 +414,7 @@ def polish_object(clip, state, start, end, max_rot_deg=6.0, max_trans_cm=1.5, it
 
 def propose_object_poses(clip, state, i, k=6):
     """FoundationPose registration at frame i: its top-k pose hypotheses (best-scored first)."""
+    clip.use(state)
     est = _fp(clip)
     rgb, d, om = _fp_inputs(clip, i)
     if om.sum() < 200:
@@ -249,6 +426,7 @@ def propose_object_poses(clip, state, i, k=6):
 
 def apply_candidate(clip, state, i, cand_pose, start, end, falloff=0):
     """Set frame i to cand_pose and apply the same change (rotation about the object center + shift) on [start, end]."""
+    clip.use(state)
     s = state.copy()
     R_d = cand_pose[:3, :3] @ state.obj[i, :3, :3].T
     c_old, c_new = clip.obj_center(state, i), cand_pose[:3, :3] @ clip.center_obj + cand_pose[:3, 3]
@@ -282,6 +460,7 @@ def _finger_names(fingers):
 def curl_finger(clip, state, start, end, fingers, delta_deg, falloff=0):
     """Turn the named fingers' MANO joints (base to tip: 40 / 35 / 25 % of delta_deg) about each joint's typical
     bending direction in this clip (curl > 0, open < 0)."""
+    clip.use(state)
     s = state.copy()
     w = weights(clip.N, start, end, falloff)
     names = _finger_names(fingers)
@@ -297,18 +476,21 @@ def curl_finger(clip, state, start, end, fingers, delta_deg, falloff=0):
 
 
 def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_weight=2.0, depth_weight=0.5,
-             smooth_weight=1.0, contact_weight=1.0, lr=1.0, shape=False, tip_smooth=TIP_SMOOTH):
+             smooth_weight=1.0, contact_weight=1.0, lr=1.0, shape=False, tip_smooth=TIP_SMOOTH, occl_weight=0.0):
     """Gradient-based fit of the MANO parameters of every frame in [start, end] at once (torch, Adam): the 2D
     keypoints (robust, 15 px units), the depth map on the hand's mask (vertices the depth map sees), staying on the
     hand/object masks, MANO's hand-pose prior (energy outside the top 15 PCA components) and a weak pull to the hand
     tracker's pose, smoothness over time (joint angles, and the positions of the joints, the fingertips and the
-    wrist: without the fingertips the fit follows the keypoints' frame-to-frame noise there), no penetration into the object
+    wrist: without the fingertips the fit follows the keypoints' frame-to-frame noise there), with occl_weight > 0
+    the occlusion order the video shows (the hand behind the object where the object is seen, in front of it where
+    the hand is seen), no penetration into the object
     (its SDF) or below the table, and in held phases (set_phases; contact=False turns it off) a grip: the thumb or palm
     and the nearest finger on the object's surface. mode: "all", "fingers" (joint rotations only) or "rigid".
     The two frames on each side of the range stay fixed and the fit joins them smoothly (the smoothness term spans the
     range's ends, and a jump there costs as much as anywhere, however long the range): no seam at the ends.
     shape=True also fits the clip's one MANO shape (betas, with a prior towards the current one; kept in the state)
     (the automatic fit does this once: a hand of the wrong size cannot match both the keypoints and the depth)."""
+    clip.use(state)
     import torch
     import torch.nn.functional as F
     fr = list(range(start, end + 1))
@@ -348,6 +530,13 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
     hm = T((clip.hm[fr] & ~clip.om[fr]).astype(np.float32))[:, None]
     dtm = T(np.stack([cv2.distanceTransform((~(clip.hm[i] | clip.om[i])).astype(np.uint8), cv2.DIST_L2, 3) for i in fr]))[:, None]
     has_mask = T([float((clip.hm[i] | clip.om[i]).sum() > 30) for i in fr]) * valid
+    # occlusion order: the object's rendered depth (fixed during the fit), and where the video shows the object in
+    # front of the hand / the hand in front of the object (SAM3 masks, one pixel in from their edges)
+    do_ = clip.render_obj_low(state, fr)
+    er = lambda b: np.stack([cv2.erode(x.astype(np.uint8), np.ones((3, 3), np.uint8)) for x in b]).astype(np.float32)
+    zo = T(do_)[:, None]
+    obj_vis = T(er((do_ > 0) & clip.om[fr] & ~clip.hm[fr]))[:, None]
+    hand_vis = T(er((do_ > 0) & clip.hm[fr] & ~clip.om[fr]))[:, None]
     sdf, lo, hi = T(clip.sdf)[None, None], T(clip.sdf_lo), T(clip.sdf_hi)
     Ro, to = T(state.obj[fr, :3, :3]), T(state.obj[fr, :3, 3])
     held = T([float(contact is not False and any(p["start"] <= i <= p["end"] and p["label"] in HELD for p in state.phases))
@@ -386,6 +575,9 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
             # weighted by the image area it covers (MANO's vertices are dense on the fingers, sparse on the palm)
             proj = torch.relu(-(vn * v).sum(-1) / torch.linalg.norm(v, dim=-1)) / z ** 2
             seen = proj * (((z - dmap).abs() < 0.15) & (inm > 0.5) & (dmap > 0.05)).float() * valid[:, None]
+            facing = (proj > 0).float()
+            uvd = uvv.detach()
+            zo_v, in_obj, in_hand = sample(zo, uvd), (sample(obj_vis, uvd) > 0.99).float(), (sample(hand_vis, uvd) > 0.99).float()
             w_seen = seen.sum(1)
             seen = seen / w_seen.clamp_min(1e-12)[:, None]
             n_seen = (seen > 0).sum(1)
@@ -395,6 +587,13 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
         bias = (r * seen).sum(1)
         L["depth"] = L["depth"] + 0.5 * (bias ** 2 * ok).sum() / ok.sum().clamp_min(1)
         L["mask"] = (sample(dtm, uvv).clamp(max=20) * has_mask[:, None]).mean()
+        # where the video shows the object, no part of the hand may be in front of it; where it shows the hand in
+        # front of the object, the hand's camera-facing side must be (a vertex counts fully up to 3 cm and a tenth
+        # beyond: masks can be wrong). Off by default (occl_weight): where the hand cannot get to its side of the
+        # object (it would have to pass through it), the term pulls it off its keypoints instead.
+        soft = lambda x: torch.where(x < 0.03, x, 0.03 + 0.1 * (x - 0.03))
+        L["occl"] = 10 * (((soft(torch.relu(zo_v + 0.003 - z)) * in_obj).sum(1)
+                           + (soft(torch.relu(z - zo_v + 0.003)) * in_hand * facing).sum(1)) * valid).mean()
         sd = sdf_at(torch.einsum("nvi,nij->nvj", v - to[:, None], Ro))
         # no penetration, with a 1.5 mm margin, at the vertices and the triangle centres (thin walls, handles)
         sdc = sdf_at(torch.einsum("nvi,nij->nvj", v[:, faces].mean(2) - to[:, None], Ro))
@@ -426,7 +625,8 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
                        + tip_w * tip_smooth * 1e5 * (d2p ** 2).sum(-1).mean()) if len(hpf) >= 3 else zero
         # the range's ends: summed, not averaged over the range, so a 1 cm jump there costs ~20 whatever its length
         L["join"] = (30 * (d2h[edge] ** 2).sum(1).sum() + 1e5 * (d2J[edge] ** 2).sum(-1).mean(-1).sum()) if edge else zero
-        total = (kp_weight * L["kp"] + depth_weight * L["depth"] + 0.1 * L["mask"] + 5 * L["pen"] + contact_weight * L["grip"]
+        total = (kp_weight * L["kp"] + depth_weight * L["depth"] + 0.1 * L["mask"] + 5 * L["pen"] + occl_weight * L["occl"]
+                 + contact_weight * L["grip"]
                  + L["table"] + L["prior"] + smooth_weight * L["smooth"] + max(1.0, smooth_weight) * L["join"])
         return total, L
 
@@ -456,7 +656,7 @@ def fit_mano(clip, state, start, end, mode="all", contact=None, iters=600, kp_we
     s.go[fr] = (go0 + dgo).detach().cpu().numpy()
     s.tr[fr] = (tr0 + dtr).detach().cpu().numpy()
     s.hp[fr] = (hp0 + dhp).detach().cpu().numpy()
-    show = ", ".join(f"{k} {float(L0[k]):.2f}->{float(L1[k]):.2f}" for k in ("kp", "depth", "pen", "grip", "smooth") + (("join",) if edge else ()))
+    show = ", ".join(f"{k} {float(L0[k]):.2f}->{float(L1[k]):.2f}" for k in ("kp", "depth", "pen", "occl", "grip", "smooth") + (("join",) if edge else ()))
     return s, fr, f"fit MANO ({mode}{', no contact' if contact is False else ''}) on {start}-{end}: {n} frames, {iters} steps; losses {show}{note}"
 
 
@@ -464,6 +664,7 @@ def separate_hand(clip, state, start, end, max_cm=1.5, step_cm=0.2, tol=3, max_k
     """Per frame, translate the hand out of the object along the surface normal where its palm crosses the surface,
     in small steps, until at most `tol` palm triangles cross; a step that raises the keypoint error by more than
     max_kp_px is not taken. The pushes are then made one smooth profile over time. (MANO translation only.)"""
+    clip.use(state)
     s = state.copy()
     moved = []
     eps = 0.002
@@ -519,6 +720,7 @@ def smooth_hand(clip, state, start, end, window=12.0, fingers=True, rigid=True, 
     than `window` frames passes; orientations relative to the range's first frame), joined to the frames outside the
     range. Where that pushes the hand through the object (more than max_extra_cross extra crossing triangles), only
     part of the smoothing is applied there (a fraction that is itself smooth in time)."""
+    clip.use(state)
     s = state.copy()
     fr = [i for i in range(start, end + 1) if clip.hand_valid[i]]
     for run in runs_of(fr):
@@ -597,6 +799,7 @@ def _fade_edges(clip, before, after, start, end, falloff=FADE):
 def seam_frames(clip, state, refs, factor=1.5, floor=3.0):
     """Frames where `state`'s hand jumps more than every reference state does around that frame (its fastest
     fingertip's acceleration > factor x theirs + floor mm/frame^2), with both accelerations per frame."""
+    clip.use(state)
     near = lambda a: np.maximum.reduce([a, np.r_[a[1:], 0.0], np.r_[0.0, a[:-1]]])
     ref = np.maximum.reduce([near(np.nan_to_num(clip.tip_accel(r))) for r in refs])
     a = np.nan_to_num(clip.tip_accel(state))
@@ -605,6 +808,7 @@ def seam_frames(clip, state, refs, factor=1.5, floor=3.0):
 
 def smooth_seams(clip, state, refs, pad=6, window=8.0):
     """Smooth the hand at the seams left where versions were joined (seam_frames). Returns (state, notes)."""
+    clip.use(state)
     notes = []
     for _ in range(2):
         bad, a, ref = seam_frames(clip, state, refs)
@@ -625,6 +829,7 @@ def smooth_seams(clip, state, refs, pad=6, window=8.0):
 
 def hand_depth_bias(clip, state, i):
     """Median depth of the rendered hand minus the depth map over the hand's mask pixels (m; < 0 = hand too close)."""
+    clip.use(state)
     r = clip.metrics(state, [i])[0]
     return None if r.get("hand_depth_bias_cm") is None else r["hand_depth_bias_cm"] / 100
 
@@ -634,6 +839,7 @@ def move_hand_to_depth(clip, state, start, end, smooth=10):
     its mask), per frame, smoothed over time: one jump, so a hand that is on the wrong side of the object (e.g. in
     front of it while the fingers really wrap its far side) gets there without passing through it step by step.
     Follow with fit_mano to settle the grip."""
+    clip.use(state)
     s = state.copy()
     fr = [i for i in range(start, end + 1) if clip.hand_valid[i]]
     rows = {r["frame"]: r for r in clip.metrics(state, fr)}
@@ -684,6 +890,7 @@ def fit_object_silhouette(clip, state, start, end, max_rot_deg=8.0, max_trans_cm
     x/y and the viewing ray), the 12 neighbouring poses rendered in one batch, within a trust region around the
     current pose (it sharpens a pose; it will not fix a wrong orientation); frames without a usable mask are skipped.
     Then the change is smoothed over time (whittaker, `smooth` frames)."""
+    clip.use(state)
     s = state.copy()
     fr = [i for i in range(start, end + 1) if clip.om[i].sum() > 40]
     for i in fr:
