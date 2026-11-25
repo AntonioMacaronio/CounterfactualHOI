@@ -1,5 +1,5 @@
 # Project Goal
-We want to train a dexterous hand policy that intakes RGB and learns to pick up, in-hand manipulate, and then set down an object solely through video generation data.
+We want to train a dexterous hand policy that intakes depth images and learns to pick up, in-hand manipulate, and then set down an object solely through video generation data.
 
 ## 1.0 Generated videos
 We film a few real reference videos per task, then use MiniMax H3 (video-to-video) to make counterfactual versions of each one. Two kinds of edit, following Alvin's plan:
@@ -39,7 +39,7 @@ For each real video, and each generated video that passes 1.0, produce a 4D hand
 - **In:** real or generated video (H3: 1344x768, 24 fps, 4–15 s) + an object prompt for SAM3 segmentation. For generated clips, we will use `<CLS>` from the generation prompt. For the real clips, prompts were hand-picked, and both spatula clips needed point prompts because the text prompt found nothing.
 - **Out (hand):** per-frame MANO (pose, shape, global wrist pose). Right hand only for now.
 - **Out (object):** one rigid mesh + per-frame 6-DoF pose, in the same camera/world frame as the hand.
-- **Out (scene):** camera intrinsics, gravity direction (from GeoCalib), metric scale. 1.2 needs the table plane (all videos are static camera, tabletop manipulation) and gravity.
+- **Out (scene):** camera intrinsics, gravity direction, metric scale. 1.2 needs the table plane (all videos are static camera, tabletop manipulation) and gravity.
 
 ### Pipeline, status
 Old pipeline in [`choir.md`](choir.md).
@@ -51,7 +51,7 @@ How it works (four commands per clip: `prepare_clip.sh`, `first_mask.sh`, `CHOIR
 3. **Depth:** Depth Pro 2 gives metric depth for every frame, using CHOIR's camera focal length.
 4. **Scale from the hand:** compare the MANO hand's depth with the depth map on the visible hand pixels. Depth Pro 2 was already close to metric: the correction factor is 0.95–1.16 across clips.
 5. **Object:** FoundationPose tracks the SAM3D mesh on that depth. It sizes the mesh by trying several sizes on the first frame, and re-registers from the mask when a frame-by-frame check says the fit has slipped.
-6. **Hand:** each frame's hand is moved onto the depth map, so hand, object, and table all share one metric depth.
+6. **Hand:** each frame's hand is moved onto the depth map, so hand, object, and table all share one metric depth (after anchoring in 1.2).
 
 Results on the 10 real videos (first/last-frame object mask IoU, both methods scored on the SAM3 masks): 0.80–0.95
 vs CHOIR's 0.31–0.74; the object ends 0.4–2.5 cm from the table (CHOIR 3–20 cm); 0–1% of frames flagged by the
@@ -71,7 +71,7 @@ The parameters the agent edits:
 - Hand: MANO parameters for every frame
 - Table: one plane for the whole clip (every frame's depth is anchored to it); the agent can re-fit it.
 
-
+Note: gravity-aligned will be the table normal.
 | Type | Tools |
 |---|---|
 | look | `inspect` (overlays on the video; gravity-aligned side/top/front views), `view3d` (any side or a contact close-up; hand red where it passes through the object, green where it touches), `view_motion` (wrist + fingertip paths and a filmstrip: shows jitter), `zoom`, `plot`, `metrics` |
@@ -102,16 +102,16 @@ It plugs in as a new refine step after run_fprecon.sh, and the website gets a fo
 
 ## 1.3 Retarget to robot morphology 
 
-We cast retargeting as an RL tracking problem with FlashDexRetarget (FDR): one policy is trained in simulation (IsaacSim, 2048 envs, FlashSAC) to make a floating-wrist sharpa Wave hand move each clip's object along its reconstructed trajectory. The policy's rollouts are the retargeted motions. Code: `scripts/flashdex/*`
+We cast retargeting as an RL tracking problem with FlashDexRetarget (FDR): one policy is trained in simulation (IsaacSim, 4096 envs, FlashSAC) to make a floating-wrist sharpa Wave hand move each clip's object along its reconstructed trajectory. The policy's rollouts are the retargeted motions. Code: `scripts/flashdex/*`
 
 ### Pipeline
-1. **Import.** Per clip, from the refinement: MANO hand parameters, object poses, table plane; from fprecon: the metric SAM3D mesh. World: z-up, table at 0.8 m, right hand only, 60 Hz.
+1. **Import.** Per clip, from the refinement: MANO hand parameters, object poses, table plane; the metric SAM3D mesh the agent refined. World: z-up, table at 0.8 m, right hand only, 60 Hz.
 2. **Scene.** The table is one support disk under the object's path. Objects that tip over at rest get a flat-bottomed collision mesh (visual mesh unchanged).
 3. **Kinematic retarget.** IK with collisions in MuJoCo: the Sharpa palm and fingertips follow the MANO wrist and fingertips. This gives a joint reference, not yet physically valid.
 4. **RL tracking.** One policy over all 10 clips.
    - Episode: starts at a random frame of a clip, ends with the clip.
    - Action: PD targets; wrist = reference + residual (5 Hz low-pass), fingers = absolute joint targets.
-   - Reward: object point-cloud match to the reference (main term), plus wrist, fingertip and joint tracking.
+   - Reward: object point-cloud match to the reference (main term), plus wrist, fingertip and joint tracking. 2 smoothness rewards: action-rate penalty and object-velocity tracking (0.1 for linear and angular).
    - Early reset: object dropped, object reward too low, or fingertips far off.
    - Curriculum: a virtual spring holds the object on its reference early on and decays as tracking improves.
    - Observations are privileged (object state, contacts, SDF, 10 future reference frames).
@@ -132,7 +132,7 @@ Imagine a Tianji 7 DoF arm with a 22 DoF sharpa connected to the end and a D405 
 | Hand | Sharpa Wave, 22 DoF |
 | Arm | Tianji 7-DoF force-controlled arm with anthropomorphic cross-axis wrist (see the arm section) |
 | Controlled joints | `N = 22 + 7 =` **29** |
-| Policy rate | 50 Hz (one step every 20 ms) |
+| Policy rate | 60 Hz (one step every 16.7 ms), the rate of the simulator and of the robot data |
 | Low-level control | Built-in joint controllers on hand and arm, servoing faster than the policy; arm targets interpolated between policy steps (see the arm section) |
 | Wrist camera | Intel RealSense D405, mounted on the wrist, looking along the hand (as in SPD's per-hand views) |
 | Exo camera | Fixed depth camera viewing the workspace (see the exo camera section) |
@@ -151,7 +151,7 @@ The outputs are pretty simple, just the 29 joint angle action chunk of 8 steps. 
 
 ### Training phases
 
-1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the FDR policy's joint targets for the next 8 steps. The text command comes from the clip's phase labels, looked up by time: the refinement labels phases in video frames (`runs/refine_<round>/VID/phases.json`), and the robot data is the same clip at 60 Hz.
+1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the joint targets for the next 8 steps. FDR's hand is on a floating 6-DoF wrist, not on the arm, so for now an IK step turns its data into arm joint angles: the 22 hand joints are the FDR policy's finger targets, and the 7 arm joints are solved from its wrist (end-effector) target pose, each step starting from the previous step's solution so that the arm moves continuously. The text command comes from the clip's phase labels, looked up by time: the refinement labels phases in video frames (`runs/refine_<round>/VID/phases.json`), and the robot data is the same clip at 60 Hz.
 2. **RL finetuning (FPO++ + SGS):** finetune the flow-matching policy with an asymmetric actor-critic, where the critic receives privileged observations (below). The supervised loss stays on at the start with a decaying weight, so the first updates with an untrained critic do not undo stage 1. FPO++ runs with its per-sample ratio and plain PPO clipping: its asymmetric trust region did poorly with sparse rewards in the paper, and the success terms below are sparse.
 
 **Scope for now: pick and place only.** The policy is trained on the five pick-place clips with the commands "pick" and "place". "rotate" is left for later: the videos turn each object about a different axis (the spatula and the bottle about their long axis, the mug about its vertical axis, the tape roll over a diameter), so no single definition of "rotated" fits all of them.
