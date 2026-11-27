@@ -180,17 +180,18 @@ Here is the I/O design spec of the policy.
 The outputs are pretty simple, just the 29 joint angle action chunk of 8 steps. We will execute the whole chunk in RL because FPO++ treats a chunk as one action. Action will be absolute joint targets, normalized by joint limits. We will sample with 10 flow steps with noise, and at deployment we will test 5 or 10 sampling steps from zero noise.
 
 ### Network
-`scripts/policy14/model.py` (8.6 M parameters; `python scripts/policy14/model.py` prints every tensor's shape).
+`scripts/policy14/model.py`: a flow-matching transformer, 7.9 M parameters. `python scripts/policy14/model.py` prints every tensor's shape.
 
-- **Observation encoder**, once per chunk, 1.5 M:
-  - each depth image (2 × 60 × 106) goes through its own CNN (four stride-2 convolutions, then a linear layer) to 64 numbers;
-  - proprioception goes through an MLP to 256, and the command through a linear layer to 32;
-  - the four are concatenated (416) and mixed by an MLP into the observation vector c (512).
-- **Velocity network**, once per flow step, 7.1 M:
-  - the noised chunk (8 × 29) is flattened and projected to 512;
-  - the flow time τ gets a sinusoidal embedding and an MLP (128); [c | τ] (640) conditions every block;
-  - four residual blocks, 512 → 1024 → 512, each with FiLM: a scale and shift for every channel, computed from [c | τ];
-  - a zero-initialised output layer gives the velocity (8 × 29), so a fresh policy outputs zeros.
+- **Observation tokens**, once per chunk (0.5 M), all projected to width 256 into O, 60 tokens:
+  - each depth image (2 × 60 × 106) goes through its own CNN (four stride-2 convolutions) to a 4 × 7 feature map, i.e. 28 patch tokens, with a position and a camera embedding;
+  - proprioception gives 3 tokens, one per history frame ([q | q*]);
+  - the command gives 1 token.
+- **Flow transformer**, once per flow step (7.4 M), with joint self-attention over one sequence [O | A]:
+  - A is the noised chunk's 8 action tokens (29 → 256) with step embeddings, so the sequence has 68 tokens;
+  - 6 blocks of 8-head attention and an MLP (256 → 1024 → 256);
+  - the flow time τ conditions every block through adaLN-Zero: a shift, scale and gate per block, starting as the identity;
+  - the action tokens attend to each other and to every image patch;
+  - a zero-initialised output layer maps the 8 action tokens to the velocity (8 × 29), so a fresh policy outputs zeros.
 - **Training target:** the velocity should equal a − ε, where a_τ = τ·a + (1 − τ)·ε. The loss is the squared error summed over the chunk; FPO++ compares it before and after an update on the same (τ, ε).
 - **Critic:** an MLP (1024, 512, 256) on the privileged state at the start of the chunk.
 
