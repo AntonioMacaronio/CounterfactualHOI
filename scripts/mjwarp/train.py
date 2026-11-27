@@ -52,7 +52,7 @@ def main():
     if a.trials:
         import shutil
         shutil.copy(a.trials, runner._save_path_base / "trials.json")
-    print(f"[cfhoi] run dir {runner._save_path_base} (MuJoCo Warp{', trials ' + a.trials if a.trials else ''})", flush=True)
+    print(f"[cfhoi] run dir {runner._save_path_base} (MuJoCo Warp, {'swap' if os.environ.get('FDR_OBJ_SWAP') else 'multi-object'} object mode{', trials ' + a.trials if a.trials else ''})", flush=True)
     runner.learn(num_learning_iterations=int(cfg.runner.max_iterations), init_at_random_ep_len=True)
     try:
         import wandb

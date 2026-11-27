@@ -97,17 +97,25 @@ class TrialRandomizer:
         self.n_trials = int(t["n_trials"])
         # per clip: the object body (global id), its collision geoms, and N trial rows
         self.body, self.geoms, self.mass, self.inertia, self.ipos, self.fric, self.solref = [], [], [], [], [], [], []
+        swap = getattr(self.cmd, "_swap_tables", None)       # FDR's swap mode: one entity, per-object rows
         for k, name in enumerate(names):
             task = t["tasks"].get(name)
             if task is None:
                 raise KeyError(f"{name} has no trials in {trials_path}")
             slot = int(lib.traj_obj_slot[side][k]) if hasattr(lib, "traj_obj_slot") else k
             ent = env.scene[ents[slot] if len(ents) > 1 else ents[0]]
-            b = int(ent.indexing.body_ids[0])
-            gids = [int(g.id) for g in ent.indexing.geoms if g.contype]
-            m0 = float(env.sim.get_default_field("body_mass")[b])
-            I0 = env.sim.get_default_field("body_inertia")[b].clone()
-            p0 = env.sim.get_default_field("body_ipos")[b].clone()
+            if swap is not None:
+                b = int(self.cmd._swap_body_id)
+                gids = [int(g) for g in self.cmd._swap_geom_ids]
+                m0 = float(swap["bmass"][slot])
+                I0 = swap["binertia"][slot].clone().float()
+                p0 = swap["bipos"][slot].clone().float()
+            else:
+                b = int(ent.indexing.body_ids[0])
+                gids = [int(g.id) for g in ent.indexing.geoms if g.contype]
+                m0 = float(env.sim.get_default_field("body_mass")[b])
+                I0 = env.sim.get_default_field("body_inertia")[b].clone()
+                p0 = env.sim.get_default_field("body_ipos")[b].clone()
             base = task["mass_kg_base"] if task["mass_kg_base"] else m0
             tr = task["trials"]
             mass = torch.tensor([base * x["mass_scale"] for x in tr], device=dev)

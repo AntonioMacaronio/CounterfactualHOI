@@ -6,6 +6,7 @@
 #
 # Same launch defaults as the Isaac launcher: Sharpa bimanual robot, right hand only (per_hand_actor_critic=false),
 # wandb offline, the two small smoothness rewards (CFHOI_ACTION_RATE, CFHOI_OBJ_SMOOTH; see scripts/flashdex/train.sh).
+# Objects: FDR's one-object swap mode by default (scripts/mjwarp/create.py); FDR_OBJ_SWAP=0 for multi-object mode.
 # Logs and checkpoints: $FDR/logs/flashsac/<RUN_NAME>-<MMDD-HHMMSS>/. Needs scripts/mjwarp/setup.sh.
 set -e
 source "$(dirname "${BASH_SOURCE[0]}")/../env.sh"

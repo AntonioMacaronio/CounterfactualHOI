@@ -10,6 +10,8 @@ run has been made on it yet.
 | `setup.sh` | venv `venvs/fdr-mjwarp`: mjlab 1.3.0, MuJoCo Warp 3.8.1, warp 1.12.1, torch 2.7 cu128, FDR's packages without Isaac; links the configs; builds the hand variant |
 | `env.py` | `MjwarpTrackingEnv`: mjlab's env + FDR's `capture_final_obs` step; action delay and noise; trials at reset |
 | `create.py` | builds train and eval envs from FDR's hydra config with FDR's own MuJoCo scene builder; `python create.py` builds, steps and profiles |
+| `swap_collision.py` | FDR's one-object swap mode (the default here): the hull data its release lacks, and a fix to its object assist |
+| `swap_check.py` | checks of swap mode: per-world rows, rollouts against multi-object mode and one-object scenes, `widen` / `subset` packs |
 | `train.py`, `train.sh` | FDR's FlashSAC runner on it, with `train_cfhoi.py`'s patches (eval archives, `metrics.jsonl`, rollout fields for §1.4) |
 | `trials.py` | `make DATASET`: N stored trials per task -> `DATASET/trials.json` |
 | `randomize.py` | applies the trials and the per-episode robot randomization in the env |
@@ -91,10 +93,6 @@ mjlab 1.3.0. This backend uses the real mjlab 1.3.0:
 - **Scene.** FDR's own MuJoCo scene builder (`envs.scene.build_scene`).
 - **Step.** The step body of FDR's Isaac twin, for `capture_final_obs`.
 
-Multi-object mode puts every clip's object in every world and parks the unused ones in the air. FDR's one-object
-"swap" mode needs `simulator.mujoco.swap_collision`, which the release does not include. With many tasks the
-multi-object scene grows, so that is the next thing to port.
-
 Settings (`config/simulator_mjwarp.yaml`):
 - dt 1/240 s with decimation 4, so 60 Hz control as on Isaac;
 - implicitfast integrator, Newton solver with 6 iterations;
@@ -109,7 +107,17 @@ Settings (`config/simulator_mjwarp.yaml`):
 | 64 | 76 ms | 475 ms | 135 |
 | 1024 | 75 ms | 690 ms | 1,485 |
 
-At 1024 envs, observations take 312 ms of the step, commands 120 ms, resets 107 ms and physics 75 ms. FDR's
+On free H200s (2026-11-27, with trials, round 10 with the wrist hardware; three timing runs and a training smoke
+test ran at once on four GPUs, so the CPU was shared):
+
+| envs | object mode | physics, 4 substeps | full env step | env steps/s |
+|---|---|---|---|---|
+| 1024 | multi-object | 57 ms | 429 ms | 2,389 |
+| 1024 | swap | 39 ms | 386 ms | 2,654 |
+| 4096 | swap | 94 ms | 332 ms | 12,328 |
+
+At 1024 envs (shared GPU, multi-object), observations take 312 ms of the step, commands 120 ms, resets 107 ms and
+physics 75 ms. FDR's
 observation terms are thousands of small kernel launches, which a busy GPU serialises. They need re-measuring on a
 free GPU before comparing with Isaac (6.9k env steps/s alone at 2048 envs). `fast.py`'s `obs` dedup applies here too
 (the actor and critic groups are identical) but is not wired in yet.
@@ -118,7 +126,78 @@ Smoke tests:
 - 64 envs, 40k and 8k env steps, with trials: training and the evaluation run.
 - The archive has `joint_pos_target`, `contact_force` (MuJoCo Warp's contact sensors, up to 47 N) and `link_obj_dist`.
 - Open: 3 of 10 clips (pp_4, pp_5, prp_3) were not scored in that evaluation, meaning they logged no in-window steps.
-  Check this on a trained policy.
+  That run was in multi-object mode, whose episodes end early (next section). In swap mode, 10 and 9 of 10 were
+  scored. Check this on a trained policy.
+
+## Object modes: multi-object and swap
+
+FDR has two ways to give each world its clip's object:
+
+| | multi-object, `FDR_OBJ_SWAP=0` | swap (default) |
+|---|---|---|
+| scene | every clip's object in every world, the unused ones parked in the air | one object entity per world |
+| per world | the active object is chosen per env | at every reset the world's model rows are pointed at its clip's object (meshes, part poses, bounds, mass, inertia) |
+| 10 clips | nq 126, 101 bodies | nq 63, 92 bodies |
+| 500 clips | impossible (500 free bodies per world) | tested (below) |
+
+Swap mode was ported 2026-11-27 and is the default of this backend: `create.py` sets `FDR_OBJ_SWAP=1`
+unless it is `0`, so `train.sh`, `train.py` and `swap_check.py` all run in swap mode, and `FDR_OBJ_SWAP=0 bash
+scripts/mjwarp/train.sh ...` selects multi-object mode. `train.py` prints the mode next to the run directory.
+`rest_check.py` builds its own one-object scenes and does not use the variable. The Isaac backend is unaffected.
+
+What the port needed:
+- **`swap_collision.py`**, the module FDR imports as `simulator.mujoco.swap_collision` and which its release lacks.
+  Every object's convex parts are compiled into the scene as meshes no geom uses. MuJoCo then leaves out their
+  hull graphs and polygons, so the module copies those from each object's own compile into the MuJoCo Warp model
+  and checks that the vertices agree (they do, exactly).
+- **A fix to FDR's object assist** (`swap_collision.patch_assist_inertia`). The assist turns its rotational PD into
+  a torque through the object's inertia, which it read from world 0. In swap mode every world then got world 0's
+  object's inertia. The metal case (prp_1), on the device's inertia, spun up to 256 rad/s within 4 control steps
+  in every world. The fix uses each object's own nominal inertia, as multi-object mode does. With trials, the
+  world's inertia is the trial's (±30%) and the assist still uses the nominal one.
+- **Trials** (`randomize.TrialRandomizer`) write into the one swap body.
+
+Checks (`swap_check.py`, 2 worlds per clip, zero residual actions, FDR's evaluation settings, round 10 with the
+wrist hardware):
+- Right after the reset, every world's object matches multi-object mode exactly: part poses, CoM, mass, inertia
+  and its frame, invweights. The swap rows match the table, and with `--trials` the trial's mass, inertia and CoM.
+- Each clip's world in the 10-object swap scene against that clip alone (a one-object swap scene: the object is
+  the template itself, no padding, no other objects):
+
+| clip | steps before the first termination (alone / swap / multi-object) | object path difference, alone vs swap: 30 / 120 steps / clip end |
+|---|---|---|
+| pp_1 | 221 / 221 / 61 of 222 | 0.001 / 0.03 / 0.19 cm |
+| pp_2 | 265 / 265 / 135 of 266 | 0.009 / 0.05 / 0.07 cm |
+| pp_3 | 167 / 167 / 71 of 168 | 0.012 / 0.15 / 0.15 cm |
+| pp_4 | 239 / 239 / 134 of 240 | 0.001 / 0.06 / 0.06 cm |
+| pp_5 | 149 / 149 / 50 of 150 | 0.000 / 1.46 / 1.46 cm |
+| prp_1 | 523 / 523 / 214 of 524 | 0.000 / 0.09 / 0.24 cm |
+| prp_2 | 319 / 319 / 80 of 320 | 0.036 / 0.19 / 0.62 cm |
+| prp_3 | 403 / 403 / 67 of 404 | 0.000 / 0.05 / 0.07 cm |
+| prp_4 | 541 / 541 / 105 of 542 | 0.001 / 0.01 / 0.26 cm |
+| prp_5 | 513 / 513 / 36 of 514 | 0.000 / 0.14 / 0.64 cm |
+
+  The small differences come from floating-point order: the swap scene's mesh arrays are laid out differently, and
+  contact normals already differ by 1e-4 at the reset. Swap mode is deterministic: both copies of every clip, and
+  repeated runs, agree exactly.
+- **Multi-object mode ends every clip early**, on FDR's object angular-velocity check (over 200 rad/s), and is not
+  deterministic: copies of one clip end at different steps (115 and 151). Its object paths stay within about 1 cm
+  of swap mode's until then. This was not investigated further; it affects the earlier multi-object smoke tests
+  (see "3 of 10 clips not scored" below).
+- **Without the hull injection**, results change little: object paths agree with the injected run to 0.01 cm, and
+  there are 3% fewer contacts (194 against 200 per step). MuJoCo Warp falls back to scanning every vertex.
+- **500 objects in the scene** (`swap_check.py widen`: each real object 50 times, every clip on its object's last
+  copy):
+  - build 154 s, with 4,700 meshes given hull data;
+  - every world's rows are correct, so are mesh ids at the far end of the table;
+  - 522 ms per step against 454 for 10 objects on a shared GPU.
+  - **Memory: 33 GB at 20 worlds**, against 1.5 GB for 10 objects. FDR bakes one signed-distance grid per object on
+    the GPU (128³ × 4 float32, 34 MB each, plus a second copy while stacking). Lower
+    `commands.object.sdf.grid_n` (64: 4 MB per object) before a 500-task run, after checking the observations it
+    feeds.
+- **Training**: two runs of 64 envs and 8,192 env steps with trials in swap mode, before and after the assist fix.
+  Training, the evaluation and the checkpoint ran in both. The evaluation scored 10 and 9 of the 10 clips (the
+  multi-object smoke test: 7). At 8k steps the policy is close to random, so this says nothing about learning.
 
 ## Wrist hardware
 
@@ -150,3 +229,10 @@ The other five clips were clear in both. Fingertip error is unchanged (median 9.
   Isaac is unverified.
 - The Isaac backend gets neither the trials nor the robot randomization. Only the VLM mass reaches it, through
   `right_object_masses`.
+- On MuJoCo Warp the VLM mass reaches the object only through the trials. FDR's MuJoCo scene builder takes the mass
+  from a density (800 kg/m³) in both object modes and ignores `right_object_masses`. So the evaluation env, which
+  runs without trials, uses the density masses (e.g. 128 g for the metal device, 161 g for the tape roll), not the
+  VLM's. The robot-data rollouts (stage B4 in `ROBOT_DATA.md`) should run every task × trial through the trials
+  instead.
+- Multi-object mode's early terminations and non-determinism (above) are not understood. Swap mode does not show
+  them.

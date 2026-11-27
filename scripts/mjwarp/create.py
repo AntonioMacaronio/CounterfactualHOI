@@ -8,6 +8,10 @@ mjlab's Simulation instead of Isaac Sim.
   train_env, eval_env = create_envs_mjwarp(cfg)
 
 Runs in $PROJECT_STORAGE_ROOT/venvs/fdr-mjwarp (scripts/mjwarp/setup.sh). Isaac Sim is not imported.
+Objects: FDR's one-object swap mode is the default here (one object entity per world, each world's object picked by
+per-world model rows; scripts/mjwarp/swap_collision.py). FDR_OBJ_SWAP=0 selects FDR's multi-object mode instead
+(every world holds every clip's object). FDR's scene builder turns swap mode on for any non-empty value, so a "0" is
+removed from the environment here.
 """
 
 from __future__ import annotations
@@ -19,6 +23,11 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 FDR = Path(os.environ.get("FDR", "/data/sky/projects/CounterfactualHOI/build/FlashDexRetarget"))
 
+if os.environ.get("FDR_OBJ_SWAP", "1").strip().lower() in ("", "0", "false", "no", "off"):
+    os.environ.pop("FDR_OBJ_SWAP", None)        # multi-object mode
+else:
+    os.environ["FDR_OBJ_SWAP"] = "1"            # swap mode (default)
+
 import mjlab  # noqa: E402,F401  (the real package first; envs puts FDR's vendored copy on sys.path)
 import mjlab.envs  # noqa: E402,F401
 import mjlab.managers  # noqa: E402,F401
@@ -27,6 +36,9 @@ import mjlab.sim  # noqa: E402,F401
 
 sys.path.insert(0, str(FDR / "src"))
 sys.path.insert(1, str(HERE))
+import swap_collision  # noqa: E402
+
+swap_collision.register()   # FDR's swap mode imports it as simulator.mujoco.swap_collision
 
 
 def compose(overrides: list[str]):
