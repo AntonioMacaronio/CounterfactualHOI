@@ -2,17 +2,20 @@
 
   cd $FDR && source scripts/env.sh && unset HEADLESS FDR_ROBOT_USD && export FDR CUDA_VISIBLE_DEVICES=<gpu>
   python $CFHOI/scripts/flashdex/profile_step.py --out prof.json [--agent CKPT_DIR] [--iters 150] [--fast] [--sgs 400] \
-      <the hydra overrides of scripts/flashdex/train.sh>  [num_envs=4096 runner.agent.buffer_max_length=2000000 ...]
+      [--fastbuild] <the hydra overrides of scripts/flashdex/train.sh>  [num_envs=4096 runner.agent.buffer_max_length=2000000 ...]
 
 Builds the env and the runner as scripts/flashdex/train_cfhoi.py does (no training run, nothing is saved), fills the
 replay buffer until the agent updates, then times the runner's own loop body (collect + updates):
   plain   no instrumentation -> iterations/s and env steps/s
   stages  torch.cuda.synchronize() around each stage of the step (physics, reset, observations, ...), ms / iteration
   kernels torch profiler over 4 iterations: GPU kernel launches, synchronizations, operator calls per iteration
-With --fast the same passes run again after scripts/flashdex/fast.py is installed (same process, same GPU load, so
-the two are comparable). With --sgs N, scripts/flashdex/sgs.py is installed and N more iterations run; its per-clip
+--obs-terms adds one stage per observation term (obs/<term>; the critic group calls the same functions, so
+without --fast each term is counted twice). With --fast the same passes run again after scripts/flashdex/fast.py is
+installed (same process, same GPU load, so the two are comparable). With --sgs N, scripts/flashdex/sgs.py is installed and N more iterations run; its per-clip
 success rates and draw probabilities go to the output. --agent loads a checkpoint so the policy behaves like a
 trained one (pass runner.agent.load_reward_normalizer=false when num_envs differs from the checkpoint's run).
+--fastbuild applies fast.py's scene-build patches before the envs are created (they cannot be switched in a running
+process: compare two runs; the kernel-launch counts do not depend on what else the GPU is doing).
 
 Measure on a GPU that no other job uses: two FDR processes on one GPU each run at well under half speed.
 """
@@ -45,19 +48,52 @@ STAGES = [("action.process", "action_manager", "process_action"), ("action.apply
           ("reset/termination.reset", "termination_manager", "reset"), ("reset/reward.reset", "reward_manager", "reset")]
 
 
+class TimedTerm:
+    """An observation term's function with a synchronized timer; other attributes (a class term's reset) pass through."""
+
+    def __init__(self, timers, name, fn):
+        self._timers, self._name, self._fn = timers, name, fn
+
+    def __call__(self, *a, **k):
+        T = self._timers
+        if not T.on:
+            return self._fn(*a, **k)
+        T.torch.cuda.synchronize()
+        t0 = time.perf_counter()
+        out = self._fn(*a, **k)
+        T.torch.cuda.synchronize()
+        T.t[self._name] += time.perf_counter() - t0
+        return out
+
+    def __getattr__(self, key):
+        return getattr(self._fn, key)
+
+    def __eq__(self, other):                             # fast.py compares the actor's and the critic's term functions
+        return self._fn == (other._fn if isinstance(other, TimedTerm) else other)
+
+    def __hash__(self):
+        return hash(self._fn)
+
+
 class Timers:
     def __init__(self, torch):
-        self.torch, self.t, self.on = torch, collections.defaultdict(float), False
+        self.torch, self.t, self.on, self.inside = torch, collections.defaultdict(float), False, set()
 
     def wrap(self, name, fn):
         def w(*a, **k):
-            if not self.on:
+            # a patch can wrap an already wrapped function (fast.py's observation pass calls the timed original):
+            # only the outermost call of a stage counts
+            if not self.on or name in self.inside:
                 return fn(*a, **k)
-            self.torch.cuda.synchronize()
-            t0 = time.perf_counter()
-            out = fn(*a, **k)
-            self.torch.cuda.synchronize()
-            self.t[name] += time.perf_counter() - t0
+            self.inside.add(name)
+            try:
+                self.torch.cuda.synchronize()
+                t0 = time.perf_counter()
+                out = fn(*a, **k)
+                self.torch.cuda.synchronize()
+                self.t[name] += time.perf_counter() - t0
+            finally:
+                self.inside.discard(name)
             return out
         return w
 
@@ -84,6 +120,8 @@ def main():
     ap.add_argument("--warm", type=int, default=40, help="iterations with updates before timing (torch.compile)")
     ap.add_argument("--fast", action="store_true", help="time again with scripts/flashdex/fast.py installed")
     ap.add_argument("--sgs", type=int, default=0, help="then run this many iterations with scripts/flashdex/sgs.py")
+    ap.add_argument("--fastbuild", action="store_true", help="build the scene with fast.py's build patches (fast.prepare)")
+    ap.add_argument("--obs-terms", action="store_true", help="also time every observation term (stages obs/<term>)")
     ap.add_argument("overrides", nargs="*")
     args = ap.parse_args()
     t_start = time.time()
@@ -103,14 +141,21 @@ def main():
 
     set_seed(cfg.seed)
     configure_torch_backends()
+    build_notes = []
+    if args.fastbuild:
+        import fast
+        build_notes = fast.prepare(cfg)
+    t_build = time.time()
     train_env, eval_env = create_envs(cfg, device=cfg.device)
+    t_build = time.time() - t_build
     setup_logger(cfg.logger, cfg.runner)
     runner = create_runner(cfg.runner, cfg.eval, train_env, eval_env=eval_env, headless=True)
     if args.agent:
         runner._agent.load(args.agent)
     env, agent, meter = runner._train_env, runner._agent, AverageMeter()
     raw, n_envs = env.unwrapped, runner._n_envs
-    res = {"overrides": args.overrides, "num_envs": n_envs, "build_s": time.time() - t_start,
+    res = {"overrides": args.overrides, "num_envs": n_envs, "build_s": time.time() - t_start, "create_envs_s": t_build,
+           "build_notes": build_notes,
            "updates_per_step": float(cfg.updates_per_interaction_step), "batch": int(cfg.runner.agent.sample_batch_size),
            "obs_dim": int(env.single_observation_space.shape[0]), "action_dim": int(env.single_action_space.shape[0]),
            "gpu_mem_after_build_mb": gpu_mem_mb()}
@@ -133,6 +178,12 @@ def main():
     for _ in range(args.warm):
         iteration()
     T = Timers(torch)
+
+    if args.obs_terms:                                   # the actor group's terms (the critic's are the same functions)
+        om = raw.observation_manager
+        for name, tc in zip(om._group_obs_term_names["actor"], om._group_obs_term_cfgs["actor"]):
+            if not isinstance(tc.func, TimedTerm):
+                tc.func = TimedTerm(T, f"obs/{name}", tc.func)
 
     def instrument():
         """(Re)wrap the stages: the patches replace some of these attributes."""

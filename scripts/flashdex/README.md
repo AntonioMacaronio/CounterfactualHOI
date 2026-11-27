@@ -44,8 +44,9 @@ dataset and the GenEnv one (`data_<rN>`, `data_<rN>_gen`).
 | `rest_check.py` | MuJoCo drop test of each clip's first / last reference pose on its table disk (no hand) |
 | `flat_base.py` | flat-bottom collision meshes (coacd) for objects whose rest pose is unstable; visual mesh unchanged |
 | `eval_curves.py` | per-eval scores of a run -> `<run>/curves.json`, `curves.png` |
+| `compare_runs.py` | runs side by side at equal env steps: assist gain, task reward, completion (`metrics.jsonl`) and eval progress (`curves.json`) |
 | `profile_step.py` | where a training iteration spends its time (stages, GPU kernel launches and synchronizations), with and without `fast.py` |
-| `fast.py` | opt-in speed patches (`CFHOI_FAST=1`): applied at run time, FDR's checkout stays untouched |
+| `fast.py` | opt-in speed patches (`CFHOI_FAST=1`) for the scene build and the training loop: applied at run time, FDR's checkout stays untouched |
 | `sgs.py` | opt-in Success-Guided Sampling of the episode resets (`CFHOI_SGS=1`) |
 | `auto_refresh.sh` | background job: keeps every run's curves current and re-exports tab 5 (+50M steps / +10 points) |
 | `build_flashdex_html.py` | the tab-5 page: refined reconstruction (left) vs FDR Sharpa rollout (right), pp / prp tabs |
@@ -219,6 +220,88 @@ is latest when it is built.
   - Training-time object error is 2-3 cm, against 15-18 cm in the evals, which run without assist.
   - The unassisted evals should only improve once the assist is near zero (about 60-70M steps at this rate).
 
+## Round 10 (2026-11-24)
+
+`prepare_dataset.sh refine_r10` with nothing copied: round 10 rescales every object mesh, so convex parts, USD and
+SDF are rebuilt from `export/object_mesh.obj` (coacd: 2-9 min per object, 31 min for the two handled objects, 20-22
+parts). 10 clips, 0 retargeting errors (`data_r10`, `data_r10_gen`).
+
+- **Drop test** (`rest_check.py`, turned at the start / at the end of the clip):
+
+  | clip | round 7 | round 10 | `data_r10_flat` |
+  |---|---|---|---|
+  | pp_1 | 22.6° / 17.0° | 9.8° / 3.8° | same |
+  | pp_2 | 0.2° / 4.3° | 0.9° / 2.3° | same |
+  | pp_3 (spatula) | 15.5° / 12.9° | 16.9° / 10.9° | same |
+  | pp_4 | 5.0° / 3.6° | 7.9° / 1.7° | same |
+  | pp_5 (bottle) | 2.7° / 4.0° | 8.8° / 26.4° | 0.0° / 1.4° |
+  | prp_1 | 3.6° / 12.0° | 5.4° / 15.2° | same |
+  | prp_2 | 1.8° / 2.1° | 1.3° / 1.0° | same |
+  | prp_3 (spatula) | 20.2° / 17.3° | 20.0° / 17.6° | same |
+  | prp_4 | 7.4° / 0.3° | 1.4° / 3.4° | same |
+  | prp_5 (bottle) | 5.8° / 20.3° | 52.8° / 49.3° | 0.1° / 5.2° |
+
+  Round 10 fixes the placed poses' height (the object centre ends within 0.5 cm of its start height; 0.7-2.6 cm
+  above it in round 7) and pp_1. The bottle of prp_5 now topples at frame 0: its long axis is 12.9° from vertical
+  with the centre 11.8 cm up and a 4 x 2 cm patch on the table. The spatula still rests on its head with the handle
+  in the air.
+- **`data_r10_flat`**: `flat_base.py --band 0.02` for pp_5 and prp_5. Rule: a clip whose drop test turns more than
+  10° at either end, and whose object rests on the same face at both ends, gets the flat base if that lowers the
+  turn; tried on pp_3, pp_5, prp_3, prp_5. A 1 cm band leaves prp_5's placed pose at 22.7° (the base of a bottle
+  leaning 13° rises 1.2 cm across its width), 2 cm gives 5.2°. The spatula does not improve (pp_3 20.6° / 15.7°,
+  prp_3 19.8° / 17.1° with a 1 cm band) and keeps its mesh; prp_1 is turned over during the clip, so a base cut at
+  its first frame does not apply to its last. `data_r10_flat4` and `data_r10_flat_band1` are the variants not used.
+- **Smoothness** (asked for 2026-11-24: the retargeted hand jitters). FDR's own regulariser is `action_penalty`
+  -0.01 on the mean squared action; `eval/action_rate_l2` (the squared change of the 56 actions between steps) grew
+  from 0.04 at 10M to 2.0-3.7 from 70M on in `cfhoi_r7_flat`. `train.sh` now gives FDR's `action_rate` term the
+  weight -0.02 by default (`CFHOI_ACTION_RATE=<weight>` changes it, `=0` leaves it out). Its size, measured in the
+  simulator next to the other terms (weight x value per step): 0.04-0.07 at that jitter (3-5% of the ~1.4 the
+  tracking terms give), 0.06 for exploration noise of std 0.15 per action, 0.73 for uniformly random actions (the
+  object-tracking term is 0.7-0.8). Since 07:13 `train.sh` also weights FDR's object-velocity terms by default
+  (`CFHOI_OBJ_SMOOTH`); the runs below started before that and do not have them.
+- **Runs** (the round-10 pair with `CFHOI_FAST=1,contacts`; all four 4096 envs, 4 updates per iteration,
+  `num_steps_per_env=16`, 20M-row buffer, 300M env steps planned, evaluation every 10M):
+
+  | run | GPU | |
+  |---|---|---|
+  | `cfhoi_r10_flat-1124-060850` | 0 | `data_r10_flat`, `action_rate` -0.02 (the default); started 06:08, build 5-8 min |
+  | `cfhoi_r10_flat_nosmooth-1124-064040` | 1 | the same with `CFHOI_ACTION_RATE=0`: the control for the smoothness term; started 06:40 |
+  | `cfhoi_r7_flat_fast4k` | 2 | round 7, uniform resets: the 4096-env recipe against `cfhoi_r7_flat` (started 03:44) |
+  | `cfhoi_r7_flat_sgs4k` | 3 | round 7, `CFHOI_SGS=1`: SGS against `cfhoi_r7_flat_fast4k` (started 04:32) |
+
+- **Paused at 10:01** (the user asked for the GPUs; `kill -USR1`, FDR's graceful stop). Each run saved `stop<N>/`
+  (networks, replay buffer, `resume_state.json`; 29 GB) in its run dir:
+
+  | run | stopped at | evaluations |
+  |---|---|---|
+  | `cfhoi_r10_flat-1124-060850` | 116.5M env steps | to 110M |
+  | `cfhoi_r10_flat_nosmooth-1124-064040` | 102.9M | to 100M |
+  | `cfhoi_r7_flat_fast4k-1124-034417` | 178.4M | to 170M |
+  | `cfhoi_r7_flat_sgs4k-1124-043223` | 139.0M | to 130M |
+
+  To resume one: `agent_load_path=<stop dir> buffer_load_path=<stop dir> step_offset=<N> logger.wandb.resume=true
+  logger.wandb.resumeid=<wandb_id in resume_state.json>` on top of the original overrides and environment
+  variables, **plus the switches for the rewards `train.sh` has added since these runs started**, or the resumed
+  run trains on a different reward: `CFHOI_OBJ_SMOOTH=0` for all four (the object-velocity terms, default since
+  07:13), and `CFHOI_ACTION_RATE=0` for the two round-7 runs (launched before the action-rate default). SGS's
+  per-cell history is not in the checkpoint; it refills within about 100 episodes per cell.
+- **Where they stood** (mean AdaDex progress / clips tracked end to end, averaged over the evaluations from 80M
+  to 110M env steps; the object assist is at 4 -> 1 of 80 there, so these are early numbers):
+
+  | | round 10, smoothness | round 10, no smoothness | round 7, 4096 envs | round 7, 4096 envs + SGS | round 7, 2048 envs |
+  |---|---|---|---|---|---|
+  | progress | 39% | 40% | 32% | 29% | 41% |
+  | end to end | 20% | 23% | 5% | 8% | 8% |
+  | `eval/action_rate_l2` at 100M | 0.24 | 1.48 | 2.21 | - | 2.67 |
+
+  - Smoothness: the action-rate term cuts the action jitter 6-10x (0.16-0.24 against 1.5-2.4 from 70M on) with the
+    same tracking (39% against 40%; task reward 0.81 against 0.82). Per clip the two differ by more than that in
+    both directions (pp_1 97% against 74%, pp_5 28% against 72%), which is the noise of 3-4 single rollouts.
+  - Round 10 against round 7 with the same recipe: 39-40% against 32%, and 20-23% of clips end to end against 5%.
+    The gain is in pp_2 (83% against 38%) and the spatula pick-and-place pp_3 (51% against 20%).
+  - The pick-rotate-place clips are still mostly not tracked in any run (prp_3 1%, prp_1 and prp_4 10-17%, prp_5
+    14-24%, prp_2 18-37%).
+
 ## Speed (2026-11-24)
 
 Measured with `profile_step.py` (the runner's own loop body, a 180M-step policy loaded). All of it was measured on
@@ -243,14 +326,62 @@ GPUs shared with a training, so the absolute rates are low; a run alone does 3.4
 
   Physics is what grows (1.8x from 2048 to 8192); resets, observations and the command stay within 20%. The envs
   need little memory (5.7 / 7.5 / 12.2 GB of simulation at 2048 / 4096 / 8192, the last with 4x the PhysX patch
-  buffer); the replay buffer fills an H200, at 1.76 GB per million rows. The cost is the scene build, which is per
-  env in per-env-object mode (the builds above ran while other scenes were building).
+  buffer); the replay buffer fills an H200, at 1.76 GB per million rows. The cost was the scene build (FDR's own,
+  in the table; those builds ran while other scenes were building): next bullet.
+- **Why the scene build is slow, and what `CFHOI_FAST=1` does about it.** With one object per env FDR cannot build
+  one env and let PhysX replicate it (`replicate_physics=False`), so every prim of every env is created by a
+  single-threaded Python loop. cProfile of a 512-env build (356 s): 69% created the table "support disks"
+  (`support_disks.count` x `radii` = 16 kinematic cylinders per env through Isaac Sim's `create_prim`, ~30 ms each;
+  our clips use one disk, of one radius), 18% added each env's object (four fifths of that is an asynchronous "does
+  this file exist" query that sleeps at least 0.1 s per call), 6% was PhysX loading the stage. Past 512 envs a
+  fourth cost shows: after each of its three clone calls Isaac Sim's cloner switches the Fabric USD notice handler
+  back on, which re-synchronises Fabric with the stage and grows faster than the env count (5.6 s at 512 envs, 72 s
+  at 2048). `fast.py`'s build patches build only the disk slots and radii the motion file uses (`disks`), check
+  local files with `os.path.isfile` (`usdcheck`) and switch the handler on once, just before physics is loaded
+  (`fabric`):
+
+  | envs | FDR's build | `disks` + `usdcheck` | + `fabric` |
+  |---|---|---|---|
+  | 512 (under cProfile) | 356 s | 61 s | 49 s |
+  | 2048 (under cProfile) | - | 288 s | 186 s |
+  | 4096 | 27.5 min (`cfhoi_r7_flat_fast4k`) | 10.9 min | 6.1 min |
+
+  Checked at 512, 2048 and 4096 envs: every env's disk sits at its clip's pose (0.001 mm at most, same radius), and
+  the physics state after a reset and two steps agrees with the unpatched Fabric handling within the difference
+  between two identical builds. What is left at 2048 envs: PhysX loading the stage 36%, one disk per env 22%, the
+  objects 14%, cloning the robot 11%. The one-disk scene also makes resets cheaper (16 of the 18 assets a scene
+  reset touched were disks): 126 -> 83 ms per iteration at 2048 envs. Not done: spawning the disk into env_0 before
+  the clone (the clone would copy it; a few lines in FDR's `build_isaac_scene`), and a `create_prim` without Isaac
+  Sim's per-prim `XFormPrim` view (10 ms per prim).
 - **`CFHOI_FAST=1`: 1.23x** at 2048 envs (1.40 -> 1.71 it/s in one process; 10,700 -> 8,450 kernel launches, 1,400
-  -> 1,040 synchronizations per iteration). Four patches, none changes what is learned: the critic observation group
-  reuses the actor's (they are identical with `share_actor_critic_obs`, and FDR computed every term twice); the
-  command's ~40 logging metrics are computed every 4th step in training; a reset reads its logging scalars back from
-  the GPU once, not one by one (checked against FDR's own code: `CFHOI_FAST_CHECK=30`); a scene reset resets each
-  asset once, not twice.
+  -> 1,040 synchronizations per iteration). Four training-loop patches, none changes what is learned: the critic
+  observation group reuses the actor's (they are identical with `share_actor_critic_obs`, and FDR computed every
+  term twice); the command's ~40 logging metrics are computed every 4th step in training; a reset reads its logging
+  scalars back from the GPU once, not one by one (checked against FDR's own code: `CFHOI_FAST_CHECK=30`); a scene
+  reset resets each asset once, not twice.
+- **`contacts`: the contact observation was 40% of the observation time.** Per-term timing (`profile_step.py
+  --obs-terms`, 2048 envs): `robot_body_contact_wrench_wrist` takes 29 of the 77 ms the 21 actor terms need, the
+  next term 6.5 ms. FDR reads the link contact forces from one Isaac Lab ContactSensor per link (21 per hand), each
+  with its own GPU round trip. `CFHOI_FAST=1,contacts` reads them from one PhysX contact view per hand (the first
+  `CFHOI_FAST_CHECK` steps are compared with the sensors: equal up to float rounding, 1.2e-4 N next to forces of
+  8,900 N under a random policy). Nothing else reads the 42 sensors, but the scene still updates each of them on
+  every physics substep and resets them (about 1,050 kernel launches per iteration, and most of what the scene
+  reset cost), so the patch then switches that off. With it the patches give 1.56x in one process at 2048 envs
+  (1.47 -> 2.28 it/s; 10,590 -> 6,970 kernel launches, 1,290 -> 590 synchronizations; the reset stage 119 -> 51
+  ms), against 1.15x without `contacts` in the same setting. It is not part of `CFHOI_FAST=1` until a full run has
+  used it: the round-10 runs do.
+- **4096 envs: the same curve while the object assist is on, about 10 points behind after it.**
+  `cfhoi_r7_flat_fast4k` (`CFHOI_FAST=1`, 4096 envs, 4 updates per iteration, `num_steps_per_env=16`) against
+  `cfhoi_r7_flat` (2048 envs), at equal env steps (`compare_runs.py`; never compare at equal wall time). The assist
+  gain is identical at every mark, and through 90M env steps the task reward is within 0.02 and the evaluations
+  within 2 points. From 100M to 170M (assist below 2 of 80) the 4096-env run's task reward is 0.01-0.05 lower and
+  its evaluations average 37.5% progress against 47.0% (8 evaluations each, lower in 7 of them; 9% against 15% of
+  clips end to end). One run each and one rollout per clip per evaluation, so part of this can be noise, but it is
+  not the equivalence the first 70M suggested. The patches themselves do not change what is learned (same
+  observations, rewards, resets), so this is the recipe: twice the data between updates. It collected 11.4k env
+  steps/s alone on a GPU (2.79 it/s) against 6.9k, which about cancels: at equal wall time the two are level. The
+  safer use of the patches is FDR's own 2048 envs with `CFHOI_FAST=1,contacts` (1.56x per iteration, not yet run
+  as a training).
 - More envs lowers the updates per env step: scale `updates_per_interaction_step` (or the batch size) with
   `num_envs` to keep the replay ratio (2 updates of 4096 samples per 2048 env steps).
 - **The object-assist curriculum paces a run, in iterations.** FDR lowers the assist gain by 0.9x at most once per
@@ -279,6 +410,20 @@ Here a configuration is (clip, 0.5 s start-frame bin): 114 cells for the 10 Trac
 when it ends by reaching its clip's end, and fails on any other termination. FDR pins each env to one object, so an
 env draws among its own object's cells (its clips' start bins); the share of envs per object stays fixed. A cell with
 no outcome yet gets the peak weight. `CFHOI_SGS=1` installs it; `<run>/sgs.jsonl` logs every cell's success rate and
-draw probability every 2 minutes. Checked in the simulator (bookkeeping, draws inside the env's clip); whether it
-learns faster than FDR's uniform start frames is not tested yet (A/B at equal env steps).
+draw probability every 2 minutes. Checked in the simulator (bookkeeping, draws inside the env's clip). Whether it
+learns faster than FDR's uniform start frames is being tested at equal env steps: `cfhoi_r7_flat_sgs4k` (started
+2026-11-24 04:32) against `cfhoi_r7_flat_fast4k` (03:44), same data and settings (`compare_runs.py`). At 30M env
+steps (assist gain 30 of 80) the sampler already separates the cells: in pp_1 the eight start bins succeed 95, 91,
+45, 29, 78, 93, 100, 100% of the time and are drawn with probability 0.13, 0.14, 0.19, 0.18, 0.17, 0.14, 0.03,
+0.03 (the bins around the grasp and lift get 6-7x the always-solved end of the clip); pp_4, solved from every bin,
+stays uniform. One thing to read with care: the assist curriculum's completion gate (0.65; dial-back below 0.5)
+sees the episodes SGS chose, which are harder than a uniform draw (completion 0.86 against 0.88 at 25M; the
+assist gain stayed the same in both runs).
+
+Result so far (both runs were paused at 10:01, the SGS run at 139M env steps): no gain. Over the evaluations from
+100M to 130M SGS averages 31% progress against 35% for uniform resets (4 evaluations each, 5% of clips end to end in
+both), and its training task reward is 0.00-0.03 lower. That is within the noise of single rollouts, and the run
+stopped before the phase without the assist had lasted long, so it is not a verdict; but nothing here says SGS helps
+on these 10 clips. With the paper's settings most of the draw goes to cells that are 85-97% solved (a cell at 95%
+gets 4.7x the weight of one at 100%, and as much as one at 27%), so it mostly removes the fully solved bins.
 

@@ -1,4 +1,5 @@
-"""Opt-in speed patches for FlashDexRetarget's training loop, applied at run time (FDR's checkout stays untouched).
+"""Opt-in speed patches for FlashDexRetarget's scene build and training loop, applied at run time (FDR's checkout
+stays untouched).
 
   CFHOI_FAST=1 bash scripts/flashdex/train.sh MOTION RUN_NAME ...      (scripts/flashdex/train_cfhoi.py installs them)
 
@@ -15,9 +16,31 @@ learner 8%. These patches remove work that does not change what is learned:
   resetlog  every reset reads ~120 logging scalars back from the GPU one by one (.item(): one synchronization
             each). They are gathered into one tensor and read once. Same values.
   entities  a scene reset resets every asset twice (FDR's adapters, then Isaac Lab's scene): once is enough.
+  contacts  the link contact forces (the contact observation, rewards and metrics) come from one Isaac Lab
+            ContactSensor per link: 21 links x 2 hands = 42 reads per step, each with its own GPU round trip. One
+            PhysX contact view per hand returns the same net forces in one read (checked against the sensors for
+            the first CFHOI_FAST_CHECK steps). The sensors, which nothing else reads, are then no longer updated
+            (4 times per step each) or reset.
 
-CFHOI_FAST selects them: "1" = all, or a comma list (e.g. "obs,resetlog"). CFHOI_FAST_CHECK=N verifies the first N
-batched reset logs against FDR's own code run on a copy of the command's accumulators.
+And three for the scene build (prepare(), before the envs are created). With one object per env FDR cannot build
+one env and let PhysX replicate it, so the build is a Python loop over the envs (a 512-env build under cProfile:
+356 s, of which 246 s spawn support disks and 65 s spawn the objects):
+
+  disks     FDR spawns count x radii = 16 table "support disk" cylinders in every env, one prim at a time (~30 ms
+            each), whatever the dataset needs; our clips use one. Only the disk slots and radius buckets the motion
+            file uses are built (each clip keeps exactly the disk it had: same radius, same pose). Resets get
+            cheaper too (16 of the 18 assets a scene reset touches were disks).
+  usdcheck  Isaac Lab checks that every spawned USD file exists with an asynchronous server query that sleeps at
+            least 0.1 s, once per env's object; for a local path it becomes os.path.isfile.
+  fabric    Isaac Sim's cloner switches the Fabric USD notice handler off while it copies prims and on again after
+            each of its three calls; switching it on re-synchronises Fabric with the stage, and that grows faster
+            than the env count (5.6 s at 512 envs, 72 s at 2048). It stays off from the first clone until physics
+            is about to be loaded (SimulationContext.reset) and is then switched on once (4.4 s at 2048). The
+            per-env spawns in between are cheaper as well. Same USD stage, same physics state.
+
+CFHOI_FAST selects them: "1" = all but the ones in EXTRA, or a comma list (e.g. "obs,resetlog", "1,contacts").
+CFHOI_FAST_CHECK=N verifies the first N batched reset logs against FDR's own code run on a copy of the command's
+accumulators, and the first N steps of the one-view contact forces against the sensors.
 """
 
 from __future__ import annotations
@@ -26,7 +49,113 @@ import os
 
 import torch
 
-ALL = ("obs", "metrics", "resetlog", "entities")
+ALL = ("obs", "metrics", "resetlog", "entities", "disks", "usdcheck", "fabric")
+EXTRA = ("contacts",)  # selectable by name; not part of "1" until a full run has used them
+_pending = []          # deferred work of the build patches that install() must not leave undone
+
+
+def _selected() -> tuple[str, ...]:
+    sel = os.environ.get("CFHOI_FAST", "1")
+    which = []
+    for x in (x.strip() for x in sel.split(",")):
+        which += list(ALL) if x in ("1", "all") else [x] if x else []
+    unknown = [x for x in which if x not in ALL + EXTRA]
+    if unknown:
+        raise ValueError(f"CFHOI_FAST: unknown patches {unknown}; choose from {ALL + EXTRA}")
+    return tuple(dict.fromkeys(which))
+
+
+def _trim_support_disks(cfg) -> str:
+    """commands.object.support_disks.count / radii cut down to what the motion file uses. A disk goes to the first
+    radius >= its radius + margin (the largest if none), as in FDR's _write_support_disks; dropping unused radii
+    keeps that choice for every disk."""
+    from omegaconf import OmegaConf
+    sd = cfg.commands.object.support_disks
+    if not bool(sd.enable):
+        return "disks: skipped (support disks are off)"
+    pack = torch.load(str(cfg.commands.motion_file), weights_only=False, map_location="cpu")
+    disks = pack.get("support_disks") if isinstance(pack, dict) else None
+    if disks is None or disks.numel() == 0 or not bool((disks[..., 3] > 0).any()):
+        return "disks: skipped (the motion file has no support disks)"
+    radii = [float(r) for r in sd.radii]
+    if radii != sorted(radii):
+        return "disks: skipped (radii are not ascending)"
+    r = disks[..., 3].float()                                              # (M, K)
+    used = r > 0
+    slots = int(used.any(0).nonzero().max()) + 1                           # disk slots in use: 0 .. slots - 1
+    r_eff = r[used] + float(sd.radius_margin)
+    bucket = (torch.tensor(radii)[None, :] < r_eff[:, None] - 1e-6).sum(-1).clamp(max=len(radii) - 1)
+    keep = [radii[j] for j in sorted(set(bucket.tolist()))]
+    before = int(sd.count) * len(radii)
+    OmegaConf.update(cfg, "commands.object.support_disks.count", slots)
+    OmegaConf.update(cfg, "commands.object.support_disks.radii", keep)
+    return f"disks: {slots * len(keep)} support disk(s) per env instead of {before} (slots {slots}, radii {keep})"
+
+
+def _local_usd_check() -> str:
+    import importlib
+    ff = importlib.import_module("isaaclab.sim.spawners.from_files.from_files")   # the module, not the package's re-exports
+    orig = getattr(ff, "check_usd_path_with_timeout", None)
+    if orig is None:
+        return "usdcheck: skipped (this Isaac Lab has no check_usd_path_with_timeout in its USD spawner)"
+
+    def check(usd_path, *a, **k):
+        if "://" not in str(usd_path):
+            return os.path.isfile(usd_path)
+        return orig(usd_path, *a, **k)
+    ff.check_usd_path_with_timeout = check
+    return "usdcheck: local USD files are checked with os.path.isfile (no 0.1 s server query per spawn)"
+
+
+def _defer_fabric_resync() -> str:
+    import importlib
+    try:
+        SM = importlib.import_module("isaacsim.core.simulation_manager").SimulationManager
+        SC = importlib.import_module("isaaclab.sim.simulation_context").SimulationContext
+        orig_enable, orig_reset = SM.enable_fabric_usd_notice_handler, SC.reset
+    except Exception as exc:  # noqa: BLE001 - another Isaac Sim / Isaac Lab layout: leave the build as it is
+        return f"fabric: skipped ({exc!r})"
+    owed, state = [], {"defer": True}
+
+    def enable(stage_id, flag):
+        if flag and state["defer"]:
+            if stage_id not in owed:
+                owed.append(stage_id)                  # switched on again in flush()
+            return None
+        return orig_enable(stage_id, flag)
+
+    def flush():
+        if not state["defer"]:
+            return
+        state["defer"] = False
+        SM.enable_fabric_usd_notice_handler, SC.reset = orig_enable, orig_reset
+        for stage_id in owed:
+            orig_enable(stage_id, True)
+        if owed:
+            print(f"[fast] fabric: notice handler switched back on once for {len(owed)} stage(s)", flush=True)
+        owed.clear()
+
+    def reset(self, *a, **k):
+        flush()                                        # before physics is loaded from the stage
+        return orig_reset(self, *a, **k)
+    SM.enable_fabric_usd_notice_handler = staticmethod(enable)
+    SC.reset = reset
+    _pending.append(flush)
+    return "fabric: the cloner's Fabric re-synchronisations are done once, before physics is loaded"
+
+
+def prepare(cfg) -> list[str]:
+    """The build patches named in CFHOI_FAST; call after the Isaac app is up and before the envs are created."""
+    which, notes = _selected(), []
+    if "disks" in which:
+        notes.append(_trim_support_disks(cfg))
+    if "usdcheck" in which:
+        notes.append(_local_usd_check())
+    if "fabric" in which:
+        notes.append(_defer_fabric_resync())
+    for n in notes:
+        print(f"[fast] {n}", flush=True)
+    return notes
 
 
 def _dedup_obs(env, share_obs: bool) -> str:
@@ -203,13 +332,91 @@ def _single_entity_reset(env) -> str:
     return f"entities: {len(ents) - len(rest)} of {len(ents)} assets are reset once per scene reset, not twice"
 
 
+def _noop(*args, **kwargs) -> None:
+    return None
+
+
+def _one_contact_view(env, n_checks: int) -> str:
+    banks = []
+    for adapter in getattr(env.scene, "sensors", {}).values():
+        bank = getattr(adapter, "_bank", None)
+        if bank is not None and getattr(bank, "_sensors", None) and all(bank is not b for b in banks):
+            banks.append(bank)
+    if not banks:
+        return "contacts: skipped (no per-link contact sensors)"
+    B, done, patched = env.num_envs, [], []
+
+    def silence():
+        """Nothing reads the per-link sensors any more: stop updating (4 times per step) and resetting them."""
+        for sens, left in patched:
+            left[0] = 0
+            for x in sens:
+                x.update = x.reset = _noop
+
+    for bank in banks:
+        sensors = list(bank._sensors)
+        try:
+            names, parents = [], set()
+            for sen in sensors:
+                c = sen.cfg
+                if sen.num_bodies != 1 or c.filter_prim_paths_expr or c.history_length or c.update_period != 0.0:
+                    raise ValueError("a sensor has several bodies, filters, a history or an update period")
+                parents.add(c.prim_path.rsplit("/", 1)[0])
+                names.append(sen.body_names[0])
+            if len(parents) != 1 or len(set(names)) != len(names):
+                raise ValueError("the sensors are not distinct links of one asset")
+            pattern = f"{parents.pop().replace('.*', '*')}/({'|'.join(names)})"
+            view = sensors[0]._physics_sim_view.create_rigid_contact_view(pattern, filter_patterns=[], max_contact_data_count=0)
+            n = len(names)
+            if view.sensor_count != n * B:
+                raise ValueError(f"the view has {view.sensor_count} bodies, expected {n} x {B}")
+            got = [path.rsplit("/", 1)[-1] for path in view.sensor_paths[:n]]
+            order = None if got == names else torch.tensor([got.index(nm) for nm in names], device=bank.device)
+            dt = float(sensors[0]._sim_physics_dt)
+        except Exception as exc:  # noqa: BLE001 - keep FDR's sensors for this hand
+            print(f"[fast] contacts: {getattr(bank, 'side', '?')} hand left as is ({exc!r})", flush=True)
+            continue
+
+        left = [n_checks]
+
+        def force(bank=bank, view=view, n=n, order=order, dt=dt, sensors=sensors, left=left, worst=[0.0, 0.0]):
+            store = bank._fresh()
+            if "force" not in store:
+                f = view.get_net_contact_forces(dt=dt).view(B, n, 3)
+                f = (f if order is None else f[:, order]).to(bank.device).clone()
+                if left[0] > 0:
+                    left[0] -= 1
+                    want = torch.stack([x.data.net_forces_w[:, 0] for x in sensors], dim=1).to(bank.device)
+                    # the two views sum the same contact impulses in a different order: float32 rounding, relative
+                    # to the largest force (1.2e-4 N seen next to forces of thousands of N); a wrong link or env
+                    # order would be off by the forces themselves
+                    diff, top = float((f - want).abs().max()), float(want.abs().max())
+                    worst[0], worst[1] = max(worst[0], diff), max(worst[1], top)
+                    if diff > 1e-3 + 1e-5 * top:
+                        raise RuntimeError(f"[fast] contacts: the {bank.side} hand's one-view forces differ from the "
+                                           f"sensors' by up to {diff:.3e} N (largest force {top:.1f} N)")
+                    if left[0] == 0:
+                        print(f"[fast] contacts: {bank.side} hand, {n_checks} steps match the {n} sensors (largest "
+                              f"difference {worst[0]:.1e} N, largest force {worst[1]:.0f} N); the per-link sensors "
+                              f"are no longer updated or reset", flush=True)
+                        silence()                          # also ends the check of a hand nothing reads
+                store["force"] = f
+            return store["force"]
+        bank.force = force
+        patched.append((sensors, left))
+        done.append(f"{getattr(bank, 'side', '?')} ({n} links)")
+    if n_checks <= 0:
+        silence()
+    return ("contacts: one PhysX contact view per hand instead of one sensor per link: " + ", ".join(done)) if done \
+        else "contacts: skipped (see above)"
+
+
 def install(env, share_obs: bool, command_name: str = "motion") -> list[str]:
-    """Apply the patches named in CFHOI_FAST to a FlashDexRetarget env (the raw manager env); returns what was done."""
-    sel = os.environ.get("CFHOI_FAST", "1")
-    which = ALL if sel in ("1", "all") else tuple(x.strip() for x in sel.split(",") if x.strip())
-    unknown = [x for x in which if x not in ALL]
-    if unknown:
-        raise ValueError(f"CFHOI_FAST: unknown patches {unknown}; choose from {ALL}")
+    """Apply the training-loop patches named in CFHOI_FAST to a FlashDexRetarget env (the raw manager env); returns
+    what was done."""
+    which = _selected()
+    while _pending:                                    # e.g. a build that never reached SimulationContext.reset
+        _pending.pop()()
     cmd = env.command_manager.get_term(command_name)
     notes = []
     if "obs" in which:
@@ -220,6 +427,8 @@ def install(env, share_obs: bool, command_name: str = "motion") -> list[str]:
         notes.append(_batch_reset_logs(env, cmd, int(os.environ.get("CFHOI_FAST_CHECK", "0"))))
     if "entities" in which:
         notes.append(_single_entity_reset(env))
+    if "contacts" in which:
+        notes.append(_one_contact_view(env, int(os.environ.get("CFHOI_FAST_CHECK", "0"))))
     for n in notes:
         print(f"[fast] {n}", flush=True)
     return notes
