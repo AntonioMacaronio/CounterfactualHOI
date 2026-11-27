@@ -1,0 +1,18 @@
+# @package _global_
+# MuJoCo Warp simulator settings for FlashDexRetarget (scripts/mjwarp/create.py); linked into FDR as
+# config/envs/simulator/mjwarp.yaml by scripts/mjwarp/setup.sh. Select with envs/simulator@simulator=mjwarp.
+
+sim:
+  backend: mjwarp
+  dt: 0.0041666667          # 1/240 s; decimation 4 -> 60 Hz control, as the Isaac config
+  robot_gravcomp: 0.0
+  mujoco:
+    integrator: implicitfast
+    cone: pyramidal         # 6x cheaper than elliptic here (1024 envs: 69 vs 424 ms per 4 substeps); also does condim 6
+    impratio: 1.0
+    solver: newton
+    iterations: 6
+    ls_iterations: 6
+    tolerance: 1.0e-6
+    nconmax: 128            # contacts per world (pooled across worlds); ~105 seen at 1024 envs
+    njmax: 2048             # constraints per world: pyramidal cones take 2(condim-1) rows per contact; ~1530 seen at 1024 envs
