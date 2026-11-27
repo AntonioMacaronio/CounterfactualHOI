@@ -1,0 +1,74 @@
+# Dexmate Vega 1 Pro: the right 7-DoF arm of the wheeled humanoid. The chassis, torso, head and left arm are held at
+# one posture (fixed_joints); only the right arm's seven joints move, so the policy still controls 22 + 7 = 29 joints.
+# Source (scripts/embodiment/setup.sh): github.com/dexmate-ai/dexmate-urdf, robots/humanoid/vega_1p. License: Apache-2.0,
+# Copyright 2025 Dexmate Inc.
+# This file is the wrist with the force/torque sensor (vega_1p.urdf). Later hardware has no sensor and a flange that is
+# 30.2 mm shorter: use vega_1p_no_ft for that robot, or the tool frame is 30.2 mm off.
+description: Dexmate Vega 1 Pro, right arm (wrist with force/torque sensor)
+vendor:
+  repo: https://github.com/dexmate-ai/dexmate-urdf
+  commit: ffcc62500fea1e2e7600411b4ec9f3b420bb780a
+  sha256: 9ef8178a9a87487fd79b763c54e323ed29914d3d7a07965407af7b9ebb0a367e       # of the commit's source tarball
+
+# under $PROJECT_STORAGE_ROOT/build
+urdf: dexmate_urdf/dexmate-urdf-ffcc62500fea1e2e7600411b4ec9f3b420bb780a/robots/humanoid/vega_1p/vega_1p.urdf
+root_link: base
+arm_joints: [R_arm_j1, R_arm_j2, R_arm_j3, R_arm_j4, R_arm_j5, R_arm_j6, R_arm_j7]
+
+# Everything else is frozen at these angles (radians; joints not listed stay at 0). The torso's three joints raise
+# and lean the shoulders: this posture (0, 60, 30 deg) leans them 30 deg forward over the table's edge and puts the
+# right shoulder at (0.40, -0.30, 1.20) in the clip world (place_base.py). The left arm is Dexmate's "folded" pose
+# (dexbot-utils pose pool).
+fixed_joints:
+  torso_j1: 0.0
+  torso_j2: 1.0472
+  torso_j3: 0.5244
+  head_j1: 0.0
+  head_j2: 0.0
+  head_j3: 0.0
+  L_arm_j1: 1.57079
+  L_arm_j2: 0.0
+  L_arm_j3: 0.0
+  L_arm_j4: -3.07
+  L_arm_j5: 0.0
+  L_arm_j6: 0.0
+  L_arm_j7: -0.69813
+
+# Joint limits: the URDF's (degrees here, rounded inwards).
+limits_deg:
+  lower: [-175.9, -88.9, -175.9, -175.9, -175.9, -79.9, -64.0]
+  upper: [175.9, 25.9, 175.9, 13.9, 175.9, 79.9, 78.9]
+velocity_deg_s: [137, 137, 154, 154, 154, 154, 154]
+
+# Tool flange. R_ee is Dexmate's end-effector frame at the end of the wrist: z along the tool axis; Dexmate's own
+# hand has its palm normal along +x and its thumb side along +y of it.
+# The bolt pattern is NOT from a vendor drawing (Dexmate's hardware docs need a login): it is measured on the URDF's
+# flange mesh of the no-sensor wrist, six holes of 4.1 mm on a 49 mm circle; the sensor wrist's mesh has no holes
+# modelled and is assumed to repeat the pattern. The meshes' end face is 3 mm behind R_ee's origin. Check both against
+# the robot before machining the plate.
+flange:
+  link: R_ee
+  pos: [0, 0, 0]
+  x_axis: [1, 0, 0]
+  z_axis: [0, 0, 1]
+  interface:
+    standard: Dexmate Vega wrist (measured on the mesh, unverified)
+    bolts: {count: 6, thread: M4, pcd_mm: 49, first_deg: 30}
+    centering: {bore_diameter_mm: 18.4, body_diameter_mm: 57}
+
+# The Sharpa flange (ISO 9409-1-50-4-M6) needs an adapter plate on this wrist; the camera-mount plate is that adapter.
+# yaw_deg turns the hand about the tool axis from Dexmate's palm direction. Only 15 + 30 k deg are buildable: the four
+# M6 holes for the Sharpa flange then sit 30 deg away from the four M4 screws that hold the plate (at 0 deg they
+# would overlap). Of those, 285 (= -75 deg) lets the arm follow the most clips (place_base.py --hand-yaw ...):
+# 9 of 10, against 8 for 15, 105 and 195.
+hand_mount:
+  yaw_deg: 285
+  plate_mm: 8
+
+# Dexmate's "L_shape" arm pose (forearm forward), the posture the IK's null space is pulled towards.
+home_deg: [-3.7, -17.2, 0, -89.2, -72.8, 0, 0]
+
+# Where the robot stands in the clip world, chosen by place_base.py. `root` is the pose of root_link (the chassis).
+placement:
+  style: chassis
+  root: {pos: [0.2915, -0.5497, 0.054], rpy_deg: [0, 0, 105]}      # wheels on the floor; the chassis' front is under the table edge

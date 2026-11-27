@@ -1,0 +1,76 @@
+# Tianji Marvin M6-S-R-CCS-696-V4.0: 7-DoF force-controlled arm with the anthropomorphic cross-axis wrist (CCS),
+# right arm, 6 kg payload, 696 mm reach. Sources (scripts/embodiment/setup.sh downloads them at these commits):
+#   URDF + meshes  github.com/cynthia-you/TJ_FX_ROBOT_CONTRL_SDK, branch 资料文档, URDF/Marvin M6-CCS-696-urdf_V4.0.rar
+#   kinematics     branch master: CommonConfig/ccs_m6_40.MvKDCfg (the SDK's D-H rows, limits, J6/J7 coupling)
+#   manual         branch master: Marvin系列机器人使用说明书_1121200066_V2.2.pdf (table 4-2 D-H, fig. 4-4, fig. 4-6 flange)
+# License: Apache-2.0, Copyright 2025 上海孚晞科技有限公司.
+description: Tianji Marvin M6-S-R-CCS-696-V4.0 (7-DoF, cross-axis wrist), right arm
+vendor:
+  repo: https://github.com/cynthia-you/TJ_FX_ROBOT_CONTRL_SDK
+  urdf_commit: 2ae22e4bec5ea1ce8bebbfcd4c15713bc56414b6
+  urdf_archive: "URDF/Marvin M6-CCS-696-urdf_V4.0.rar"
+  urdf_sha256: 8471d1d8c77c56d41101bdbc51ba38323c42a835e870658b363d9f6cb02a027c
+  sdk_commit: 44ff42090d085cf77414a8ed468ecc54cc0600c6
+
+# under $PROJECT_STORAGE_ROOT/build
+urdf: "tianji_marvin/urdf_m6/R/Marvin M6-S-R-CCS-696-V4.0 urdf (FUSION)/urdf/Marvin M6-S-R-CCS-696-V4.0 urdf.urdf"
+root_link: Base_R
+arm_joints: [Joint1_R, Joint2_R, Joint3_R, Joint4_R, Joint5_R, Joint6_R, Joint7_R]
+fixed_joints: {}
+
+# Joint limits in degrees. The SDK's software limits (ccs_m6_40.MvKDCfg) are used: the manual's table 4-1 and the URDF
+# allow +-178 on J1, J3 and J5, but the vendor's own kinematics and planner stop at +-170.
+limits_deg:
+  lower: [-170, -120, -170, -145, -170, -60, -90]
+  upper: [170, 120, 170, 60, 170, 60, 90]
+velocity_deg_s: [180, 180, 180, 180, 180, 180, 180]
+acceleration_deg_s2: [450, 450, 900, 900, 900, 900, 900]
+# The two cross-axis wrist joints share their travel (manual fig. 4-4, the config's BD rows): |J7| <= 110.5 - 1.025 |J6|,
+# an octagon through (+-20, +-90) and (+-60, +-49). Rows are a . q_deg <= b over 1-based joint numbers.
+coupled_limits_deg:
+  - {joints: [6, 7], a: [1.025, 1.0], b: 110.5}
+  - {joints: [6, 7], a: [-1.025, 1.0], b: 110.5}
+  - {joints: [6, 7], a: [1.025, -1.0], b: 110.5}
+  - {joints: [6, 7], a: [-1.025, -1.0], b: 110.5}
+
+# Modified D-H (Craig) rows a_{i-1} [mm], alpha_{i-1} [deg], d_i [mm], theta offset [deg]: manual table 4-2 and the
+# config. build_model.py checks the generated model against them.
+mdh:
+  - [0, 0, 174.5, 0]
+  - [0, 90, 0, 0]
+  - [0, -90, 287, 0]
+  - [18, 90, 0, 180]
+  - [18, 90, 314, 180]
+  - [0, 90, 0, 90]
+  - [0, 90, 0, 90]
+  - [0, 90, 95, 90]          # flange
+
+# Tool flange (manual fig. 4-6): ISO 9409-1-50-4-M6. Frame = the vendor's flange frame (the D-H "flange" row), its
+# origin on the mating face, z out of the arm. In Link7_R's frame the face is the plane y = -95 mm.
+flange:
+  link: Link7_R
+  pos: [0, -0.095, 0]
+  x_axis: [0, 0, 1]
+  z_axis: [0, -1, 0]
+  interface:
+    standard: ISO 9409-1-50-4-M6
+    bolts: {count: 4, thread: M6, depth_mm: 9, pcd_mm: 50, first_deg: 45}     # angles from the flange frame's +x
+    pin: {diameter_mm: 6, depth_mm: 6, pcd_mm: 50, at_deg: -90}                # the dowel hole lies on -y of the flange frame
+    centering: {recess_diameter_mm: 31.5, boss_diameter_mm: 63, boss_height_mm: 2, body_diameter_mm: 75}
+    notes: 8-pin connector (WEIPU SF812B/S8) and the drag button sit on the flange's rim on its +-x sides (along J7's axis)
+
+# How the Sharpa Wave's flange (also ISO 9409-1-50-4-M6) sits on it. yaw_deg turns the hand about the flange's z, from
+# the flange frame's +x to the palm normal (+x of the palm). 90 is the only position the dowel pin allows: the Sharpa
+# flange's pin hole is on the back-of-hand side, the arm's on -y. It is also the anthropomorphic one: J7 (+-90 deg)
+# flexes and extends the hand, J6 (+-60 deg) is radial / ulnar deviation.
+hand_mount:
+  yaw_deg: 90
+  plate_mm: 6            # the camera-mount plate clamped between the two flanges (scripts/embodiment/d405_mount.py)
+
+# A comfortable posture for the IK's null space and for pictures, degrees.
+home_deg: [0, -40, 0, -100, 0, 0, 0]
+
+# Where the arm stands in the clip world, chosen by place_base.py. `root` is the pose of root_link.
+placement:
+  style: pedestal
+  root: {pos: [0.6, -0.4, 0.8], rpy_deg: [0, 0, 132]}

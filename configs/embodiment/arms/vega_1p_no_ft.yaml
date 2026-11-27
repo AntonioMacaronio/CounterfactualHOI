@@ -1,0 +1,5 @@
+# Dexmate Vega 1 Pro without the wrist force/torque sensor (later hardware): the flange is 30.2 mm shorter. Everything
+# else as vega_1p.yaml.
+extends: vega_1p
+description: Dexmate Vega 1 Pro, right arm (wrist without force/torque sensor)
+urdf: dexmate_urdf/dexmate-urdf-ffcc62500fea1e2e7600411b4ec9f3b420bb780a/robots/humanoid/vega_1p/vega_1p_no_ft.urdf

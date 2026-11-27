@@ -1,0 +1,104 @@
+# Camera definitions for the §1.4 policy: the wrist D405 and the exo depth camera (row 14 of "Data this stage has to
+# hand to 1.4" in antzhang-notes/project.md). scripts/embodiment/cameras.py turns this file into depth images
+# (render_depth.py) and is the reference for what every number means.
+#
+# Frames
+#   optical frame   +z along the view, +x to the image's right, +y down the image (OpenCV); its origin is the centre
+#                   of the LEFT imager, which is where a RealSense measures depth from
+#   palm            the body FDR's floating wrist moves, R_forearm_rot_y_link = the Sharpa hand's base right_hand_C_MC:
+#                   +z from the wrist to the fingers, +x out of the palm, +y towards the thumb; its origin is the
+#                   palm's wrist end, 29.5 mm in front of the Sharpa flange's mounting face
+#   world           the clip world: z up, table top at z = 0.8 m, the object's first-frame centre over the origin,
+#                   +y the way the source video's camera looked (it stood near (0.05, -0.55, 1.33))
+#
+# What is measured and what is nominal
+#   Poses are designed (design_wrist_cam.py, design_exo_cam.py; the numbers behind them are in the README).
+#   Intrinsics are NOMINAL: square pixels with a focal length that matches the datasheet's vertical field of view.
+#   On the real cameras read the factory calibration (rs-enumerate-devices -c) and replace them; in simulation
+#   randomise them by a few percent. Depth ranges and the noise model follow the D400 datasheet (rev. 017).
+
+sensors:
+  d405:
+    name: Intel RealSense D405 (D401 module; passive stereo, global shutter, no IR projector)
+    stream: {width: 848, height: 480, fps: 60}        # Z16; 60 fps is the policy rate
+    # 650 px at 1280x720 scaled by 848/1280: the imager sees 89.1 x 58.3 deg. The datasheet's 84 x 58 deg "depth FOV"
+    # is narrower because depth needs both imagers; the renderer reproduces that (see `stereo` in cameras.py).
+    intrinsics: {fx: 430.6, fy: 430.6, cx: 424.0, cy: 240.0}
+    baseline_m: 0.018
+    depth_unit_m: 0.0001                              # Z16 resolution
+    min_z_m: {848x480: 0.07, 640x360: 0.055, 480x270: 0.045, 424x240: 0.04, 1280x720: 0.10}      # datasheet table 4-11
+    # Housing in the optical frame: 42 x 42 x 23 mm, 58 g. The left imager is 9 mm left of the housing's centre line;
+    # depth starts 3.7 mm behind the front glass, so the glass is at z = +3.7 mm and the back face at z = -19.3 mm.
+    # Two M3 threads (4 mm deep) 20 mm apart on the back; USB 3 Micro-B on the side of the left imager (-x).
+    housing: {size_mm: [42, 42, 23], centre_mm: [9.0, 0.0, -7.8], mass_g: 58}
+    # Sensor model, applied at the policy image's resolution (cameras.py, Camera.observe). Disparities are in stream
+    # pixels; depth error = z^2 * (disparity error) / (fx * baseline): 0.1 mm at 10 cm, 0.8 mm at 30 cm, 2.3 mm at 50 cm
+    # for the two disparity terms together. Datasheet (<= 0.5 m, textured target): RMS error <= 1 %, temporal noise
+    # <= 0.5 %, absolute error within +-2 %, fill rate >= 99.5 %.
+    noise:
+      disparity_sigma_px: 0.05        # white, per pixel and frame
+      disparity_lowfreq_px: 0.05      # smooth over the image (a 4 x 5 grid, interpolated), redrawn every frame
+      scale_sigma: 0.01               # depth scale error of this camera unit, drawn once per episode (2 sigma = 2 %)
+      dropout_pixel: 0.005            # isolated invalid pixels
+      grazing_deg: 82                 # surfaces seen at more than this angle from their normal ...
+      grazing_dropout: 0.5            # ... are invalid with this probability
+      edge_dropout: 0.5               # pixels on a depth edge are invalid with this probability
+      edge_jump_m: 0.01               # what counts as a depth edge between neighbouring pixels
+      holes_per_frame: 1.5            # Poisson mean of round invalid patches: passive stereo fails on untextured patches
+      hole_radius_px: [1.0, 5.0]
+  d435:
+    name: Intel RealSense D435 / D435i (D430 module; active stereo with IR projector, global shutter)
+    stream: {width: 848, height: 480, fps: 60}        # 848x480 is the D435's best depth mode
+    intrinsics: {fx: 425.0, fy: 425.0, cx: 424.0, cy: 240.0}      # 89.9 x 58.9 deg
+    baseline_m: 0.050
+    depth_unit_m: 0.001
+    min_z_m: {848x480: 0.195, 1280x720: 0.28}
+    housing: {size_mm: [90, 25, 25], centre_mm: [17.5, 0.0, -8.3], mass_g: 75}
+    # depth error: 1.9 mm at 0.75 m, 2.7 mm at 0.9 m, 4.8 mm at 1.2 m. Datasheet (<= 2 m): RMS <= 2 %, temporal <= 1 %.
+    noise:
+      disparity_sigma_px: 0.05
+      disparity_lowfreq_px: 0.05
+      scale_sigma: 0.01
+      dropout_pixel: 0.005
+      grazing_deg: 85
+      grazing_dropout: 0.5
+      edge_dropout: 0.5
+      edge_jump_m: 0.03
+      holes_per_frame: 0.5            # the projector fills untextured surfaces; holes are rarer than on the D405
+      hole_radius_px: [1.0, 4.0]
+
+# Wrist camera: under the wrist on the palm side, looking straight along the fingers, its back against the mount
+# plate that sits between the arm's flange and the hand's (scripts/embodiment/d405_mount.py). The image's top edge
+# is towards the palm, so the fingers hang into the image from the top; the thumb is on the left.
+# Housing centre in the palm frame: (54, 0, -18) mm, i.e. 54 mm below the hand's axis, between 33 and 75 mm from it.
+wrist:
+  sensor: d405
+  parent: palm
+  pose: {pos: [0.054, 0.009, -0.0102], x_axis: [0, -1, 0], z_axis: [0, 0, 1]}
+  # valid depth: from the D405's minimum at 848x480 to the end of its rated range. Nearer or farther pixels, and
+  # pixels only one imager sees, are invalid (depth 0, mask 0).
+  depth_range_m: [0.07, 0.50]
+  # The policy sees the whole frame, 8x smaller: each pixel is the median of its 8 x 8 block's valid depths and is
+  # valid when at least half of the block is.
+  policy_image: {width: 106, height: 60}
+
+# Exo camera: a D435 on a stand at the table's left-front corner, 0.43 m above the table, looking 25 deg down at the
+# middle of the workspace (0.162, 0.132, 0.85) from 0.90 m, from azimuth 210 deg: opposite the side the right arm
+# reaches in from, so it looks into the open hand. Image up = world up.
+exo:
+  sensor: d435
+  parent: world
+  pose: {pos: [-0.5443, -0.2758, 1.2304], x_axis: [0.5, -0.86603, 0.0], z_axis: [0.78489, 0.45315, -0.42262]}
+  depth_range_m: [0.30, 1.50]
+  # The policy sees a 530 x 300 window of the stream (x0, y0, width, height), 5x smaller: the smallest window that
+  # holds the object and the fingertips in every frame of the ten clips with a 24 px margin. It spans 63.6 x 38.8 deg
+  # (off-centre: 28.6 deg left to 35.0 deg right, 22.1 deg up to 16.6 deg down).
+  policy_image: {width: 106, height: 60, roi: [192, 67, 530, 300]}
+
+# Both cameras feed the policy two channels per image: depth mapped linearly to [0, 1] over depth_range_m (0 where
+# invalid), and the validity mask (Camera.encode).
+
+# The table the renderer puts into the scene: a slab with its top at z = 0.8 m. Its extent is an assumption (the
+# clips only show that every object path lies inside it); set it to the real table.
+scene:
+  table: {centre: [0.15, 0.15], size: [1.2, 1.0], thickness: 0.04}
