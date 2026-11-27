@@ -57,6 +57,26 @@ def table(clips):
     return f'<table class="sum">{head}{"".join(rows)}</table>'
 
 
+def stance_rows(arm, cfg):
+    """The robot's stance in the clip world, from the built model: shoulder height and the torso's forward lean."""
+    import mujoco
+    try:
+        m = mujoco.MjModel.from_xml_path(str(C.model_dir(arm) / "scene.xml"))
+    except Exception:
+        return []
+    d = mujoco.MjData(m)
+    mujoco.mj_kinematics(m, d)
+    b1 = m.jnt_bodyid[mujoco.mj_name2id(m, mujoco.mjtObj.mjOBJ_JOINT, "arm_j1")]
+    sh = d.xpos[b1]
+    if not cfg.get("fixed_joints"):
+        return [("Stance", f"arm base at ({sh[0]:.2f}, {sh[1]:.2f}, {sh[2]:.2f}) m in the clip world (table top at 0.80 m)")]
+    up = d.xmat[m.body_parentid[b1]].reshape(3, 3)[:, 2]
+    lean = float(np.degrees(np.arccos(np.clip(up[2], -1, 1))))
+    return [("Stance", f"right shoulder {sh[2]:.2f} m above the floor ({sh[2] - C.TABLE_Z:.2f} m above the table top), torso leaning "
+                       f"{lean:.0f}° forward; chosen with compare_placements.py so that the arm reaches with its elbow open "
+                       "and clear of itself")]
+
+
 def spec(arm, cfg, cams, mount):
     w, e = cams["wrist"], cams["exo"]
     ws, es = cams["sensors"][w["sensor"]], cams["sensors"][e["sensor"]]
@@ -70,6 +90,7 @@ def spec(arm, cfg, cams, mount):
         ("Hand", "Sharpa Wave, right, 22 joints, on the arm's flange through the camera mount plate "
                  f"(clocked {cfg['hand_mount']['yaw_deg']:.0f}° about the tool axis)"),
         ("Controlled joints", "7 + 22 = 29"),
+    ] + stance_rows(arm, cfg) + [
         ("Wrist camera", f"{ws['name'].split(' (')[0]} on the palm side of the wrist, looking along the fingers (housing centre "
                          f"{centre[0]:.0f} mm below the hand's axis, {-centre[2]:.0f} mm behind the palm's wrist end); "
                          f"{ws['stream']['width']}×{ws['stream']['height']} at {ws['stream']['fps']} fps, depth "

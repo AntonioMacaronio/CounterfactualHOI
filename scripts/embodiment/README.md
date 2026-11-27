@@ -48,6 +48,7 @@ $PY d405_mount.py --arm marvin_m6ccs; $PY build_model.py --arm marvin_m6ccs     
 | `build_model.py` | vendor URDF + FDR's Sharpa hand + mount + cameras -> `robot.xml`, `scene.xml`, `frames.json`, `wrist_stub/`; checks |
 | `ik.py` | `ArmIK`: palm pose -> 7 arm joints (QP steps, limits, coupled wrist limit); clip conversion and report |
 | `ik_pyroki.py` | the IK step with collision avoidance on PyRoki: `palm` and `fingertips` modes, report on the exact meshes |
+| `compare_placements.py` | stances of the Vega (shoulder height, distance from the table) compared under `ik_pyroki.py`'s fingertips mode: usable frames, elbow, joint limits, the arm's clearance from itself and the body |
 | `spheres.py` | what `ik_pyroki.py` needs from a model: `ik_arm.urdf`, `ik_full.urdf`, collision spheres and hull corners |
 | `place_base.py` | placement search: every candidate scored with the IK on all clips |
 | `cameras.py` | camera definitions as objects, ray-cast depth renderer, stereo validity, noise model, policy encoding |
@@ -130,24 +131,50 @@ the home posture), iterated to 0.05 mm / 0.01°. Speeds are reported, not clampe
 | Marvin, as on Tianji's dual-arm body (base axis horizontal) | 2,688 poses × 4 clockings | shoulder at (0.42, −0.25, 1.30), clocking 270° | 8 of 10 clips |
 | Vega (chassis + torso posture) | 243 shoulder targets × 3 clockings | chassis at (0.29, −0.55), heading 105°, right shoulder at (0.40, −0.30, 1.20), clocking 285° | 9 of 10 clips |
 
-The configs hold the pedestal placement for the Marvin (clocking 90°, the pin's) and the Vega placement above.
+The configs hold the pedestal placement for the Marvin (clocking 90°, the pin's). For the Vega, the placement above
+was then raised and moved back (below).
+
+**Vega stance** (`compare_placements.py`, 2026-11-27). At the placement above the Vega reaches the table with its
+elbow folded hard: median elbow angle −132°, an arm joint within 5° of its limit in 29% of the frames, and the upper
+arm comes within 20 mm of its own forearm. Each stance below is the right shoulder raised and moved back from there
+along the robot's heading (the torso's most upright posture of that height, the chassis following), solved with
+`ik_pyroki.py --mode fingertips` on the ten reference clips at 10 Hz and measured on the exact meshes:
+
+| shoulder height, moved back | clips usable in every frame | frames usable | elbow, median | a joint within 5° of its limit | upper arm to forearm / hand, closest |
+|---|---|---|---|---|---|
+| 1.20 m, 0 (place_base.py's) | 7 | 98.8% | −132° | 28.5% | 20 mm |
+| 1.20 m, 0.10 m | 8 | 99.6% | −121° | 24.0% | 41 mm |
+| 1.25 m, 0.05 m | 8 | 99.3% | −119° | 22.2% | 49 mm |
+| **1.30 m, 0.05 m (configured)** | 7 | 98.8% | −108° | 16.0% | 86 mm |
+| 1.30 m, 0.10 m | 7 | 97.7% | −103° | 15.7% | 98 mm |
+| 1.35 m, 0.10 m | 4 | 95.9% | −89° | 21.0% | 125 mm |
+
+(all twelve in `runs/embodiment/placement/vega_1p/stances_fixed.json`). Higher stances open the elbow further but have
+to reach down to the table and lose clips; 1.30 m and 5 cm back keeps the usable frames of the first placement with
+the elbow 24° more open, joints near their limits about half as often and the arm four times farther from itself. The
+torso posture is 15 / 67.5 / 30°, leaning 22° (was 0 / 60 / 30°, 30°); right shoulder at (0.41, −0.35, 1.30). In this
+stance `prp_4`'s first palm pose cannot be reached with the palm held exactly, so `ik.py` has no solution for that
+clip; `ik_pyroki.py --mode fingertips` then starts from the arm's home posture.
 
 **Result at 60 Hz** (round-10 clips; "solved" = within 1 mm / 0.5°; "arm–table" = lowest point of the arm's moving
 links above the table, negative = inside it):
 
 | clip | Marvin: reference | Marvin: FDR rollout | Vega: reference | Vega: FDR rollout |
 |---|---|---|---|---|
-| pp_1 | 100%, +27 mm | 98%, +35 | 100%, +27 | 100%, +34 |
-| pp_2 | 59%, −30 | 63%, −13 | 77%, −8 | 84%, −24 |
-| pp_3 | 69%, 0 | 57%, +14 | 100%, −12 | 100%, +13 |
-| pp_4 | 100%, −1 | 100%, −9 | 100%, +6 | 100%, +1 |
-| pp_5 | 100%, −9 | 100%, +10 | 100%, −3 | 100%, +14 |
-| prp_1 | 100%, +62 | 100%, +46 | 100%, +28 | 100%, +32 |
-| prp_2 | 65%, −50 | 47%, −34 | 100%, −52 | 100%, −49 |
-| prp_3 | 100%, −10 | 100%, −35 | 100%, −8 | 100%, −43 |
-| prp_4 | 100%, −74 | 82%, −79 | 100%, −69 | 45%, −105 |
-| prp_5 | 99.8%, −6 | 96%, −25 | 100%, +3 | 100%, −34 |
-| fully solved and clear of the table | 2 | 2 | 4 | 5 |
+| pp_1 | 100%, +27 mm | 98%, +35 | 100%, +27 | 100%, +39 |
+| pp_2 | 59%, −30 | 63%, −13 | 57%, +4 | 54%, −24 |
+| pp_3 | 69%, 0 | 57%, +14 | 74%, −12 | 71%, +18 |
+| pp_4 | 100%, −1 | 100%, −9 | 100%, +5 | 100%, +4 |
+| pp_5 | 100%, −9 | 100%, +10 | 100%, −3 | 100%, +18 |
+| prp_1 | 100%, +62 | 100%, +46 | 100%, +71 | 100%, +58 |
+| prp_2 | 65%, −50 | 47%, −34 | 71%, −51 | 100%, −48 |
+| prp_3 | 100%, −10 | 100%, −35 | 100%, −6 | 100%, −43 |
+| prp_4 | 100%, −74 | 82%, −79 | no first frame | no first frame |
+| prp_5 | 99.8%, −6 | 96%, −25 | 100%, +3 | 93%, −10 |
+| fully solved and clear of the table | 2 | 2 | 4 | 4 |
+
+(Vega: the configured stance, 1.30 m and 5 cm back. At the first placement it was 4 and 5 clips, with every first
+frame reachable.)
 
 (FDR rollout: `cfhoi_r10_flat-1124-060850`, evaluation at 110M steps.) Joint speeds exceed the arms' limits in part of
 most clips (up to 2–4× in solved clips), mostly where a joint rides along a limit.
@@ -193,25 +220,29 @@ exceeds its speed limit. Round-10 clips, measured on the exact meshes:
 
 | | Marvin: clips usable in every frame | Marvin: frames usable | Vega: clips | Vega: frames |
 |---|---|---|---|---|
-| `palm`, reference clips | 2 of 10 | 78.4% | 2 of 10 | 85.5% |
-| `fingertips`, reference clips | **6 of 10** | 94.1% | **8 of 10** | 99.6% |
-| `fingertips`, FDR rollouts (110M steps) | 3 of 10 | 90.2% | 4 of 10 | 95.6% |
+| `palm`, reference clips | 2 of 10 | 78.4% | 3 of 10 | 70.3% |
+| `fingertips`, reference clips | **6 of 10** | 94.1% | **8 of 10** | 99.0% |
+| `fingertips`, FDR rollouts (110M steps) | 3 of 10 | 90.2% | 7 of 10 | 96.7% |
+
+(Vega in its configured stance. At the first placement, 1.20 m: `palm` 2 of 10 / 85.5%, `fingertips` 8 of 10 / 99.6%,
+rollouts 4 of 10 / 95.6%. The taller stance reaches the palm poses less easily, which `palm` mode feels and
+`fingertips` mode absorbs.)
 
 Usable frames per clip, `fingertips` mode on the reference clips:
 
 | | pp_1 | pp_2 | pp_3 | pp_4 | pp_5 | prp_1 | prp_2 | prp_3 | prp_4 | prp_5 |
 |---|---|---|---|---|---|---|---|---|---|---|
 | Marvin | 100% | 71% | 86% | 100% | 100% | 100% | 72% | 100% | 99.3% | 100% |
-| Vega | 100% | 100% | 100% | 100% | 100% | 100% | 98.4% | 100% | 98.7% | 100% |
+| Vega | 100% | 94% | 100% | 100% | 100% | 100% | 100% | 100% | 96.5% | 100% |
 
 - **The table problem is gone in `fingertips` mode**: arm or wrist hardware is inside the table in 0.0% (Marvin) and
   0.1% (Vega) of the reference frames, against 9.5% and 5.7% in `palm` mode. `prp_4`, where the Marvin's wrist was
   74 mm inside the table, is clear in every frame with the fingertips within 2.5 mm.
-- What it costs: the palm leaves FDR's pose by up to 37 mm / 20° (Marvin, `prp_4`) and 48 mm / 27° (Vega, `pp_2`)
-  in the worst frame; in a typical frame it does not move (median 0 mm in every fully usable Marvin clip, at most
-  2.9 mm on the Vega). The fingers re-bend by up to 59° (Marvin, `prp_4`) and 52° (Vega, `pp_2`) in the clips
-  that needed the largest correction, and by 5-32° at most in the other usable clips. The hand is no deeper in
-  the object than FDR's (within 0.2 mm) in every reference clip.
+- What it costs: the palm leaves FDR's pose by up to 37 mm / 20° (Marvin, `prp_4`) and 84 mm / 44° (Vega, `pp_2`)
+  in the worst frame; in a typical frame it barely moves (median 0 mm in every fully usable Marvin clip, at most
+  5 mm on the Vega). The fingers re-bend by up to 59° (Marvin, `prp_4`) and 62° (Vega, `pp_2`) in the clips
+  that needed the largest correction, and by 3-33° at most in most others. The hand is no deeper in the object
+  than FDR's (within 0.2 mm) in every reference clip.
 - What is left on the Marvin is reach, not collision: in `pp_2`, `pp_3` and `prp_2` the fingertips cannot be
   reached within the joint limits in 14-29% of the frames.
 - FDR's rollouts are harder than the reference clips (its wrist jitters and the object slips): fewer clips are usable
@@ -222,8 +253,10 @@ Usable frames per clip, `fingertips` mode on the reference clips:
 FDR's did, but the hand's pose around them changed, and the result has not been through physics again. Contacts
 made by other parts of the fingers or the palm can differ, most where the fingers re-bend a lot. Before training on
 it, replay the joint targets in the simulator and keep the clips whose object still follows. Self-collision is in
-the solver as a cost on coarse spheres; it has not been checked on exact geometry (the links' convex hulls overlap
-too much to tell).
+the solver as a cost on coarse spheres, not a hard constraint. Measured on points sampled on the exact meshes
+(Vega, configured stance, every third frame): the upper arm stays at least 85 mm from the forearm and hand, but the
+elbow comes within 10 mm of the torso's side in 4.3% of the frames (closest 1.2 mm, mostly `R_arm_l4` against
+`torso_l3`). Making that term a constraint on tighter torso spheres would remove it, at some cost in usable frames.
 
 ## Wrist camera (`design_wrist_cam.py`)
 

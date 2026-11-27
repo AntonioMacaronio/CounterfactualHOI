@@ -16,12 +16,15 @@ root_link: base
 arm_joints: [R_arm_j1, R_arm_j2, R_arm_j3, R_arm_j4, R_arm_j5, R_arm_j6, R_arm_j7]
 
 # Everything else is frozen at these angles (radians; joints not listed stay at 0). The torso's three joints raise
-# and lean the shoulders: this posture (0, 60, 30 deg) leans them 30 deg forward over the table's edge and puts the
-# right shoulder at (0.40, -0.30, 1.20) in the clip world (place_base.py). The left arm is Dexmate's "folded" pose
-# (dexbot-utils pose pool).
+# and lean the shoulders: this posture (15, 67.5, 30 deg) leans them 22 deg forward and puts the right shoulder at
+# (0.41, -0.35, 1.30) in the clip world. The left arm is Dexmate's "folded" pose (dexbot-utils pose pool).
+# The stance (2026-11-27, compare_placements.py, under ik_pyroki.py's fingertips mode): 10 cm taller and 5 cm farther
+# from the table than place_base.py's first choice (shoulder 1.20 m, posture 0 / 60 / 30 deg), so that the arm reaches
+# with its elbow more open: median elbow -108 instead of -132 deg, an arm joint within 5 deg of its limit in 6% of the
+# frames instead of 29%, the upper arm at least 124 mm from the forearm and hand instead of 20 mm, as many frames usable.
 fixed_joints:
-  torso_j1: 0.0
-  torso_j2: 1.0472
+  torso_j1: 0.2618
+  torso_j2: 1.1781
   torso_j3: 0.5244
   head_j1: 0.0
   head_j2: 0.0
@@ -71,4 +74,4 @@ home_deg: [-3.7, -17.2, 0, -89.2, -72.8, 0, 0]
 # Where the robot stands in the clip world, chosen by place_base.py. `root` is the pose of root_link (the chassis).
 placement:
   style: chassis
-  root: {pos: [0.2915, -0.5497, 0.054], rpy_deg: [0, 0, 105]}      # wheels on the floor; the chassis' front is under the table edge
+  root: {pos: [0.2677, -0.4611, 0.054], rpy_deg: [0, 0, 105]}      # wheels on the floor; the chassis' front is under the table edge

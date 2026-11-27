@@ -103,11 +103,14 @@ def se3(T):
 
 
 class PyrokiIK:
-    def __init__(self, arm, mode="palm", speed_limit=1.0, fps=60.0, max_iterations=60, penalty_initial=PENALTY_INITIAL, verbose=True):
+    def __init__(self, arm, mode="palm", speed_limit=1.0, fps=60.0, max_iterations=60, penalty_initial=PENALTY_INITIAL, verbose=True,
+                 model_dir=None):
+        """model_dir: where ik_arm.urdf / ik_full.urdf and spheres.json are (default: the built model's directory;
+        compare_placements.py points it at a stance's own URDF)."""
         assert mode in W
         self.speed_limit, self.fps, self.max_iterations, self.penalty_initial = speed_limit, fps, max_iterations, penalty_initial
         self.arm, self.mode, self.cfg = arm, mode, C.load_arm(arm)
-        d = C.model_dir(arm)
+        d = Path(model_dir) if model_dir else C.model_dir(arm)
         info = self.info = json.load(open(d / "spheres.json"))
         self.urdf = yourdfpy.URDF.load(str(d / ("ik_arm.urdf" if mode == "palm" else "ik_full.urdf")), load_meshes=False)
         self.arm_joints, self.hand_joints = info["arm_joints"], info["hand_joints"]
@@ -224,8 +227,15 @@ class PyrokiIK:
         """Ts_palm (T, 4, 4) and Q_hand (T, 22): FDR's palm poses and finger angles; Ts_tips (T, 5, 4, 4): its
         fingertip frames; Q_arm_ref (T, 7): ik.py's arm solution, the posture this solver stays close to where
         nothing forces it away; finger_clearance (T,): how far FDR's fingers were above the table (negative =
-        inside), the level this solver's fingers may not go below. Returns arm_q (T, 7), hand_q (T, 22)."""
+        inside), the level this solver's fingers may not go below. Returns arm_q (T, 7), hand_q (T, 22).
+        Q_arm_ref None (fingertips mode only: ik.py found no arm posture that reaches the palm's first pose): the
+        first frame starts from the arm's home posture and is solved three times over, and each later frame's
+        posture reference is the previous frame's solution."""
         n = len(Ts_palm)
+        no_ref = Q_arm_ref is None
+        if no_ref:
+            assert self.mode == "fingertips", "palm mode needs ik.py's solution"
+            Q_arm_ref = np.tile(self.home[:7], (n, 1))
         q = np.concatenate([Q_arm_ref[0], Q_hand[0]])[: self.nq][self.to_pk]
         fm = np.zeros(n) if finger_clearance is None else np.minimum(finger_clearance, 0.0) - 0.001
         out = np.zeros((n, self.nq))
@@ -233,11 +243,13 @@ class PyrokiIK:
         tips = se3(Ts_tips) if self.mode == "fingertips" else None
         free = jnp.full(self.nq, 1e3)
         for t in range(n):
-            ref = np.concatenate([Q_arm_ref[t], Q_hand[t]])[: self.nq][self.to_pk]
+            arm_ref = q[self.from_pk][:7] if (no_ref and t > 0) else Q_arm_ref[t]
+            ref = np.concatenate([arm_ref, Q_hand[t]])[: self.nq][self.to_pk]
             # the first frame has no previous frame: it may move as far from the start as the constraints need
-            q = np.array(self._solve(jnp.array(q), free if t == 0 else self.dmax, jaxlie.SE3(palm.wxyz_xyz[t]),
-                                     jaxlie.SE3(tips.wxyz_xyz[t]) if tips is not None else jaxlie.SE3(palm.wxyz_xyz[t]),
-                                     jnp.array(ref), jnp.array(fm[t])))
+            for _ in range(3 if (no_ref and t == 0) else 1):
+                q = np.array(self._solve(jnp.array(q), free if t == 0 else self.dmax, jaxlie.SE3(palm.wxyz_xyz[t]),
+                                         jaxlie.SE3(tips.wxyz_xyz[t]) if tips is not None else jaxlie.SE3(palm.wxyz_xyz[t]),
+                                         jnp.array(ref), jnp.array(fm[t])))
             out[t] = q
         out = out[:, self.from_pk]
         return out[:, :7], (out[:, 7:] if self.mode == "fingertips" else Q_hand.copy())
@@ -383,10 +395,12 @@ def main():
             fing0[t] = floating.table_clearance(floating.finger_geoms)
             obj0[t] = parts.depth(floating.world_points(fl_hand, 60), OP[t], OR[t])
         Q_ref, _ = ik0.convert(Ts)                               # ik.py's solution: the first frame and the posture reference
-        if Q_ref is None:
-            report["clips"][c["name"]] = {"reason": "no IK solution for the first frame"}
+        if Q_ref is None and args.mode == "palm":
+            report["clips"][c["name"]] = {"reason": "no IK solution for the first frame", "frames": len(Qf), "usable_pct": 0.0}
             print(f"{c['name']:22s} no solution for the first frame")
             continue
+        if Q_ref is None:
+            print(f"{c['name']:22s} ik.py cannot reach the first palm pose: starting from the home posture")
         t0 = time.time()
         arm_q, hand_q = solver.solve_clip(Ts, Qh, tips, Q_ref, fing0)
         dt = time.time() - t0
