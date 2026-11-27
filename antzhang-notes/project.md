@@ -121,21 +121,51 @@ We cast retargeting as an RL tracking problem with FlashDexRetarget (FDR): one p
 
 Training speed: `CFHOI_FAST=1` applies run-time patches that make an iteration 1.23x faster without changing what is learned, and more envs raise the env steps per second further (2.9x at 8192 envs). `CFHOI_SGS=1` optionally samples episode starts by their success rate. Details in `scripts/flashdex/README.md`.
 
+### Data this stage has to hand to 1.4
+1.4 trains on rollouts of the FDR policy. This is everything those rollouts, and the dataset around them, have to provide. "Saved today" refers to the rollout archive (`<run>/evals/step<N>/`: joint positions and velocities, the policy's actions, the object's pose) and the dataset directory.
+
+| # | Data | What 1.4 uses it for | Saved today |
+|---|---|---|---|
+| | **Per step, at 60 Hz** | | |
+| 1 | Robot state: the 22 hand joint angles and the wrist pose | proprioception; the wrist pose goes through the IK step to give the 7 arm joint angles | yes |
+| 2 | Joint targets the controller received: the 22 finger targets and the wrist target pose, logged directly at every step | `q*` in the proprioception, and the 8-step action labels (the wrist target through IK) | yes: `joint_pos_target` in every archived rollout (`scripts/flashdex/train_cfhoi.py`) |
+| 3 | Object pose | checking "pick done" and "place done" on the data; re-rendering depth | yes |
+| 4 | Hand–object contacts: the force on each of the hand's 21 collision links, and the object's distance from the palm and the five fingertips | "pick done" (thumb and one other finger) and "place done" (no contact, fingertips clear) | yes: `contact_force` and `link_obj_dist` in every archived rollout |
+| 5 | Wrist depth image and validity mask | actor input 3 | rendered after the rollouts by `scripts/embodiment/render_depth.py` (the simulator has no cameras) |
+| 6 | Exo depth image and validity mask | actor input 4 | as 5 |
+| 7 | Clip and time within the clip | the SGS cell | yes (rollouts start at the clip's first frame) |
+| | **Per rollout** | | |
+| 8 | Enough rollouts. One per video is enough once the generated videos are reconstructed and retargeted. Until then there are five pick-place clips (about 1,050 steps, 130 action chunks), so several rollouts per clip: different start frames and noise on the start state | enough coverage for supervised learning | one deterministic rollout per clip per evaluation |
+| 9 | Outcome of each rollout: whether and at which step it passes 1.4's "pick done" and "place done", and its tracking errors | keeping only successful demonstrations; the text command, which is "pick" until the rollout's own pick-done step and "place" after it | yes: `scripts/flashdex/done_checks.py` writes `done.json` next to the rollouts (from 3 and 4) |
+| | **Per clip and object** | | |
+| 10 | (dropped) Phase labels of the human clip | not needed for pick and place: the command switches at the robot's own pick-done step (9), as it does in RL, not at the time the human lifted the object | – |
+| 11 | Scene: the table (support disk and height), the object's mesh, scale, collision parts and mass, and its resting pose at the start | rendering depth; the reward's table height, pick-up place and vertical axis; the RL environment | yes (dataset directory) |
+| 12 | The reference clip (`motion.pt`): the robot's joint reference and the object's trajectory | starting RL episodes inside a clip (SGS); the supervised loss | yes |
+| | **Once** | | |
+| 13 | The FDR policy's checkpoint, with its config and observation layout | labelling the student's states during supervised learning | yes (`step<N>/`, `final/`) |
+| 14 | Camera definitions: the wrist camera's mount on the palm and its intrinsics (D405), the exo camera's pose and intrinsics, depth range and noise | making 5 and 6 match the real cameras | yes: `configs/embodiment/cameras.yaml` (a D405 on the palm side of the wrist, a D435 at the table's left-front corner); the intrinsics are nominal and the noise is a model, not a calibration |
+| 15 | Robot conventions: joint order, joint limits, control rate, action scaling and the wrist's low-pass | turning actions into joint targets; normalising joints to [-1, 1] | in FDR's config, not with the data |
+| 16 | The arm's kinematic model and how the hand mounts on its flange | the IK step | yes for the Dexmate Vega 1 Pro: `scripts/embodiment/` (model, mount, IK); a kinematic model, not yet a simulation asset |
+
+The depth images (5, 6) do not have to be rendered while the rollouts run: 1, 3 and 11 are enough to re-render them afterwards.
+
+The joint targets (2) are logged, not recomputed. FDR's action is a number in [-1, 1] per joint: for a finger it is stretched onto the joint's range, and for the wrist it is added to the reference clip's wrist pose (× 0.1 for position, × 1.0 for rotation) and then low-pass filtered at 5 Hz. Recomputing the wrist target would mean reproducing that filter's state over the whole rollout. The environment already holds the target it sends to the controller, so the rollout archive gets it as one more field.
+
 ## 1.4 Distill into robot policy with the following embodiment and I/O 
 From FlashDexRetarget, we have a policy that is capable of tracking any of the hand+object motions in our 3D reconstruction dataset. We need to distill this into a text conditioned flow matching policy (text will be only "pick", "rotate", "place") that can pick, in-hand-rotate, and place objects of various geometries and appearances.
 
-Imagine a Tianji 7 DoF arm with a 22 DoF sharpa connected to the end and a D405 on the wrist like there is in spd.bot. Since spd.bot uses a YAM, we have to mount the wrist camera on the palm side of the hand but it will be near the flange.
+Imagine a Dexmate Vega 1 Pro right arm (7 DoF) with a 22 DoF sharpa connected to the end and a D405 on the wrist like there is in spd.bot. Since spd.bot uses a YAM, we have to mount the wrist camera on the palm side of the hand but it will be near the flange.
 
 
 | Item | Value |
 |---|---|
 | Hand | Sharpa Wave, 22 DoF |
-| Arm | Tianji 7-DoF force-controlled arm with anthropomorphic cross-axis wrist (see the arm section) |
+| Arm | Dexmate Vega 1 Pro, right arm, 7 DoF (`vega_1p`: the wrist with the F/T sensor is assumed until the robot is ordered). Model, hand mount and IK: `scripts/embodiment/README.md` |
 | Controlled joints | `N = 22 + 7 =` **29** |
 | Policy rate | 60 Hz (one step every 16.7 ms), the rate of the simulator and of the robot data |
-| Low-level control | Built-in joint controllers on hand and arm, servoing faster than the policy; arm targets interpolated between policy steps (see the arm section) |
-| Wrist camera | Intel RealSense D405, mounted on the wrist, looking along the hand (as in SPD's per-hand views) |
-| Exo camera | Fixed depth camera viewing the workspace (see the exo camera section) |
+| Low-level control | Built-in joint controllers on hand and arm, servoing faster than the policy; arm targets interpolated between policy steps |
+| Wrist camera | Intel RealSense D405 on the palm side of the wrist, on the mount plate between the arm's flange and the hand, looking along the fingers (`configs/embodiment/cameras.yaml`) |
+| Exo camera | Intel RealSense D435, fixed at the table's left-front corner, 0.9 m from the workspace (`configs/embodiment/cameras.yaml`) |
 | Tactile | Not used |
 
 Here is the I/O design spec of the policy. 
@@ -143,15 +173,32 @@ Here is the I/O design spec of the policy.
 | # | Group | Contents | Frame / encoding | Dim (N = 29) |
 |---|---|---|---|---|
 | 1 | **Proprioception** | Last 3 frames of measured joint angles `q`, and last 3 frames of the policy's own joint targets `q*` | Each joint normalized to [-1, 1] by its limits | 3 × 2N = **174** |
-| 2 | **Text command** | "pick" or "place": the stage of the task the policy should carry out now. In training it comes from the clip's phase labels (approach / grasp / lift → pick; carry / place / release / rest → place) | One-hot | **2** |
-| 3 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | See the wrist camera section | latent **64** |
-| 4 | **Exo depth** | Depth image + validity mask → separate CNN encoder | See the exo camera section | latent **64** |
+| 2 | **Text command** | "pick" or "place": the stage of the task the policy should carry out now. In the training data it is "pick" until the rollout's own "pick done" step and "place" after it, the same rule as in RL | One-hot | **2** |
+| 3 | **Wrist depth (D405)** | Depth image + validity mask → CNN encoder | 2 × 60 × 106: depth scaled to [0, 1] over the valid range (0 where invalid), and the mask | latent **64** |
+| 4 | **Exo depth (D435)** | Depth image + validity mask → separate CNN encoder | 2 × 60 × 106, as the wrist image | latent **64** |
 
 The outputs are pretty simple, just the 29 joint angle action chunk of 8 steps. We will execute the whole chunk in RL because FPO++ treats a chunk as one action. Action will be absolute joint targets, normalized by joint limits. We will sample with 10 flow steps with noise, and at deployment we will test 5 or 10 sampling steps from zero noise.
 
+### Network
+`scripts/policy14/model.py` (8.6 M parameters; `python scripts/policy14/model.py` prints every tensor's shape).
+
+- **Observation encoder**, once per chunk, 1.5 M:
+  - each depth image (2 × 60 × 106) goes through its own CNN (four stride-2 convolutions, then a linear layer) to 64 numbers;
+  - proprioception goes through an MLP to 256, and the command through a linear layer to 32;
+  - the four are concatenated (416) and mixed by an MLP into the observation vector c (512).
+- **Velocity network**, once per flow step, 7.1 M:
+  - the noised chunk (8 × 29) is flattened and projected to 512;
+  - the flow time τ gets a sinusoidal embedding and an MLP (128); [c | τ] (640) conditions every block;
+  - four residual blocks, 512 → 1024 → 512, each with FiLM: a scale and shift for every channel, computed from [c | τ];
+  - a zero-initialised output layer gives the velocity (8 × 29), so a fresh policy outputs zeros.
+- **Training target:** the velocity should equal a − ε, where a_τ = τ·a + (1 − τ)·ε. The loss is the squared error summed over the chunk; FPO++ compares it before and after an update on the same (τ, ε).
+- **Critic:** an MLP (1024, 512, 256) on the privileged state at the start of the chunk.
+
+![Tensor flow of the policy network](policy_arch.svg)
+
 ### Training phases
 
-1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the joint targets for the next 8 steps. FDR's hand is on a floating 6-DoF wrist, not on the arm, so for now an IK step turns its data into arm joint angles: the 22 hand joints are the FDR policy's finger targets, and the 7 arm joints are solved from its wrist (end-effector) target pose, each step starting from the previous step's solution so that the arm moves continuously. The text command comes from the clip's phase labels, looked up by time: the refinement labels phases in video frames (`runs/refine_<round>/VID/phases.json`), and the robot data is the same clip at 60 Hz.
+1. **Supervised learning (BC):** pretrain the flow-matching policy on robot data generated from FDR. The label is the joint targets for the next 8 steps. FDR's hand is on a floating 6-DoF wrist, not on the arm, so for now an IK step turns its data into arm joint angles (`scripts/embodiment/ik.py`): the 22 hand joints are the FDR policy's finger targets, and the 7 arm joints are solved from its wrist (end-effector) target pose, each step starting from the previous step's solution so that the arm moves continuously. For the arm to be able to follow, the retargeting has to be redone with the arm's wrist hardware (its last link, the mount plate and the D405) attached to FDR's hand as collision geometry: without it the floating palm passes 3–8.5 cm above the table, where that hardware does not fit. The text command is "pick" until the rollout's own pick-done step and "place" after it.
 2. **RL finetuning (FPO++ + SGS):** finetune the flow-matching policy with an asymmetric actor-critic, where the critic receives privileged observations (below). The supervised loss stays on at the start with a decaying weight, so the first updates with an untrained critic do not undo stage 1. FPO++ runs with its per-sample ratio and plain PPO clipping: its asymmetric trust region did poorly with sparse rewards in the paper, and the success terms below are sparse.
 
 **Scope for now: pick and place only.** The policy is trained on the five pick-place clips with the commands "pick" and "place". "rotate" is left for later: the videos turn each object about a different axis (the spatula and the bottle about their long axis, the mug about its vertical axis, the tape roll over a diameter), so no single definition of "rotated" fits all of them.
@@ -183,7 +230,7 @@ The thresholds come from the five pick-place clips (round-10 reconstructions): t
 The human-like grasp is not rewarded. It comes from stage 1 and from the supervised loss kept during early RL.
 
 #### Critic inputs
-FPO++ is PPO-style, so the critic is a value function of the state at the start of each chunk. It keeps FDR's privileged state terms from `policy/config/obs_cfhoi_policy.yaml` and drops the reference terms, since the reward no longer depends on a reference:
+FPO++ is PPO-style, so the critic is a value function of the state at the start of each chunk. It keeps FDR's privileged state terms from `scripts/flashdex/policy/config/obs_cfhoi_policy.yaml` and drops the reference terms, since the reward no longer depends on a reference:
 
 | Group | Contents |
 |---|---|

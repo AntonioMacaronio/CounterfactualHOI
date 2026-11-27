@@ -1,0 +1,482 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1970 1560" width="1970" height="1560">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#2f6f66"/></marker></defs>
+<rect width="1970" height="1560" fill="#f3fbf8"/>
+<g transform="translate(64,0)">
+<text x="20" y="38" font-size="21" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Observation encoder, once per action chunk (1.53 M parameters)</text>
+<rect x="20" y="74" width="124" height="70" fill="#fdf1e7" stroke="#c0532c" stroke-width="2.2" rx="2"/>
+<line x1="35.5" y1="74" x2="35.5" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="51.0" y1="74" x2="51.0" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="66.5" y1="74" x2="66.5" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="82.0" y1="74" x2="82.0" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="97.5" y1="74" x2="97.5" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="113.0" y1="74" x2="113.0" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="128.5" y1="74" x2="128.5" y2="144" stroke="#c0532c" stroke-width="0.8" opacity="0.6"/>
+<line x1="20" y1="88.0" x2="144" y2="88.0" stroke="#c0532c" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="102.0" x2="144" y2="102.0" stroke="#c0532c" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="116.0" x2="144" y2="116.0" stroke="#c0532c" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="130.0" x2="144" y2="130.0" stroke="#c0532c" stroke-width="0.5" opacity="0.4"/>
+<text x="82.0" y="65" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">2 × 60 × 106</text>
+<text x="82.0" y="164" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">wrist depth + mask</text>
+<path d="M144,109 L196,109" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="83" width="330" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="363.0" y="115.0" font-size="15" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">CNN: 4 × (conv, GroupNorm, GELU)</text>
+<text x="363.0" y="155" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">32×30×53 → 64×15×27 → 128×8×14 → 128×4×7</text>
+<path d="M528,109 L580,109" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="582" y="69" width="26" height="80" fill="#fdf1e7" stroke="#c0532c" stroke-width="2.2" rx="2"/>
+<line x1="582" y1="77.0" x2="608" y2="77.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="85.0" x2="608" y2="85.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="93.0" x2="608" y2="93.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="101.0" x2="608" y2="101.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="109.0" x2="608" y2="109.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="117.0" x2="608" y2="117.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="125.0" x2="608" y2="125.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="133.0" x2="608" y2="133.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="141.0" x2="608" y2="141.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<text x="595.0" y="60" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">3584</text>
+<path d="M608,109 L654,109" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="656" y="83" width="96" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="704.0" y="115.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W</text>
+<text x="704.0" y="155" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">3584→64</text>
+<path d="M752,109 L800,109" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="802" y="89" width="26" height="40" fill="#fdf1e7" stroke="#c0532c" stroke-width="2.2" rx="2"/>
+<line x1="802" y1="99.0" x2="828" y2="99.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="109.0" x2="828" y2="109.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="119.0" x2="828" y2="119.0" stroke="#c0532c" stroke-width="0.7" opacity="0.55"/>
+<text x="815.0" y="80" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">64</text>
+<circle cx="363" cy="66" r="13" fill="#2f6f66"/>
+<text x="363" y="72" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">1</text>
+<rect x="20" y="214" width="124" height="70" fill="#e9eefc" stroke="#3b4fd0" stroke-width="2.2" rx="2"/>
+<line x1="35.5" y1="214" x2="35.5" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="51.0" y1="214" x2="51.0" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="66.5" y1="214" x2="66.5" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="82.0" y1="214" x2="82.0" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="97.5" y1="214" x2="97.5" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="113.0" y1="214" x2="113.0" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="128.5" y1="214" x2="128.5" y2="284" stroke="#3b4fd0" stroke-width="0.8" opacity="0.6"/>
+<line x1="20" y1="228.0" x2="144" y2="228.0" stroke="#3b4fd0" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="242.0" x2="144" y2="242.0" stroke="#3b4fd0" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="256.0" x2="144" y2="256.0" stroke="#3b4fd0" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="270.0" x2="144" y2="270.0" stroke="#3b4fd0" stroke-width="0.5" opacity="0.4"/>
+<text x="82.0" y="205" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">2 × 60 × 106</text>
+<text x="82.0" y="304" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">exo depth + mask</text>
+<path d="M144,249 L196,249" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="223" width="330" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="363.0" y="255.0" font-size="15" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">CNN: 4 × (conv, GroupNorm, GELU)</text>
+<text x="363.0" y="295" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">32×30×53 → 64×15×27 → 128×8×14 → 128×4×7</text>
+<path d="M528,249 L580,249" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="582" y="209" width="26" height="80" fill="#e9eefc" stroke="#3b4fd0" stroke-width="2.2" rx="2"/>
+<line x1="582" y1="217.0" x2="608" y2="217.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="225.0" x2="608" y2="225.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="233.0" x2="608" y2="233.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="241.0" x2="608" y2="241.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="249.0" x2="608" y2="249.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="257.0" x2="608" y2="257.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="265.0" x2="608" y2="265.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="273.0" x2="608" y2="273.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="582" y1="281.0" x2="608" y2="281.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<text x="595.0" y="200" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">3584</text>
+<path d="M608,249 L654,249" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="656" y="223" width="96" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="704.0" y="255.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W</text>
+<text x="704.0" y="295" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">3584→64</text>
+<path d="M752,249 L800,249" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="802" y="229" width="26" height="40" fill="#e9eefc" stroke="#3b4fd0" stroke-width="2.2" rx="2"/>
+<line x1="802" y1="239.0" x2="828" y2="239.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="249.0" x2="828" y2="249.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="259.0" x2="828" y2="259.0" stroke="#3b4fd0" stroke-width="0.7" opacity="0.55"/>
+<text x="815.0" y="220" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">64</text>
+<circle cx="363" cy="206" r="13" fill="#2f6f66"/>
+<text x="363" y="212" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">1</text>
+<rect x="20" y="348" width="26" height="96" fill="#fbf6dc" stroke="#a8862a" stroke-width="2.2" rx="2"/>
+<line x1="20" y1="364.0" x2="46" y2="364.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="20" y1="380.0" x2="46" y2="380.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="20" y1="396.0" x2="46" y2="396.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="20" y1="412.0" x2="46" y2="412.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="20" y1="428.0" x2="46" y2="428.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<text x="33.0" y="339" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">174</text>
+<text x="33.0" y="464" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">proprioception</text>
+<path d="M46,396 L196,396" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="370" width="330" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="363.0" y="402.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">MLP: linear, GELU, linear</text>
+<text x="363.0" y="442" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">174→256→256</text>
+<circle cx="363" cy="362" r="13" fill="#2f6f66"/>
+<text x="363" y="368" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">2</text>
+<path d="M528,396 L800,396" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="802" y="356" width="26" height="80" fill="#fbf6dc" stroke="#a8862a" stroke-width="2.2" rx="2"/>
+<line x1="802" y1="366.0" x2="828" y2="366.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="376.0" x2="828" y2="376.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="386.0" x2="828" y2="386.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="396.0" x2="828" y2="396.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="406.0" x2="828" y2="406.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="416.0" x2="828" y2="416.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<line x1="802" y1="426.0" x2="828" y2="426.0" stroke="#a8862a" stroke-width="0.7" opacity="0.55"/>
+<text x="815.0" y="347" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">256</text>
+<rect x="20" y="492" width="26" height="20" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<text x="33.0" y="483" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">2</text>
+<text x="33.0" y="532" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">command: pick / place</text>
+<path d="M46,502 L196,502" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="476" width="330" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="363.0" y="508.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W</text>
+<text x="363.0" y="548" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">2→32</text>
+<circle cx="363" cy="468" r="13" fill="#2f6f66"/>
+<text x="363" y="474" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">3</text>
+<path d="M528,502 L800,502" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="802" y="487" width="26" height="30" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="802" y1="502.0" x2="828" y2="502.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="815.0" y="478" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">32</text>
+<text x="953" y="148" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">416</text>
+<rect x="940" y="158" width="26" height="100" fill="#fbf6dc" stroke="#a8862a" stroke-width="2.2" rx="2"/>
+<rect x="940" y="258" width="26" height="14" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<rect x="940" y="272" width="26" height="26" fill="#fdf1e7" stroke="#c0532c" stroke-width="2.2" rx="2"/>
+<rect x="940" y="298" width="26" height="26" fill="#e9eefc" stroke="#3b4fd0" stroke-width="2.2" rx="2"/>
+<text x="896" y="352" font-size="15" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">[256 | 32 | 64 | 64]</text>
+<path d="M828,109 L884,109 L884,285 L938,285" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M828,249 L884,249 L884,311 L938,311" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M828,396 L884,396 L884,208 L938,208" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M828,502 L884,502 L884,265 L938,265" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<circle cx="953" cy="120" r="13" fill="#2f6f66"/>
+<text x="953" y="126" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">4</text>
+<path d="M966,241 L1040,241" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="1042" y="215" width="190" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="1137.0" y="247.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">MLP</text>
+<text x="1137.0" y="287" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">416→512→512</text>
+<path d="M1232,241 L1290,241" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="1292" y="161" width="30" height="160" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="1292" y1="171.0" x2="1322" y2="171.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="181.0" x2="1322" y2="181.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="191.0" x2="1322" y2="191.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="201.0" x2="1322" y2="201.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="211.0" x2="1322" y2="211.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="221.0" x2="1322" y2="221.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="231.0" x2="1322" y2="231.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="241.0" x2="1322" y2="241.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="251.0" x2="1322" y2="251.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="261.0" x2="1322" y2="261.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="271.0" x2="1322" y2="271.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="281.0" x2="1322" y2="281.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="291.0" x2="1322" y2="291.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="301.0" x2="1322" y2="301.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1292" y1="311.0" x2="1322" y2="311.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="1307.0" y="152" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512</text>
+<text x="1307" y="345" font-size="20" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">c</text>
+<text x="20" y="584" font-size="21" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Velocity network v(a_τ, τ; c), once per flow step (7.09 M parameters)</text>
+<rect x="20" y="640" width="124" height="76" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="35.5" y1="640" x2="35.5" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="51.0" y1="640" x2="51.0" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="66.5" y1="640" x2="66.5" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="82.0" y1="640" x2="82.0" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="97.5" y1="640" x2="97.5" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="113.0" y1="640" x2="113.0" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="128.5" y1="640" x2="128.5" y2="716" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="20" y1="652.6666666666666" x2="144" y2="652.6666666666666" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="665.3333333333334" x2="144" y2="665.3333333333334" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="678.0" x2="144" y2="678.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="690.6666666666666" x2="144" y2="690.6666666666666" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="20" y1="703.3333333333334" x2="144" y2="703.3333333333334" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<text x="82.0" y="631" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">8 × 29</text>
+<text x="82.0" y="736" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">noised chunk a_τ</text>
+<path d="M144,678 L196,678" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="652" width="110" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="253.0" y="684.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">flatten</text>
+<path d="M308,678 L356,678" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="358" y="632" width="26" height="92" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="358" y1="643.5" x2="384" y2="643.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="655.0" x2="384" y2="655.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="666.5" x2="384" y2="666.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="678.0" x2="384" y2="678.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="689.5" x2="384" y2="689.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="701.0" x2="384" y2="701.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="358" y1="712.5" x2="384" y2="712.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="371.0" y="623" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">232</text>
+<path d="M384,678 L432,678" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="434" y="652" width="120" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="494.0" y="684.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W_in</text>
+<text x="494.0" y="724" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">232→512</text>
+<circle cx="494" cy="644" r="13" fill="#2f6f66"/>
+<text x="494" y="650" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">5</text>
+<path d="M554,678 L602,678" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="604" y="628" width="30" height="100" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="604" y1="638.0" x2="634" y2="638.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="648.0" x2="634" y2="648.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="658.0" x2="634" y2="658.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="668.0" x2="634" y2="668.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="678.0" x2="634" y2="678.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="688.0" x2="634" y2="688.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="698.0" x2="634" y2="698.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="708.0" x2="634" y2="708.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="718.0" x2="634" y2="718.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="619.0" y="619" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512</text>
+<text x="619" y="752" font-size="20" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">x</text>
+<circle cx="33" cy="838" r="14" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2"/>
+<text x="33" y="844" font-size="18" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">τ</text>
+<text x="33" y="876" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">flow time</text>
+<path d="M47,838 L196,838" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="198" y="812" width="150" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="273.0" y="844.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">sin / cos</text>
+<text x="273.0" y="884" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">→ 64</text>
+<path d="M348,838 L396,838" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="398" y="812" width="156" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="476.0" y="844.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">MLP</text>
+<text x="476.0" y="884" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">64→128→128</text>
+<path d="M554,838 L602,838" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="604" y="818" width="26" height="40" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="604" y1="828.0" x2="630" y2="828.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="838.0" x2="630" y2="838.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="604" y1="848.0" x2="630" y2="848.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="617.0" y="809" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">128</text>
+<rect x="760" y="778" width="30" height="120" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="760" y1="788.0" x2="790" y2="788.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="798.0" x2="790" y2="798.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="808.0" x2="790" y2="808.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="818.0" x2="790" y2="818.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="828.0" x2="790" y2="828.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="838.0" x2="790" y2="838.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="848.0" x2="790" y2="848.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="858.0" x2="790" y2="858.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="868.0" x2="790" y2="868.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="878.0" x2="790" y2="878.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="760" y1="888.0" x2="790" y2="888.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="775.0" y="769" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512</text>
+<text x="775" y="922" font-size="20" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">c</text>
+<text x="775" y="944" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">from the encoder</text>
+<circle cx="862" cy="800" r="13" fill="#2f6f66"/>
+<text x="862" y="806" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">6</text>
+<rect x="886" y="818" width="28" height="100" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<rect x="886" y="918" width="28" height="26" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<text x="900" y="808" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">640</text>
+<text x="930" y="876" font-size="16" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">cond = [c | τ]</text>
+<path d="M790,838 L884,838" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M630,838 L700,838 L700,966 L850,966 L850,931 L884,931" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="20" y="1000" width="1300" height="312" fill="none" stroke="#2f6f66" stroke-width="2" rx="12" stroke-dasharray="8 6"/>
+<text x="36" y="1028" font-size="18" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">ResBlock × 4 (1.71 M each)</text>
+<rect x="48" y="1148" width="30" height="96" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="48" y1="1157.6" x2="78" y2="1157.6" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1167.2" x2="78" y2="1167.2" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1176.8" x2="78" y2="1176.8" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1186.4" x2="78" y2="1186.4" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1196.0" x2="78" y2="1196.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1205.6" x2="78" y2="1205.6" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1215.2" x2="78" y2="1215.2" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1224.8" x2="78" y2="1224.8" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1234.4" x2="78" y2="1234.4" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="63.0" y="1139" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace"></text>
+<text x="63" y="1270" font-size="18" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">x, 512</text>
+<path d="M78,1196 L120,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="122" y="1170" width="70" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="157.0" y="1202.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">LN</text>
+<path d="M192,1196 L232,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="234" y="1170" width="214" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="341.0" y="1202.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">FiLM: × (1 + γ) + β</text>
+<circle cx="460" cy="1162" r="13" fill="#2f6f66"/>
+<text x="460" y="1168" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">7</text>
+<rect x="246" y="1044" width="190" height="44" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="341.0" y="1072.0" font-size="15" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W_f: cond → [γ | β]</text>
+<text x="446" y="1072" font-size="14" fill="#4b6b66" text-anchor="start" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">640→1024</text>
+<path d="M341,1088 L341,1168" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<text x="352" y="1104" font-size="14" fill="#4b6b66" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">γ, β</text>
+<path d="M448,1196 L488,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M490,1151.0 L586,1111.0 L586,1281.0 L490,1241.0 Z" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4"/>
+<text x="538.0" y="1202" font-size="18" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">W₁</text>
+<text x="538.0" y="1301.0" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512→1024</text>
+<path d="M586,1196 L622,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="624" y="1170" width="90" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="669.0" y="1202.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">GELU</text>
+<path d="M714,1196 L750,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="752" y="1111" width="34" height="170" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="752" y1="1119.5" x2="786" y2="1119.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1128.0" x2="786" y2="1128.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1136.5" x2="786" y2="1136.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1145.0" x2="786" y2="1145.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1153.5" x2="786" y2="1153.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1162.0" x2="786" y2="1162.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1170.5" x2="786" y2="1170.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1179.0" x2="786" y2="1179.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1187.5" x2="786" y2="1187.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1196.0" x2="786" y2="1196.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1204.5" x2="786" y2="1204.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1213.0" x2="786" y2="1213.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1221.5" x2="786" y2="1221.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1230.0" x2="786" y2="1230.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1238.5" x2="786" y2="1238.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1247.0" x2="786" y2="1247.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1255.5" x2="786" y2="1255.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1264.0" x2="786" y2="1264.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="752" y1="1272.5" x2="786" y2="1272.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="769.0" y="1102" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">1024</text>
+<path d="M786,1196 L822,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M824,1111.0 L920,1151.0 L920,1241.0 L824,1281.0 Z" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4"/>
+<text x="872.0" y="1202" font-size="18" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">W₂</text>
+<text x="872.0" y="1301.0" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">1024→512</text>
+<path d="M920,1196 L966,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<circle cx="983" cy="1196" r="15" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4"/>
+<text x="983" y="1203" font-size="22" fill="#2f6f66" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">+</text>
+<circle cx="1012" cy="1166" r="13" fill="#2f6f66"/>
+<text x="1012" y="1172" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">8</text>
+<path d="M63,1148 L63,1132 L983,1132 L983,1179" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<text x="640" y="1126" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">skip: x</text>
+<path d="M998,1196 L1046,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="1048" y="1148" width="30" height="96" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="1048" y1="1157.6" x2="1078" y2="1157.6" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1167.2" x2="1078" y2="1167.2" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1176.8" x2="1078" y2="1176.8" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1186.4" x2="1078" y2="1186.4" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1196.0" x2="1078" y2="1196.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1205.6" x2="1078" y2="1205.6" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1215.2" x2="1078" y2="1215.2" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1224.8" x2="1078" y2="1224.8" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="1048" y1="1234.4" x2="1078" y2="1234.4" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="1063.0" y="1139" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace"></text>
+<text x="1063" y="1270" font-size="18" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif" font-style="italic">x, 512</text>
+<text x="1094" y="1202" font-size="16" fill="#4b6b66" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">→ next block</text>
+<path d="M900,946 L900,972 L341,972 L341,1042" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<path d="M634,678 L1290,678 L1290,988 L40,988 L40,1196 L46,1196" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="48" y="1360" width="30" height="120" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="48" y1="1370.0" x2="78" y2="1370.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1380.0" x2="78" y2="1380.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1390.0" x2="78" y2="1390.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1400.0" x2="78" y2="1400.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1410.0" x2="78" y2="1410.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1420.0" x2="78" y2="1420.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1430.0" x2="78" y2="1430.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1440.0" x2="78" y2="1440.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1450.0" x2="78" y2="1450.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1460.0" x2="78" y2="1460.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="48" y1="1470.0" x2="78" y2="1470.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="63.0" y="1351" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512</text>
+<text x="63" y="1504" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">x after block 4</text>
+<path d="M78,1420 L150,1420" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="152" y="1394" width="70" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="187.0" y="1426.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">LN</text>
+<path d="M222,1420 L262,1420" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="264" y="1394" width="130" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="329.0" y="1426.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">W_out</text>
+<text x="329.0" y="1466" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">512→232, zero init</text>
+<circle cx="329" cy="1380" r="13" fill="#2f6f66"/>
+<text x="329" y="1386" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">9</text>
+<path d="M394,1420 L440,1420" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="442" y="1374" width="26" height="92" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="442" y1="1385.5" x2="468" y2="1385.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1397.0" x2="468" y2="1397.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1408.5" x2="468" y2="1408.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1420.0" x2="468" y2="1420.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1431.5" x2="468" y2="1431.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1443.0" x2="468" y2="1443.0" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<line x1="442" y1="1454.5" x2="468" y2="1454.5" stroke="#2f6f66" stroke-width="0.7" opacity="0.55"/>
+<text x="455.0" y="1365" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">232</text>
+<path d="M468,1420 L512,1420" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="514" y="1394" width="110" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="569.0" y="1426.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">reshape</text>
+<path d="M624,1420 L672,1420" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="674" y="1382" width="124" height="76" fill="#ffffff" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="689.5" y1="1382" x2="689.5" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="705.0" y1="1382" x2="705.0" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="720.5" y1="1382" x2="720.5" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="736.0" y1="1382" x2="736.0" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="751.5" y1="1382" x2="751.5" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="767.0" y1="1382" x2="767.0" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="782.5" y1="1382" x2="782.5" y2="1458" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="674" y1="1394.6666666666667" x2="798" y2="1394.6666666666667" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="674" y1="1407.3333333333333" x2="798" y2="1407.3333333333333" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="674" y1="1420.0" x2="798" y2="1420.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="674" y1="1432.6666666666667" x2="798" y2="1432.6666666666667" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="674" y1="1445.3333333333333" x2="798" y2="1445.3333333333333" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<text x="736.0" y="1373" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">8 × 29</text>
+<text x="736.0" y="1478" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">velocity v</text>
+<rect x="880" y="1350" width="440" height="190" fill="#ffffff" stroke="#2f6f66" stroke-width="2" rx="12"/>
+<text x="900" y="1378" font-size="18" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Sampling an action chunk</text>
+<circle cx="1288" cy="1372" r="13" fill="#2f6f66"/>
+<text x="1288" y="1378" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">10</text>
+<rect x="900" y="1416" width="96" height="60" fill="#f3f4f6" stroke="#6b7280" stroke-width="2.2" rx="2"/>
+<line x1="912.0" y1="1416" x2="912.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="924.0" y1="1416" x2="924.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="936.0" y1="1416" x2="936.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="948.0" y1="1416" x2="948.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="960.0" y1="1416" x2="960.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="972.0" y1="1416" x2="972.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="984.0" y1="1416" x2="984.0" y2="1476" stroke="#6b7280" stroke-width="0.8" opacity="0.6"/>
+<line x1="900" y1="1426.0" x2="996" y2="1426.0" stroke="#6b7280" stroke-width="0.5" opacity="0.4"/>
+<line x1="900" y1="1436.0" x2="996" y2="1436.0" stroke="#6b7280" stroke-width="0.5" opacity="0.4"/>
+<line x1="900" y1="1446.0" x2="996" y2="1446.0" stroke="#6b7280" stroke-width="0.5" opacity="0.4"/>
+<line x1="900" y1="1456.0" x2="996" y2="1456.0" stroke="#6b7280" stroke-width="0.5" opacity="0.4"/>
+<line x1="900" y1="1466.0" x2="996" y2="1466.0" stroke="#6b7280" stroke-width="0.5" opacity="0.4"/>
+<text x="948.0" y="1407" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">8 × 29</text>
+<text x="948.0" y="1496" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">ε</text>
+<path d="M996,1446 L1032,1446" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="1034" y="1420" width="152" height="52" fill="#ffffff" stroke="#2f6f66" stroke-width="2.4" rx="9"/>
+<text x="1110.0" y="1452.0" font-size="17" fill="#1f3f3a" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">a ← a + v / K</text>
+<text x="1110.0" y="1492" font-size="14" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">τ = k / K, k = 0 … K−1</text>
+<path d="M1186,1446 L1218,1446" fill="none" stroke="#2f6f66" stroke-width="2.2" marker-end="url(#ah)"/>
+<rect x="1220" y="1416" width="96" height="60" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2.2" rx="2"/>
+<line x1="1232.0" y1="1416" x2="1232.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1244.0" y1="1416" x2="1244.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1256.0" y1="1416" x2="1256.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1268.0" y1="1416" x2="1268.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1280.0" y1="1416" x2="1280.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1292.0" y1="1416" x2="1292.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1304.0" y1="1416" x2="1304.0" y2="1476" stroke="#2f6f66" stroke-width="0.8" opacity="0.6"/>
+<line x1="1220" y1="1426.0" x2="1316" y2="1426.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="1220" y1="1436.0" x2="1316" y2="1436.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="1220" y1="1446.0" x2="1316" y2="1446.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="1220" y1="1456.0" x2="1316" y2="1456.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<line x1="1220" y1="1466.0" x2="1316" y2="1466.0" stroke="#2f6f66" stroke-width="0.5" opacity="0.4"/>
+<text x="1268.0" y="1407" font-size="15" fill="#4b6b66" text-anchor="middle" font-weight="400" font-family="ui-monospace, Menlo, Consolas, monospace">8 × 29</text>
+<text x="1268.0" y="1496" font-size="16" fill="#1f3f3a" text-anchor="middle" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">joint targets</text>
+</g>
+<text x="1446" y="38" font-size="20" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Each stage, in order:</text>
+<circle cx="1460" cy="74" r="13" fill="#2f6f66"/>
+<text x="1460" y="80" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">1</text>
+<text x="1486" y="80" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Each depth image (depth scaled to [0, 1], and its</text>
+<text x="1486" y="106" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">validity mask) goes through its own CNN: four</text>
+<text x="1486" y="132" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">stride-2 convolutions, then one linear layer to a</text>
+<text x="1486" y="158" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">64-vector. The two cameras do not share weights.</text>
+<circle cx="1460" cy="198" r="13" fill="#2f6f66"/>
+<text x="1460" y="204" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">2</text>
+<text x="1486" y="204" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Proprioception: the last 3 frames of joint angles q</text>
+<text x="1486" y="230" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">and of the policy's own targets q*, 3 × 2 × 29 = 174.</text>
+<circle cx="1460" cy="270" r="13" fill="#2f6f66"/>
+<text x="1460" y="276" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">3</text>
+<text x="1486" y="276" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The text command, pick or place, as a one-hot.</text>
+<circle cx="1460" cy="316" r="13" fill="#2f6f66"/>
+<text x="1460" y="322" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">4</text>
+<text x="1486" y="322" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Concatenate to 416 and mix with an MLP: the</text>
+<text x="1486" y="348" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">observation vector c, computed once per chunk.</text>
+<text x="1446" y="404" font-size="20" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Per flow step:</text>
+<circle cx="1460" cy="438" r="13" fill="#2f6f66"/>
+<text x="1460" y="444" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">5</text>
+<text x="1486" y="444" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The noised chunk a_τ = τ·a + (1 − τ)·ε is flattened</text>
+<text x="1486" y="470" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">(8 × 29 = 232) and projected to x, 512.</text>
+<circle cx="1460" cy="510" r="13" fill="#2f6f66"/>
+<text x="1460" y="516" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">6</text>
+<text x="1486" y="516" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">τ gets a sinusoidal embedding and an MLP.</text>
+<text x="1486" y="542" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">cond = [c | τ], 640, conditions every block.</text>
+<circle cx="1460" cy="582" r="13" fill="#2f6f66"/>
+<text x="1460" y="588" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">7</text>
+<text x="1486" y="588" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">FiLM: one linear layer maps cond to a scale γ and a</text>
+<text x="1486" y="614" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">shift β for each of the 512 channels of LN(x).</text>
+<circle cx="1460" cy="654" r="13" fill="#2f6f66"/>
+<text x="1460" y="660" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">8</text>
+<text x="1486" y="660" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">x ← x + W₂ GELU(W₁ FiLM(LN(x))), 512 → 1024 → 512.</text>
+<circle cx="1460" cy="700" r="13" fill="#2f6f66"/>
+<text x="1460" y="706" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">9</text>
+<text x="1486" y="706" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">LN and a zero-initialised linear layer give the</text>
+<text x="1486" y="732" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">velocity, reshaped to 8 × 29. A fresh policy outputs 0.</text>
+<circle cx="1460" cy="772" r="13" fill="#2f6f66"/>
+<text x="1460" y="778" font-size="16" fill="#ffffff" text-anchor="middle" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">10</text>
+<text x="1486" y="778" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Euler steps from τ = 0 to 1. Training rollouts:</text>
+<text x="1486" y="804" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">ε ~ N(0, I), K = 10. Deployment: ε = 0, K = 5 or 10.</text>
+<text x="1486" y="830" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The encoder runs once; steps 5–9 run K times.</text>
+<text x="1446" y="886" font-size="20" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Training target:</text>
+<text x="1446" y="920" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">v should equal a − ε (conditional flow matching).</text>
+<text x="1446" y="946" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">The loss is the squared error summed over the 232</text>
+<text x="1446" y="972" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">numbers of a chunk; FPO++ compares it before and</text>
+<text x="1446" y="998" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">after an update on the same (τ, ε).</text>
+<text x="1446" y="1048" font-size="20" fill="#2f6f66" text-anchor="start" font-weight="700" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">Colours:</text>
+<rect x="1446" y="1065" width="22" height="18" fill="#fdf1e7" stroke="#c0532c" stroke-width="2" rx="3"/>
+<text x="1478" y="1080" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">wrist camera</text>
+<rect x="1446" y="1093" width="22" height="18" fill="#e9eefc" stroke="#3b4fd0" stroke-width="2" rx="3"/>
+<text x="1478" y="1108" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">exo camera</text>
+<rect x="1446" y="1121" width="22" height="18" fill="#fbf6dc" stroke="#a8862a" stroke-width="2" rx="3"/>
+<text x="1478" y="1136" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">proprioception</text>
+<rect x="1446" y="1149" width="22" height="18" fill="#e3f4ee" stroke="#2f6f66" stroke-width="2" rx="3"/>
+<text x="1478" y="1164" font-size="17" fill="#1f3f3a" text-anchor="start" font-weight="400" font-family="-apple-system, 'Segoe UI', Helvetica, Arial, sans-serif">command, c and the output</text>
+</svg>
